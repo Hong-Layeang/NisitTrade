@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../utils/routes/app_routes.dart';
+import '../../../services/auth/microsoft_auth_service.dart';
 import '../../widgets/auth/white_blur_gradient.dart';
+import '../../widgets/auth/microsoft_signin_button.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,12 +15,46 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isMicrosoftLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleMicrosoftLogin() async {
+    if (_isMicrosoftLoading) {
+      return;
+    }
+
+    setState(() {
+      _isMicrosoftLoading = true;
+    });
+
+    final result = await MicrosoftAuthService.instance.signIn();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isMicrosoftLoading = false;
+    });
+
+    if (result.isSuccess) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.marketplace,
+        (route) => false,
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message)),
+    );
   }
 
   @override
@@ -230,6 +266,12 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      MicrosoftSignInButton(
+                        isLoading: _isMicrosoftLoading,
+                        onPressed: _handleMicrosoftLogin,
                       ),
                       const SizedBox(height: 16),
 
