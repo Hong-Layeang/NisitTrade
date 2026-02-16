@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../utils/routes/app_routes.dart';
+import '../../../services/auth/auth_service.dart';
 import '../../../services/auth/microsoft_auth_service.dart';
+import 'set_password_page.dart';
 import '../../widgets/auth/white_blur_gradient.dart';
 import '../../widgets/auth/microsoft_signin_button.dart';
 
@@ -16,6 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isMicrosoftLoading = false;
+  bool _isEmailLoading = false;
 
   @override
   void dispose() {
@@ -43,7 +46,65 @@ class _LoginPageState extends State<LoginPage> {
       _isMicrosoftLoading = false;
     });
 
-    if (result.isSuccess) {
+    if (result.needsPasswordSetup && result.token != null) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.setPassword,
+        arguments: SetPasswordArgs(
+          accessToken: result.token!,
+          email: result.email,
+        ),
+      );
+      return;
+    }
+
+    if (result.isAuthenticated) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.marketplace,
+        (route) => false,
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message)),
+    );
+  }
+
+  Future<void> _handleEmailLogin() async {
+    if (_isEmailLoading) {
+      return;
+    }
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email and password are required.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isEmailLoading = true;
+    });
+
+    final result = await AuthService.instance.login(
+      email: email,
+      password: password,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isEmailLoading = false;
+    });
+
+    if (result.isAuthenticated) {
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRoutes.marketplace,
@@ -240,14 +301,7 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            // Navigate to marketplace after login
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              AppRoutes.marketplace,
-                              (route) => false,
-                            );
-                          },
+                          onPressed: _isEmailLoading ? null : _handleEmailLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00BCD4),
                             foregroundColor: Colors.white,
