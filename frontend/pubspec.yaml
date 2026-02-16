@@ -37,6 +37,7 @@ dependencies:
   url_launcher: ^6.3.2
   aad_oauth: ^1.0.1
   dio: ^5.7.0
+  flutter_secure_storage: ^9.2.4
 
 dev_dependencies:
   flutter_test:
