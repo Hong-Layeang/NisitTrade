@@ -1,10 +1,12 @@
 <div align="center">
 
-<p align="center">
-  <img src="https://media.tenor.com/ccpKmf7plusAAAAi/anime-sad-wave.gif" width="60" alt="Welcome">&nbsp;
-  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&size=40&duration=3000&pause=1000&color=FFFFFF&center=true&vCenter=true&width=300&lines=NisitTrade" alt="NisitTrade">&nbsp;
-  <img width="80" alt="NisitTradeLogo" src="https://github.com/user-attachments/assets/435bbaa4-c485-4461-9881-cd9101e9e659">
-</p>
+<h1>
+<img src="https://media.tenor.com/ccpKmf7plusAAAAi/anime-sad-wave.gif" width="80" alt="Welcome">
+&nbsp;
+NisitTrade
+&nbsp;
+<img width="80" alt="NisitTradeLogo" src="https://github.com/user-attachments/assets/435bbaa4-c485-4461-9881-cd9101e9e659">
+</h1>
 
 **Campus Marketplace Platform with Verified University Access**
 
@@ -28,10 +30,10 @@ NisitTrade is a **university-focused marketplace platform** that revolutionizes 
 
 | Challenge | NisitTrade Solution |
 |-----------|-------------------|
-| 🚫 Fake Accounts | Domain-restricted Microsoft OAuth |
-| ⚠️ Unverified Users | University email verification |
-| 💔 Trust Issues & Scams | Centralized moderation system |
-| 🔓 Poor Access Control | Role-based authorization (RBAC) |
+| Fake Accounts | Domain-restricted Microsoft OAuth |
+| Unverified Users | University email verification |
+| Trust Issues & Scams | Centralized moderation system |
+| Poor Access Control | Role-based authorization (RBAC) |
 
 ---
 
@@ -157,12 +159,12 @@ NisitTrade employs a **centralized backend architecture** serving both Admin and
 
 ### Core Security Principles
 
-- ✅ **Remote JWKS Verification**: Tokens verified against Microsoft's public keys
-- ✅ **Domain Restriction**: Only allowed university domains (e.g., `student.cadt.edu.kh`)
-- ✅ **Role Isolation**: Admin and student authentication completely separated
-- ✅ **Authorization Middleware**: Protected routes enforce role-based permissions
-- ✅ **JWT Expiration**: 7-day token lifecycle with refresh capability
-- ✅ **Environment Configuration**: Domain whitelist managed via environment variables
+- **Remote JWKS Verification**: Tokens verified against Microsoft's public keys
+- **Domain Restriction**: Only allowed university domains (e.g., `student.cadt.edu.kh`)
+- **Role Isolation**: Admin and student authentication completely separated
+- **Authorization Middleware**: Protected routes enforce role-based permissions
+- **JWT Expiration**: 7-day token lifecycle with refresh capability
+- **Environment Configuration**: Domain whitelist managed via environment variables
 
 ### Protected Routes
 
@@ -322,16 +324,11 @@ We welcome contributions! Please follow these steps:
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 👨‍💻 Authors
 
 **NisitTrade Development Team**
 
+- **Project Advisor**: Mr. CHHUON Sopheakmanith
 - Project Lead: Hong Layeang
 - Backend Developer: Sithav Seavthean, Kong Visal, Soun Sokhunmony
 - Frontend Developer: Keo Sivmey, Hong Layeang
@@ -339,22 +336,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📞 Support
-
-For support and queries:
-
-- 📧 Email: support@nisittrade.com
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/nisittrade/issues)
-- 📖 Documentation: [Wiki](https://github.com/yourusername/nisittrade/wiki)
-
----
-
 ## 🙏 Acknowledgments
 
-- Microsoft Azure for OAuth services
-- The open-source community
-- All contributors and testers
-- University administration for support
+We would like to express our sincere gratitude to:
+
+* **Mr. CHHUON Sopheakmanith** – Project Advisor, for guidance, technical feedback, and continuous support throughout the development of NisitTrade.
+* **Microsoft Azure** – For providing secure OAuth authentication services logic.
+* **The open-source community** – For the tools, libraries, and resources that made this project possible.
+* **All contributors and testers** – For his valuable feedback and improvements.
+* **The University Administration** – For institutional support and encouragement.
 
 ---
 
