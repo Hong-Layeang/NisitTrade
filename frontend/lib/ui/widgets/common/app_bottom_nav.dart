@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/constants/colors.dart';
 
 class AppBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -14,7 +15,7 @@ class AppBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.background,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -39,7 +40,7 @@ class AppBottomNav extends StatelessWidget {
                 label: 'Search',
                 index: 1,
               ),
-              _buildCenterButton(),
+              _buildCenterButton(context),
               _buildNavItem(
                 icon: Icons.groups_rounded,
                 label: 'Community',
@@ -63,7 +64,7 @@ class AppBottomNav extends StatelessWidget {
     required int index,
   }) {
     final isSelected = currentIndex == index;
-    final color = isSelected ? const Color(0xFF00B4D8) : Colors.grey.shade600;
+    final color = isSelected ? AppColors.primary : AppColors.textSecondary;
 
     return InkWell(
       onTap: () {
@@ -97,11 +98,12 @@ class AppBottomNav extends StatelessWidget {
     );
   }
 
-  Widget _buildCenterButton() {
+  Widget _buildCenterButton(BuildContext context) {
     final isSelected = currentIndex == 2;
-    final activeColor = const Color(0xFF00B4D8);
-    final inactiveLabelColor = Colors.grey.shade600;
-    final inactiveBgColor = Color(0xFF80E2F1);
+    final activeColor = AppColors.primary;
+    final inactiveLabelColor = AppColors.textSecondary;
+    final inactiveBgColor = AppColors.accent;
+    final onPrimary = Theme.of(context).colorScheme.onPrimary;
     
     return InkWell(
       onTap: () {
@@ -123,7 +125,7 @@ class AppBottomNav extends StatelessWidget {
               ),
               child: Icon(
                 Icons.add,
-                color: isSelected ? Colors.white : activeColor,
+                color: isSelected ? onPrimary : activeColor,
                 size: 22,
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/constants/colors.dart';
 
 class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int chatBadgeCount;
@@ -23,8 +24,9 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onPrimary = Theme.of(context).colorScheme.onPrimary;
     return AppBar(
-      backgroundColor: const Color(0xFF00B4D8),
+      backgroundColor: AppColors.primary,
       elevation: 0,
       automaticallyImplyLeading: false,
       title: Row(
@@ -39,10 +41,10 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           const SizedBox(width: 10),
-          const Text(
+          Text(
             'NisitTrade',
             style: TextStyle(
-              color: Colors.white,
+              color: onPrimary,
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
@@ -53,9 +55,9 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
         if (showFavorite)
           IconButton(
             onPressed: onFavoriteTap,
-            icon: const Icon(
+            icon: Icon(
               Icons.favorite_border,
-              color: Colors.white,
+              color: onPrimary,
               size: 26,
             ),
           ),
@@ -64,9 +66,9 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
             children: [
               IconButton(
                 onPressed: onChatTap,
-                icon: const Icon(
+                icon: Icon(
                   Icons.chat_bubble_outline,
-                  color: Colors.white,
+                  color: onPrimary,
                   size: 26,
                 ),
               ),
@@ -86,8 +88,8 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                     child: Text(
                       chatBadgeCount > 99 ? '99+' : chatBadgeCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: onPrimary,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),

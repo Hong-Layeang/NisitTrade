@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/constants/colors.dart';
 
 /// Reusable empty state widget
 class EmptyState extends StatelessWidget {
@@ -24,14 +25,14 @@ class EmptyState extends StatelessWidget {
           Icon(
             icon,
             size: 80,
-            color: Colors.grey.shade400,
+            color: AppColors.textSecondary,
           ),
           const SizedBox(height: 16),
           Text(
             title,
             style: TextStyle(
               fontSize: 18,
-              color: Colors.grey.shade600,
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -41,7 +42,7 @@ class EmptyState extends StatelessWidget {
               subtitle!,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey.shade500,
+                color: AppColors.textSecondary,
               ),
             ),
           ],
