@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/auth/microsoft_auth_service.dart';
+import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
+import '../../widgets/common/app_buttons.dart';
+import '../../widgets/common/app_form_fields.dart';
 
 class SetPasswordArgs {
   final String accessToken;
@@ -84,46 +87,6 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     return null;
   }
 
-  InputDecoration _buildInputDecoration({
-    required String hintText,
-    required bool obscureText,
-    required VoidCallback onToggleVisibility,
-  }) {
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: TextStyle(
-        color: Colors.grey.shade400,
-        fontSize: 16,
-      ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 14,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(
-          color: Color(0xFF00BCD4),
-          width: 2,
-        ),
-      ),
-      suffixIcon: IconButton(
-        icon: Icon(
-          obscureText ? Icons.visibility_off : Icons.visibility,
-          color: Colors.grey,
-        ),
-        onPressed: onToggleVisibility,
-      ),
-    );
-  }
-
   Future<void> _handleSubmit() async {
     if (_isSubmitting) {
       return;
@@ -171,8 +134,8 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -185,26 +148,18 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Spacer(flex: 2),
-                const Text(
-                  'Set Password',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('Set Password', style: textTheme.titleLarge),
                 if (widget.args.email != null) ...[
                   const SizedBox(height: 8),
                   Text(
                     widget.args.email!,
-                    style: const TextStyle(
-                      color: Colors.black54,
-                      fontSize: 14,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
                 const SizedBox(height: 24),
-                TextFormField(
+                AppTextFormField(
                   controller: _passwordController,
                   focusNode: _passwordFocus,
                   obscureText: _obscurePassword,
@@ -214,10 +169,15 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                     FocusScope.of(context).requestFocus(_confirmFocus);
                   },
                   validator: _validatePassword,
-                  decoration: _buildInputDecoration(
-                    hintText: 'New password',
-                    obscureText: _obscurePassword,
-                    onToggleVisibility: () {
+                  hintText: 'New password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {
                       setState(() {
                         _obscurePassword = !_obscurePassword;
                       });
@@ -225,7 +185,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
+                AppTextFormField(
                   controller: _confirmController,
                   focusNode: _confirmFocus,
                   obscureText: _obscureConfirm,
@@ -233,10 +193,15 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _handleSubmit(),
                   validator: _validateConfirmation,
-                  decoration: _buildInputDecoration(
-                    hintText: 'Confirm password',
-                    obscureText: _obscureConfirm,
-                    onToggleVisibility: () {
+                  hintText: 'Confirm password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirm
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {
                       setState(() {
                         _obscureConfirm = !_obscureConfirm;
                       });
@@ -244,27 +209,10 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00BCD4),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      _isSubmitting ? 'Setting Password...' : 'Set Password',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                AppPrimaryButton(
+                  label: _isSubmitting ? 'Setting Password...' : 'Set Password',
+                  isLoading: _isSubmitting,
+                  onPressed: _isSubmitting ? null : _handleSubmit,
                 ),
                 const Spacer(flex: 3),
               ],

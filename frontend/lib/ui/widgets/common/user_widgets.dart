@@ -25,7 +25,7 @@ class StudentListTile extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: Colors.grey.shade100,
+              color: AppColors.surface,
               width: 1,
             ),
           ),
@@ -46,7 +46,7 @@ class StudentListTile extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -54,7 +54,7 @@ class StudentListTile extends StatelessWidget {
                     student.username,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade500,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -88,12 +88,12 @@ class UserAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: radius,
-      backgroundColor: Colors.grey.shade200,
+      backgroundColor: AppColors.surface,
       backgroundImage: NetworkImage(imageUrl),
       onBackgroundImageError: (exception, stackTrace) {},
       child: Icon(
         fallbackIcon,
-        color: Colors.grey.shade400,
+        color: AppColors.textSecondary,
         size: radius,
       ),
     );
@@ -125,7 +125,7 @@ class FollowButton extends StatelessWidget {
         ),
         child: Icon(
           isFollowing ? Icons.person : Icons.person_add_outlined,
-          color: isFollowing ? AppColors.primary : Colors.grey.shade400,
+          color: isFollowing ? AppColors.primary : AppColors.textSecondary,
           size: 24,
         ),
       ),

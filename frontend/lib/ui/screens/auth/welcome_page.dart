@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
-import '../../widgets/auth/white_blur_gradient.dart';
+import '../../widgets/auth/auth_footer_links.dart';
 import '../../widgets/auth/join_waitlist_dialog.dart';
+import '../../widgets/auth/white_blur_gradient.dart';
+import '../../widgets/common/app_buttons.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -42,31 +45,29 @@ class WelcomePage extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             'Welcome to NisitTrade',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 12),
                           RichText(
                             textAlign: TextAlign.center,
-                            text: const TextSpan(
+                            text: TextSpan(
                               children: [
                                 TextSpan(
                                   text: 'Buy. Sell.\n',
-                                  style: TextStyle(
-                                    color: Color(0xFF00BCD4),
+                                  style: textTheme.titleLarge?.copyWith(
+                                    color: AppColors.primary,
                                     fontSize: 36,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 TextSpan(
                                   text: 'Repeat the magic.',
-                                  style: TextStyle(
-                                    color: Colors.black,
+                                  style: textTheme.titleLarge?.copyWith(
+                                    color: AppColors.textPrimary,
                                     fontSize: 32,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -75,12 +76,10 @@ class WelcomePage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          const Text(
+                          Text(
                             'Sign in to connect with your community',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -89,48 +88,20 @@ class WelcomePage extends StatelessWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton(
+                                child: AppPrimaryButton(
                                   onPressed: () {
                                     Navigator.pushNamed(context, AppRoutes.login);
                                   },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF00BCD4),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'LOGIN',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  label: 'LOGIN',
                                 ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
-                                child: OutlinedButton(
+                                child: AppSecondaryButton(
                                   onPressed: () {
                                     Navigator.pushNamed(context, AppRoutes.signup);
                                   },
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.black87,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    side: const BorderSide(color: Colors.grey),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'SIGN UP',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  label: 'SIGN UP',
                                 ),
                               ),
                             ],
@@ -138,11 +109,10 @@ class WelcomePage extends StatelessWidget {
                           const SizedBox(height: 24),
 
                           // Join Community Section
-                          const Text(
+                          Text(
                             'Looking for NisitTrade at your school ?',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -153,11 +123,11 @@ class WelcomePage extends StatelessWidget {
                             child: const Text(
                               'Join community',
                               style: TextStyle(
-                                color: Color(0xFF00BCD4),
+                                color: AppColors.primary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                                 decoration: TextDecoration.underline,
-                                decorationColor: Color(0xFF00BCD4),
+                                decorationColor: AppColors.primary,
                               ),
                             ),
                           ),
@@ -169,54 +139,25 @@ class WelcomePage extends StatelessWidget {
                     // Footer Links
                     Padding(
                       padding: const EdgeInsets.only(bottom: 24, top: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          GestureDetector(
-                            onTap: () async {
-                              final uri = Uri.parse('https://nisittrade.com/terms');
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              }
-                            },
-                            child: const Text(
-                              'Terms of use',
-                              style: TextStyle(
-                                color: Color(0xFF00BCD4),
-                                fontSize: 14,
-                                decoration: TextDecoration.underline,
-                                decorationColor: Color(0xFF00BCD4),
-                              ),
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              '|',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () async {
-                              final uri = Uri.parse('https://nisittrade.com/privacy');
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              }
-                            },
-                            child: const Text(
-                              'privacy policy',
-                              style: TextStyle(
-                                color: Color(0xFF00BCD4),
-                                fontSize: 14,
-                                decoration: TextDecoration.underline,
-                                decorationColor: Color(0xFF00BCD4),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: AuthFooterLinks(
+                        onTermsTap: () async {
+                          final uri = Uri.parse('https://nisittrade.com/terms');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          }
+                        },
+                        onPrivacyTap: () async {
+                          final uri = Uri.parse('https://nisittrade.com/privacy');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          }
+                        },
                       ),
                     ),
                     SizedBox(height: MediaQuery.of(context).padding.bottom),

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
+import '../../widgets/auth/auth_back_link.dart';
+import '../../widgets/auth/auth_footer_links.dart';
 import '../../widgets/auth/white_blur_gradient.dart';
+import '../../widgets/common/app_buttons.dart';
+import '../../widgets/common/app_form_fields.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -26,8 +31,8 @@ class _SignupPageState extends State<SignupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -51,28 +56,13 @@ class _SignupPageState extends State<SignupPage> {
             // Back to Welcome page
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                },
-                child: const Row(
-                  children: [
-                    Icon(Icons.arrow_back, color: Colors.black87, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Back to Welcome page',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
+              child: AuthBackLink(
+                label: 'Back to Welcome page',
+                onTap: () => Navigator.pop(context),
               ),
             ),
 
-            Divider(height: 1, color: Colors.grey.shade300),
+            const Divider(height: 1, color: AppColors.border),
 
             // Content Section
             Expanded(
@@ -85,133 +75,57 @@ class _SignupPageState extends State<SignupPage> {
                       const SizedBox(height: 24),
 
                       // Sign Up Now Title
-                      const Center(
-                        child: Text(
-                          'Sign Up Now',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                      Center(
+                        child: Text('Sign Up Now', style: textTheme.titleLarge),
                       ),
                       const SizedBox(height: 24),
 
                       // Full Name Field
-                      _buildRequiredLabel('Full Name'),
+                      const AppRequiredLabel(label: 'Full Name'),
                       const SizedBox(height: 8),
-                      TextField(
+                      AppTextField(
                         controller: _fullNameController,
                         keyboardType: TextInputType.name,
                         textCapitalization: TextCapitalization.words,
-                        decoration: InputDecoration(
-                          hintText: 'John Doe',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 16,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF00BCD4),
-                              width: 2,
-                            ),
-                          ),
-                        ),
+                        hintText: 'John Doe',
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.name],
                       ),
                       const SizedBox(height: 20),
 
                       // University Email Field
-                      _buildRequiredLabel('University Email'),
+                      const AppRequiredLabel(label: 'University Email'),
                       const SizedBox(height: 8),
-                      TextField(
+                      AppTextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          hintText: 'John.doe@university.com',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 16,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF00BCD4),
-                              width: 2,
-                            ),
-                          ),
-                        ),
+                        hintText: 'John.doe@university.com',
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.email],
                       ),
                       const SizedBox(height: 20),
 
                       // Password Field
-                      _buildRequiredLabel('Password'),
+                      const AppRequiredLabel(label: 'Password'),
                       const SizedBox(height: 8),
-                      TextField(
+                      AppTextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          hintText: '****************',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 16,
+                        hintText: '****************',
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.newPassword],
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: AppColors.textSecondary,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF00BCD4),
-                              width: 2,
-                            ),
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -230,12 +144,12 @@ class _SignupPageState extends State<SignupPage> {
                                   _agreedToTerms = value ?? false;
                                 });
                               },
-                              activeColor: const Color(0xFF00BCD4),
+                              activeColor: AppColors.primary,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               side: BorderSide(
-                                color: Colors.grey.shade400,
+                                color: AppColors.textSecondary,
                                 width: 1.5,
                               ),
                             ),
@@ -251,7 +165,7 @@ class _SignupPageState extends State<SignupPage> {
                               child: RichText(
                                 text: TextSpan(
                                   style: const TextStyle(
-                                    color: Colors.black87,
+                                    color: AppColors.textPrimary,
                                     fontSize: 14,
                                   ),
                                   children: [
@@ -266,12 +180,12 @@ class _SignupPageState extends State<SignupPage> {
                                         child: const Text(
                                           'Terms of Service',
                                           style: TextStyle(
-                                            color: Color(0xFF00BCD4),
+                                            color: AppColors.primary,
                                             fontSize: 14,
                                             fontWeight: FontWeight.w500,
                                             decoration:
                                                 TextDecoration.underline,
-                                            decorationColor: Color(0xFF00BCD4),
+                                            decorationColor: AppColors.primary,
                                           ),
                                         ),
                                       ),
@@ -286,38 +200,17 @@ class _SignupPageState extends State<SignupPage> {
                       const SizedBox(height: 24),
 
                       // Sign Up Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _agreedToTerms
-                              ? () {
-                                  // Navigate to marketplace after signup
-                                  Navigator.pushNamedAndRemoveUntil(
-                                    context,
-                                    AppRoutes.marketplace,
-                                    (route) => false,
-                                  );
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00BCD4),
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: Colors.grey.shade300,
-                            disabledForegroundColor: Colors.grey.shade500,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Sign up',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+                      AppPrimaryButton(
+                        label: 'Sign up',
+                        onPressed: _agreedToTerms
+                            ? () {
+                                Navigator.pushNamedAndRemoveUntil(
+                                  context,
+                                  AppRoutes.marketplace,
+                                  (route) => false,
+                                );
+                              }
+                            : null,
                       ),
                       const SizedBox(height: 16),
 
@@ -329,7 +222,7 @@ class _SignupPageState extends State<SignupPage> {
                             const Text(
                               'Already have an account?',
                               style: TextStyle(
-                                color: Colors.grey,
+                                color: AppColors.textSecondary,
                                 fontSize: 14,
                               ),
                             ),
@@ -341,7 +234,7 @@ class _SignupPageState extends State<SignupPage> {
                               child: const Text(
                                 'Sign In',
                                 style: TextStyle(
-                                  color: Color(0xFF00BCD4),
+                                  color: AppColors.primary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -359,73 +252,18 @@ class _SignupPageState extends State<SignupPage> {
             // Footer Links
             Padding(
               padding: const EdgeInsets.only(bottom: 24, top: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      // TODO: Open terms of use
-                    },
-                    child: const Text(
-                      'Terms of use',
-                      style: TextStyle(
-                        color: Color(0xFF00BCD4),
-                        fontSize: 14,
-                        decoration: TextDecoration.underline,
-                        decorationColor: Color(0xFF00BCD4),
-                      ),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      '|',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      // TODO: Open privacy policy
-                    },
-                    child: const Text(
-                      'privacy policy',
-                      style: TextStyle(
-                        color: Color(0xFF00BCD4),
-                        fontSize: 14,
-                        decoration: TextDecoration.underline,
-                        decorationColor: Color(0xFF00BCD4),
-                      ),
-                    ),
-                  ),
-                ],
+              child: AuthFooterLinks(
+                onTermsTap: () {
+                  // TODO: Open terms of use
+                },
+                onPrivacyTap: () {
+                  // TODO: Open privacy policy
+                },
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildRequiredLabel(String label) {
-    return Row(
-      children: [
-        const Text(
-          '* ',
-          style: TextStyle(
-            color: Colors.red,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.black87,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }

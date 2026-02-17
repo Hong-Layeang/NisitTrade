@@ -32,7 +32,7 @@ class CategoryCircle extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                  color: isSelected ? AppColors.primary : AppColors.border,
                   width: isSelected ? 3 : 2,
                 ),
               ),
@@ -41,10 +41,10 @@ class CategoryCircle extends StatelessWidget {
                   category.imageUrl,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.grey.shade200,
+                    color: AppColors.surface,
                     child: Icon(
                       Icons.category,
-                      color: Colors.grey.shade400,
+                      color: AppColors.textSecondary,
                       size: size * 0.4,
                     ),
                   ),
@@ -57,7 +57,7 @@ class CategoryCircle extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppColors.primary : Colors.black87,
+                color: isSelected ? AppColors.primary : AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,

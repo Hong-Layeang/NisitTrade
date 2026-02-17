@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../utils/constants/colors.dart';
+import '../../widgets/common/app_buttons.dart';
+import '../../widgets/common/app_form_fields.dart';
 
 class JoinWaitlistDialog extends StatefulWidget {
   const JoinWaitlistDialog({super.key});
@@ -28,11 +31,11 @@ class _JoinWaitlistDialogState extends State<JoinWaitlistDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      backgroundColor: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -47,145 +50,62 @@ class _JoinWaitlistDialogState extends State<JoinWaitlistDialog> {
                 child: const Icon(
                   Icons.close,
                   size: 28,
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
             const SizedBox(height: 8),
 
             // Title
-            const Text(
+            Text(
               'Join the Waitlist',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF00BCD4),
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+              style: textTheme.titleLarge?.copyWith(color: AppColors.primary),
             ),
             const SizedBox(height: 16),
 
             // Description
-            const Text(
+            Text(
               'Want Empor at your school? Join our waitlist and be the first to know when we expand to your campus!',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textPrimary,
                 height: 1.4,
               ),
             ),
             const SizedBox(height: 24),
 
             // School Name Label
-            const Text(
-              'School Name',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('School Name', style: textTheme.labelLarge),
             const SizedBox(height: 8),
 
             // School Name Input Field
-            TextField(
+            AppTextField(
               controller: _schoolNameController,
-              decoration: InputDecoration(
-                hintText: 'Enter your school name',
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 16,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF00BCD4),
-                    width: 2,
-                  ),
-                ),
-              ),
+              hintText: 'Enter your school name',
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.organizationName],
             ),
             const SizedBox(height: 16),
 
             // Email Address Label
-            const Text(
-              'Email Address',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Email Address', style: textTheme.labelLarge),
             const SizedBox(height: 8),
 
             // Email Input Field
-            TextField(
+            AppTextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                hintText: 'Enter your student email',
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 16,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF00BCD4),
-                    width: 2,
-                  ),
-                ),
-              ),
+              hintText: 'Enter your student email',
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.email],
             ),
             const SizedBox(height: 24),
 
             // Register Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _onRegister,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00BCD4),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Register',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            AppPrimaryButton(
+              label: 'Register',
+              onPressed: _onRegister,
             ),
           ],
         ),
@@ -213,7 +133,7 @@ class _JoinWaitlistDialogState extends State<JoinWaitlistDialog> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Successfully joined the waitlist!'),
-        backgroundColor: Color(0xFF00BCD4),
+        backgroundColor: AppColors.primary,
       ),
     );
   }

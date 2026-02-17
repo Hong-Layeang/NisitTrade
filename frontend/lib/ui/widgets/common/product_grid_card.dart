@@ -24,7 +24,7 @@ class ProductGridCard extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.background,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -42,7 +42,7 @@ class ProductGridCard extends StatelessWidget {
                     Expanded(
                       child: Container(
                         width: double.infinity,
-                        color: Colors.grey.shade100,
+                        color: AppColors.surface,
                         child: Image.asset(
                           product.images.first,
                           fit: BoxFit.cover,
@@ -52,11 +52,11 @@ class ProductGridCard extends StatelessWidget {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                              color: Colors.grey.shade200,
+                              color: AppColors.surface,
                               child: Icon(
                                 Icons.image,
                                 size: 40,
-                                color: Colors.grey.shade400,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -73,7 +73,7 @@ class ProductGridCard extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.black87,
+                                color: AppColors.textPrimary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -134,12 +134,12 @@ class LikeButton extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
+            color: AppColors.background.withOpacity(0.9),
             shape: BoxShape.circle,
           ),
           child: Icon(
             isLiked ? Icons.favorite : Icons.favorite_border,
-            color: isLiked ? Colors.red : Colors.grey,
+            color: isLiked ? Colors.red : AppColors.textSecondary,
             size: size * 0.55,
           ),
         ),

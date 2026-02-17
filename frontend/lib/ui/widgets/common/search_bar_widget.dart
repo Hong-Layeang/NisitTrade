@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/constants/colors.dart';
 
 class SearchBarWidget extends StatelessWidget {
   final TextEditingController? controller;
@@ -18,13 +19,14 @@ class SearchBarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: padding,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
           ),
           child: TextField(
@@ -32,13 +34,12 @@ class SearchBarWidget extends StatelessWidget {
             onChanged: onChanged,
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 16,
+              hintStyle: textTheme.bodyLarge?.copyWith(
+                color: AppColors.textSecondary,
               ),
               prefixIcon: Icon(
                 Icons.search,
-                color: Colors.grey.shade500,
+                color: AppColors.textSecondary,
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
