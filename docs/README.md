@@ -1,12 +1,10 @@
 <div align="center">
 
-<h1>
-<img src="https://media.tenor.com/ccpKmf7plusAAAAi/anime-sad-wave.gif" width="80" alt="Welcome">
-&nbsp;
-NisitTrade
-&nbsp;
-<img width="80" alt="NisitTradeLogo" src="https://github.com/user-attachments/assets/435bbaa4-c485-4461-9881-cd9101e9e659">
-</h1>
+<p align="center">
+  <img src="https://media.tenor.com/ccpKmf7plusAAAAi/anime-sad-wave.gif" width="60" alt="Welcome">&nbsp;
+  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&size=40&duration=3000&pause=1000&color=FFFFFF&center=true&vCenter=true&width=300&lines=NisitTrade" alt="NisitTrade">&nbsp;
+  <img width="80" alt="NisitTradeLogo" src="https://github.com/user-attachments/assets/435bbaa4-c485-4461-9881-cd9101e9e659">
+</p>
 
 **Campus Marketplace Platform with Verified University Access**
 
