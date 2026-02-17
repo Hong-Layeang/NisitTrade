@@ -28,10 +28,10 @@ NisitTrade is a **university-focused marketplace platform** that revolutionizes 
 
 | Challenge | NisitTrade Solution |
 |-----------|-------------------|
-| Fake Accounts | Domain-restricted Microsoft OAuth |
-| Unverified Users | University email verification |
-| Trust Issues & Scams | Centralized moderation system |
-| Poor Access Control | Role-based authorization (RBAC) |
+| 🚫 Fake Accounts | Domain-restricted Microsoft OAuth |
+| ⚠️ Unverified Users | University email verification |
+| 💔 Trust Issues & Scams | Centralized moderation system |
+| 🔓 Poor Access Control | Role-based authorization (RBAC) |
 
 ---
 
