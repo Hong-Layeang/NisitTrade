@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/product.dart';
+import '../../../utils/constants/colors.dart';
 import 'product_card_action_row.dart';
 import 'product_card_image_carousel.dart';
 import 'product_card_info.dart';
@@ -35,7 +36,7 @@ class _ProductCardState extends State<ProductCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: AppColors.background,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

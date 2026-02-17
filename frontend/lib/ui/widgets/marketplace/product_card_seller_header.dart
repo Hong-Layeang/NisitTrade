@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/product.dart';
+import '../../../utils/constants/colors.dart';
 import '../common/user_widgets.dart';
 
 class ProductCardSellerHeader extends StatelessWidget {
@@ -27,12 +28,13 @@ class ProductCardSellerHeader extends StatelessWidget {
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 Text(
                   product.seller.username,
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: AppColors.textSecondary,
                     fontSize: 13,
                   ),
                 ),

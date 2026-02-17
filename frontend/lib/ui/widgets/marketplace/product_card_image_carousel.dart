@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/constants/colors.dart';
 
 class ProductCardImageCarousel extends StatelessWidget {
   final List<String> images;
@@ -27,11 +28,11 @@ class ProductCardImageCarousel extends StatelessWidget {
               images[index],
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
-                color: Colors.grey.shade200,
+                color: AppColors.surface,
                 child: Icon(
                   Icons.image,
                   size: 80,
-                  color: Colors.grey.shade400,
+                  color: AppColors.textSecondary,
                 ),
               ),
             );

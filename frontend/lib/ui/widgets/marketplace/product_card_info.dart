@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/product.dart';
+import '../../../utils/constants/colors.dart';
 
 class ProductCardInfo extends StatelessWidget {
   final Product product;
@@ -8,6 +9,7 @@ class ProductCardInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
       child: Column(
@@ -15,17 +17,15 @@ class ProductCardInfo extends StatelessWidget {
         children: [
           Text(
             product.title,
-            style: const TextStyle(
+            style: textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              fontSize: 17,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             product.description,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 14,
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
               height: 1.3,
             ),
             maxLines: 2,
@@ -34,8 +34,8 @@ class ProductCardInfo extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             product.timeAgo,
-            style: TextStyle(
-              color: Colors.grey.shade500,
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
               fontSize: 13,
             ),
           ),

@@ -43,7 +43,7 @@ class ProductCardActionRow extends StatelessWidget {
                   children: [
                     Icon(
                       isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : Colors.black87,
+                      color: isLiked ? Colors.red : AppColors.textPrimary,
                       size: 26,
                     ),
                     const SizedBox(width: 6),
@@ -54,7 +54,7 @@ class ProductCardActionRow extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color: isLiked ? Colors.red : Colors.black87,
+                        color: isLiked ? Colors.red : AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -72,7 +72,7 @@ class ProductCardActionRow extends StatelessWidget {
                 children: [
                   const Icon(
                     Icons.chat_bubble_outline,
-                    color: Colors.black87,
+                    color: AppColors.textPrimary,
                     size: 24,
                   ),
                   const SizedBox(width: 6),
@@ -91,7 +91,7 @@ class ProductCardActionRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF3CD),
+              color: AppColors.warningBackground,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -107,7 +107,7 @@ class ProductCardActionRow extends StatelessWidget {
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
-                    color: Colors.black87,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
