@@ -332,10 +332,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **NisitTrade Development Team**
 
-- Project Lead: [Your Name]
-- Backend Developer: [Name]
-- Frontend Developer: [Name]
-- UI/UX Designer: [Name]
+- Project Lead: Hong Layeang
+- Backend Developer: Sithav Seavthean, Kong Visal, Soun Sokhunmony
+- Frontend Developer: Keo Sivmey, Hong Layeang
+- UI/UX Designer: Sithav Seavthean, Kong Visal, Soun Sokhunmony, Keo Sivmey, Hong Layeang
 
 ---
 
