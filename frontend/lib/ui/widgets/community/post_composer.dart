@@ -13,15 +13,15 @@ class PostComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'want to post something?',
-            style: TextStyle(
-              fontSize: 16,
+            style: textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
@@ -32,9 +32,9 @@ class PostComposer extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.background,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 children: [
@@ -67,7 +67,7 @@ class PostComposer extends StatelessWidget {
                       padding: EdgeInsets.all(4),
                       child: Icon(
                         Icons.send_rounded,
-                        color: Colors.grey,
+                        color: AppColors.textSecondary,
                         size: 20,
                       ),
                     ),
@@ -77,7 +77,7 @@ class PostComposer extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Divider(height: 1, color: Colors.grey.shade200),
+          const Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 8),
         ],
       ),

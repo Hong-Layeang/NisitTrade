@@ -52,7 +52,7 @@ class _SearchPageState extends State<SearchPage>
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildTabBar(),
+        _buildTabBar(context),
         Expanded(
           child: TabBarView(
             controller: _tabController,
@@ -66,22 +66,28 @@ class _SearchPageState extends State<SearchPage>
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.background,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+          bottom: BorderSide(color: AppColors.border, width: 1),
         ),
       ),
       child: TabBar(
         controller: _tabController,
         labelColor: AppColors.primary,
-        unselectedLabelColor: Colors.grey,
+        unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.primary,
         indicatorWeight: 3,
-        labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        unselectedLabelStyle:
+        labelStyle: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ) ??
+            const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w400,
+            ) ??
             const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
         tabs: const [
           Tab(text: 'Listings'),

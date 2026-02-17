@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/constants/colors.dart';
 import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
 import '../screens/profile/profile_page.dart';
@@ -40,7 +41,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: IndexedStack(
         index: _currentIndex,

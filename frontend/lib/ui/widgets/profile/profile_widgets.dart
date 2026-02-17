@@ -28,17 +28,17 @@ class ProfileAvatar extends StatelessWidget {
       padding: EdgeInsets.all(gapWidth),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white,
+        color: AppColors.background,
         border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: CircleAvatar(
         radius: radius,
-        backgroundColor: Colors.grey.shade200,
+        backgroundColor: AppColors.surface,
         backgroundImage: NetworkImage(imageUrl),
         onBackgroundImageError: (exception, stackTrace) {},
         child: Icon(
           Icons.person,
-          color: Colors.grey.shade400,
+          color: AppColors.textSecondary,
           size: radius,
         ),
       ),
@@ -65,7 +65,7 @@ class ProfileStatItem extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 20, color: Colors.grey.shade600),
+        Icon(icon, size: 20, color: AppColors.textSecondary),
         const SizedBox(width: 6),
         Flexible(
           child: Text.rich(
@@ -85,7 +85,7 @@ class ProfileStatItem extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: AppColors.textPrimary,
                     ),
                   ),
               ],
@@ -128,14 +128,14 @@ class ProfileSectionTabBar extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                color: isSelected ? AppColors.primary : AppColors.border,
                 width: isSelected ? 2.5 : 1,
               ),
             ),
           ),
           child: Icon(
             icon,
-            color: isSelected ? AppColors.primary : Colors.grey.shade400,
+            color: isSelected ? AppColors.primary : AppColors.textSecondary,
             size: 28,
           ),
         ),

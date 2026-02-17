@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../utils/constants/colors.dart';
+import '../../widgets/common/app_buttons.dart';
 import '../../widgets/sell/sell_form_widgets.dart';
 
 class SellPage extends StatelessWidget {
@@ -81,7 +82,7 @@ class SellPage extends StatelessWidget {
             const SizedBox(height: 14),
             const PhotoGrid(count: 6),
             const SizedBox(height: 22),
-            PrimaryButton(text: 'Add', onPressed: () {}),
+            AppPrimaryButton(label: 'Add', onPressed: () {}),
           ],
         ),
       ),

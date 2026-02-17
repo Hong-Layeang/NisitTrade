@@ -43,12 +43,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
       child: Column(
         children: [
           _buildCoverAndAvatar(),
           _buildStatsRow(),
-          _buildNameAndBio(),
+          _buildNameAndBio(textTheme),
           const SizedBox(height: 16),
           ProfileSectionTabBar(
             selectedIndex: _selectedTabIndex,
@@ -169,27 +170,24 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   /// Profile name and bio text
-  Widget _buildNameAndBio() {
+  Widget _buildNameAndBio(TextTheme textTheme) {
     return Column(
-      children: const [
-        SizedBox(height: 8),
+      children: [
+        const SizedBox(height: 8),
         Text(
           _name,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
+          style: textTheme.titleLarge?.copyWith(
             color: AppColors.primary,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Text(
             _bio,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.black87,
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textPrimary,
               height: 1.4,
             ),
           ),
@@ -215,8 +213,8 @@ class _ProfilePageState extends State<ProfilePage> {
           _productImages[index],
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Container(
-            color: Colors.grey.shade200,
-            child: Icon(Icons.image, color: Colors.grey.shade400),
+            color: AppColors.surface,
+            child: const Icon(Icons.image, color: AppColors.textSecondary),
           ),
         );
       },

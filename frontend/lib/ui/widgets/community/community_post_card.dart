@@ -109,7 +109,7 @@ class CommunityPostCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: Colors.grey.shade100,
+                    color: AppColors.surface,
                     child: const Center(
                       child: Icon(Icons.image_not_supported_outlined),
                     ),
@@ -148,7 +148,7 @@ class CommunityPostCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Divider(height: 1, color: Colors.grey.shade200),
+        const Divider(height: 1, color: AppColors.border),
         const SizedBox(height: 12),
       ],
     );

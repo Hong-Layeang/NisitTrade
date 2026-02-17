@@ -46,13 +46,13 @@ class _CommunityPageState extends State<CommunityPage>
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildTabBar(),
+        _buildTabBar(context),
         Expanded(
           child: TabBarView(
             controller: _tabController,
             children: [
               _buildCommunityTab(),
-              _buildFriendsTab(),
+              _buildFriendsTab(context),
             ],
           ),
         ),
@@ -60,20 +60,26 @@ class _CommunityPageState extends State<CommunityPage>
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+        color: AppColors.background,
+        border: const Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: TabBar(
         controller: _tabController,
         labelColor: AppColors.primary,
-        unselectedLabelColor: Colors.grey.shade500,
+        unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.primary,
         indicatorWeight: 3,
-        labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        unselectedLabelStyle:
+        labelStyle: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ) ??
+            const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w500,
+            ) ??
             const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         tabs: const [
           Tab(text: 'Community @cadt'),
@@ -110,15 +116,15 @@ class _CommunityPageState extends State<CommunityPage>
     );
   }
 
-  Widget _buildFriendsTab() {
+  Widget _buildFriendsTab(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final friendPosts = _friendPosts ?? const <CommunityPost>[];
     if (friendPosts.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No friend posts yet',
-          style: TextStyle(
+          style: textTheme.bodyMedium?.copyWith(
             color: AppColors.textSecondary,
-            fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),

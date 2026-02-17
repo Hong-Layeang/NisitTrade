@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/constants/colors.dart';
 import '../widgets/common/app_bottom_nav.dart';
 
 class MainLayout extends StatelessWidget {
@@ -18,7 +19,7 @@ class MainLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: appBar,
       body: child,
       bottomNavigationBar: AppBottomNav(currentIndex: currentNavIndex),

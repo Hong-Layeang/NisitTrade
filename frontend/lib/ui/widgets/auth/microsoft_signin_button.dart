@@ -86,7 +86,6 @@ class _MicrosoftSignInButtonState extends State<MicrosoftSignInButton> {
     // Microsoft logo: 4 squares in 2x2 grid
     const logoSize = 16.0;
     const squareSize = 6.5;
-    const gap = 1.5;
 
     return SizedBox(
       width: logoSize,

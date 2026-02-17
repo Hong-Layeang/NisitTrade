@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../utils/routes/app_routes.dart';
 import '../../../services/auth/auth_session.dart';
+import '../../../utils/constants/colors.dart';
+import '../../../utils/routes/app_routes.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -95,7 +96,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF00BCD4),
+      backgroundColor: AppColors.primary,
       body: SafeArea(
         child: Column(
           children: [

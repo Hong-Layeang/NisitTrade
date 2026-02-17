@@ -3,6 +3,7 @@ import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../models/category.dart';
 import '../../../models/product.dart';
+import '../../../utils/constants/colors.dart';
 import '../../widgets/common/category_widgets.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/marketplace/product_card.dart';
@@ -64,7 +65,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
             circleSize: 56,
           ),
         ),
-        Divider(height: 1, color: Colors.grey.shade100),
+        const Divider(height: 1, color: AppColors.surface),
         Expanded(
           child: _filteredProducts.isEmpty
               ? const EmptyState(
