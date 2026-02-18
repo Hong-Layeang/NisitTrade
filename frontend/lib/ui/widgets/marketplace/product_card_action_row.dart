@@ -25,34 +25,44 @@ class ProductCardActionRow extends StatelessWidget {
     return number.toString();
   }
 
+  String _formatPrice(double price) {
+    // If the price has no decimal part (e.g., 45.00), show without decimals
+    if (price == price.toInt()) {
+      return '\$${price.toInt()}';
+    }
+    // Otherwise show with 2 decimals (e.g., 45.15, 45.89)
+    return '\$${price.toStringAsFixed(2)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 12, 4),
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
       child: Row(
         children: [
+          // Like button
           Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: onLikeTap,
               borderRadius: BorderRadius.circular(20),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       isLiked ? Icons.favorite : Icons.favorite_border,
                       color: isLiked ? Colors.red : AppColors.textPrimary,
-                      size: 26,
+                      size: 23,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Text(
                       _formatNumber(
                         product.likes + (isLiked && !product.isLiked ? 1 : 0),
                       ),
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 13,
                         fontWeight: FontWeight.w500,
                         color: isLiked ? Colors.red : AppColors.textPrimary,
                       ),
@@ -62,24 +72,26 @@ class ProductCardActionRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
+          // Comment button
           InkWell(
             onTap: onCommentTap,
             borderRadius: BorderRadius.circular(20),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
                     Icons.chat_bubble_outline,
                     color: AppColors.textPrimary,
-                    size: 24,
+                    size: 21,
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   Text(
                     _formatNumber(product.comments),
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -88,8 +100,9 @@ class ProductCardActionRow extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          // Price badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               color: AppColors.warningBackground,
               borderRadius: BorderRadius.circular(20),
@@ -99,50 +112,49 @@ class ProductCardActionRow extends StatelessWidget {
               children: [
                 const Text(
                   '💰',
-                  style: TextStyle(fontSize: 14),
+                  style: TextStyle(fontSize: 13),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 3),
                 Text(
-                  '\$ ${product.price.toStringAsFixed(2)}',
+                  _formatPrice(product.price),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 13,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
+          // Chat button
           InkWell(
             onTap: onChatTap,
             borderRadius: BorderRadius.circular(20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.send_rounded,
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.send_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Chat',
+                    style: TextStyle(
                       color: Colors.white,
-                      size: 16,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
                     ),
-                    SizedBox(width: 6),
-                    Text(
-                      'Chat',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

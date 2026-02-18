@@ -150,6 +150,7 @@ class CategoryList extends StatelessWidget {
       height: height,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         itemCount: categories.length + (showSeeAll ? 1 : 0),
         itemBuilder: (context, index) {
           if (showSeeAll && index == categories.length) {

@@ -22,7 +22,7 @@ class StudentListTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           border: Border(
             bottom: BorderSide(
               color: AppColors.surface,
@@ -52,7 +52,7 @@ class StudentListTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     student.username,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
@@ -71,7 +71,7 @@ class StudentListTile extends StatelessWidget {
   }
 }
 
-/// Reusable user avatar with error handling
+/// Reusable user avatar with proper error handling
 class UserAvatar extends StatelessWidget {
   final String imageUrl;
   final double radius;
@@ -89,12 +89,41 @@ class UserAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor: AppColors.surface,
-      backgroundImage: NetworkImage(imageUrl),
-      onBackgroundImageError: (exception, stackTrace) {},
-      child: Icon(
-        fallbackIcon,
-        color: AppColors.textSecondary,
-        size: radius,
+      child: ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: radius * 2,
+              height: radius * 2,
+              color: AppColors.surface,
+              child: Icon(
+                fallbackIcon,
+                color: AppColors.textSecondary,
+                size: radius,
+              ),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: radius * 2,
+              height: radius * 2,
+              color: AppColors.surface,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
