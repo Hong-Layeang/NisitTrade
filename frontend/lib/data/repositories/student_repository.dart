@@ -1,13 +1,13 @@
 import '../../models/student.dart';
-import '../mock/mock_data.dart';
 
 abstract class StudentRepository {
-  List<Student> getStudents();
+  Future<List<Student>> getStudents();
 }
 
 class StudentRepositoryImpl implements StudentRepository {
   @override
-  List<Student> getStudents() {
-    return mockStudents;
+  Future<List<Student>> getStudents() async {
+    // TODO: Implement student API integration when backend is ready
+    throw UnimplementedError('StudentRepository not yet implemented. Awaiting backend API.');
   }
 }

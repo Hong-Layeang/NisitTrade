@@ -1,8 +1,6 @@
 ﻿import 'package:flutter/material.dart';
-import '../../../data/repositories/community_repository.dart';
-import '../../../data/repositories/student_repository.dart';
 import '../../../models/community_post.dart';
-import '../../../models/student.dart';
+import '../../../models/seller.dart';
 import '../../../utils/constants/colors.dart';
 import '../../widgets/community/community_post_card.dart';
 import '../../widgets/community/post_composer.dart';
@@ -17,23 +15,58 @@ class CommunityPage extends StatefulWidget {
 class _CommunityPageState extends State<CommunityPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final CommunityRepository _communityRepository = CommunityRepositoryImpl();
-  final StudentRepository _studentRepository = StudentRepositoryImpl();
-  late final List<CommunityPost> _posts;
-  late final List<Student> _friends;
-  List<CommunityPost>? _friendPosts;
+  List<CommunityPost> _posts = [];
+  List<CommunityPost> _friendPosts = [];
   final Set<String> _likedPosts = {};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _posts = _communityRepository.getPosts();
-    _friends = _studentRepository.getStudents();
-    final friendAvatarUrls = _friends.map((friend) => friend.avatarUrl).toSet();
-    _friendPosts = _posts
-      .where((post) => friendAvatarUrls.contains(post.author.avatarUrl))
-      .toList();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final author = Seller(
+      id: 1,
+      fullName: 'Nisit Community',
+      email: 'community@cadt.edu.kh',
+      profileImage: 'https://i.pravatar.cc/300?img=25',
+      provider: null,
+      role: 'admin',
+      universityId: null,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    final posts = [
+      CommunityPost(
+        id: '1',
+        author: author,
+        content:
+            'Welcome to the NisitTrade community! Share tips, deals, and campus finds here.',
+        imageUrl:
+            'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=900',
+        likes: 128,
+        comments: 14,
+        timeAgo: '2h ago',
+      ),
+      CommunityPost(
+        id: '2',
+        author: author,
+        content:
+            'Reminder: Be kind and keep posts relevant to campus trading. Happy selling!',
+        imageUrl: null,
+        likes: 64,
+        comments: 8,
+        timeAgo: '1d ago',
+      ),
+    ];
+
+    setState(() {
+      _posts = posts;
+      _friendPosts = [];
+    });
   }
 
   @override
@@ -65,7 +98,6 @@ class _CommunityPageState extends State<CommunityPage>
     return Container(
       decoration: BoxDecoration(
         color: AppColors.background,
-        border: const Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: TabBar(
         controller: _tabController,
@@ -73,6 +105,7 @@ class _CommunityPageState extends State<CommunityPage>
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.primary,
         indicatorWeight: 3,
+        dividerColor: Colors.transparent,
         labelStyle: textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w600,
             ) ??
@@ -118,8 +151,7 @@ class _CommunityPageState extends State<CommunityPage>
 
   Widget _buildFriendsTab(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final friendPosts = _friendPosts ?? const <CommunityPost>[];
-    if (friendPosts.isEmpty) {
+    if (_friendPosts.isEmpty) {
       return Center(
         child: Text(
           'No friend posts yet',
@@ -133,9 +165,9 @@ class _CommunityPageState extends State<CommunityPage>
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
-      itemCount: friendPosts.length,
+      itemCount: _friendPosts.length,
       itemBuilder: (context, index) {
-        final post = friendPosts[index];
+        final post = _friendPosts[index];
         return CommunityPostCard(
           post: post,
           isLiked: _likedPosts.contains(post.id),

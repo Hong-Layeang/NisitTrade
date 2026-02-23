@@ -35,20 +35,24 @@ class CategoryCircle extends StatelessWidget {
                   color: isSelected ? AppColors.primary : AppColors.border,
                   width: isSelected ? 3 : 2,
                 ),
+                color: AppColors.surface,
               ),
               child: ClipOval(
-                child: Image.network(
-                  category.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: AppColors.surface,
-                    child: Icon(
-                      Icons.category,
-                      color: AppColors.textSecondary,
-                      size: size * 0.4,
-                    ),
-                  ),
-                ),
+                child: category.imageUrl != null && category.imageUrl!.isNotEmpty
+                    ? Image.network(
+                        category.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.category,
+                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                          size: size * 0.4,
+                        ),
+                      )
+                    : Icon(
+                        Icons.category,
+                        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                        size: size * 0.4,
+                      ),
               ),
             ),
             const SizedBox(height: 8),

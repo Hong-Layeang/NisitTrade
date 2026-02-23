@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../models/product.dart';
 import '../../../utils/constants/colors.dart';
+import '../common/app_action_chip.dart';
 
 class ProductCardActionRow extends StatelessWidget {
   final Product product;
   final bool isLiked;
+  final bool isLoading;
+  final AnimationController likeAnimationController;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
   final VoidCallback onChatTap;
@@ -13,6 +16,8 @@ class ProductCardActionRow extends StatelessWidget {
     super.key,
     required this.product,
     required this.isLiked,
+    this.isLoading = false,
+    required this.likeAnimationController,
     required this.onLikeTap,
     required this.onCommentTap,
     required this.onChatTap,
@@ -26,11 +31,7 @@ class ProductCardActionRow extends StatelessWidget {
   }
 
   String _formatPrice(double price) {
-    // If the price has no decimal part (e.g., 45.00), show without decimals
-    if (price == price.toInt()) {
-      return '\$${price.toInt()}';
-    }
-    // Otherwise show with 2 decimals (e.g., 45.15, 45.89)
+    // Always show price with 2 decimal places (e.g., 65.00, 89.99)
     return '\$${price.toStringAsFixed(2)}';
   }
 
@@ -40,64 +41,34 @@ class ProductCardActionRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
       child: Row(
         children: [
-          // Like button
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onLikeTap,
-              borderRadius: BorderRadius.circular(20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : AppColors.textPrimary,
-                      size: 23,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatNumber(
-                        product.likes + (isLiked && !product.isLiked ? 1 : 0),
-                      ),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: isLiked ? Colors.red : AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
+          AppActionChip(
+            icon: ScaleTransition(
+              scale: Tween<double>(begin: 1.0, end: 1.25).animate(
+                CurvedAnimation(
+                  parent: likeAnimationController,
+                  curve: Curves.elasticOut,
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Comment button
-          InkWell(
-            onTap: onCommentTap,
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.chat_bubble_outline,
-                    color: AppColors.textPrimary,
-                    size: 21,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatNumber(product.comments),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+              child: Icon(
+                isLiked ? Icons.favorite : Icons.favorite_border,
+                color: isLiked ? Colors.red : AppColors.textPrimary,
+                size: 18,
               ),
             ),
+            label: _formatNumber(product.likesCount),
+            labelColor: isLiked ? Colors.red : AppColors.textPrimary,
+            onTap: onLikeTap,
+          ),
+          const SizedBox(width: 4),
+          AppActionChip(
+            icon: const Icon(
+              Icons.chat_bubble_outline,
+              color: AppColors.textPrimary,
+              size: 18,
+            ),
+            label: _formatNumber(product.commentsCount),
+            labelColor: AppColors.textPrimary,
+            onTap: onCommentTap,
           ),
           const Spacer(),
           // Price badge

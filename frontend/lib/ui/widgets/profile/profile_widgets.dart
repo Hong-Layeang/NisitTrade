@@ -36,11 +36,6 @@ class ProfileAvatar extends StatelessWidget {
         backgroundColor: AppColors.surface,
         backgroundImage: NetworkImage(imageUrl),
         onBackgroundImageError: (exception, stackTrace) {},
-        child: Icon(
-          Icons.person,
-          color: AppColors.textSecondary,
-          size: radius,
-        ),
       ),
     );
   }
@@ -90,6 +85,8 @@ class ProfileStatItem extends StatelessWidget {
                   ),
               ],
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

@@ -1,4 +1,4 @@
-import 'auth_api.dart';
+import '../api/auth_api.dart';
 import 'auth_token_store.dart';
 
 enum LoginStatus {

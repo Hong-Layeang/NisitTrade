@@ -33,14 +33,14 @@ class CommunityPostCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              UserAvatar(imageUrl: post.author.avatarUrl, radius: 22),
+              UserAvatar(imageUrl: post.author.profileImage ?? 'https://i.pravatar.cc/300?img=99', radius: 22),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      post.author.name,
+                      post.author.fullName,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -49,7 +49,7 @@ class CommunityPostCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      post.author.username,
+                      post.author.email,
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,

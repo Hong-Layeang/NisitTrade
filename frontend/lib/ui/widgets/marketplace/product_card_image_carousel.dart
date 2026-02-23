@@ -25,8 +25,27 @@ class ProductCardImageCarousel extends StatelessWidget {
           itemCount: images.length,
           onPageChanged: onPageChanged,
           itemBuilder: (context, index) {
+            final imageUrl = images[index];
+            final isNetwork = imageUrl.startsWith('http://') ||
+                imageUrl.startsWith('https://');
+
+            if (isNetwork) {
+              return Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: AppColors.surface,
+                  child: const Icon(
+                    Icons.image,
+                    size: 80,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
             return Image.asset(
-              images[index],
+              imageUrl,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
                 color: AppColors.surface,

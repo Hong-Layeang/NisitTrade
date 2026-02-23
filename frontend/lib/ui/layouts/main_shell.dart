@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../utils/constants/colors.dart';
+import '../../providers/product_feed_provider.dart';
 import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
 import '../screens/profile/profile_page.dart';
@@ -7,6 +9,7 @@ import '../screens/search/search_page.dart';
 import '../Screens/sell/sell_page.dart';
 import '../widgets/common/app_app_bar.dart';
 import '../widgets/common/app_bottom_nav.dart';
+import '../../utils/routes/app_routes.dart';
 
 class MainShell extends StatefulWidget {
   final int initialIndex;
@@ -19,6 +22,8 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
+  final GlobalKey<MarketplacePageState> _marketplaceKey =
+      GlobalKey<MarketplacePageState>();
 
   @override
   void initState() {
@@ -27,15 +32,29 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _onTabSelected(int index) {
-    if (_currentIndex != index) {
+    final isMarketplace = index == 0;
+    final shouldSwitch = _currentIndex != index;
+
+    if (shouldSwitch) {
       setState(() {
         _currentIndex = index;
+      });
+    }
+
+    if (isMarketplace) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _marketplaceKey.currentState?.resetFilterAndRefresh();
       });
     }
   }
 
   PreferredSizeWidget _buildAppBar() {
-    return const AppAppBar(chatBadgeCount: 6);
+    return AppAppBar(
+      chatBadgeCount: 6,
+      onFavoriteTap: () {
+        Navigator.pushNamed(context, AppRoutes.saved);
+      },
+    );
   }
 
   @override
@@ -46,7 +65,7 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          const MarketplacePage(),
+          MarketplacePage(key: _marketplaceKey),
           const SearchPage(),
           const SellPage(),
           const CommunityPage(),

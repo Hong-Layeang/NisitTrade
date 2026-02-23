@@ -5,7 +5,9 @@ import '../../ui/screens/auth/set_password_page.dart';
 import '../../ui/screens/auth/signup_page.dart';
 import '../../ui/screens/auth/welcome_page.dart';
 import '../../ui/Screens/splash/splash_page.dart';
+import '../../ui/screens/marketplace/product_detail_page.dart';
 import '../../ui/layouts/main_shell.dart';
+import '../../ui/screens/saved/saved_listings_page.dart';
 import 'app_routes.dart';
 import 'auth_gate.dart';
 
@@ -65,6 +67,22 @@ Route<dynamic> controlRoute(RouteSettings settings) {
       return MaterialPageRoute(
         builder: (_) => const AuthGate(
           child: MainShell(initialIndex: 4),
+        ),
+      );
+
+    case AppRoutes.productDetail:
+      final args = settings.arguments;
+      if (args is ProductDetailArgs) {
+        return MaterialPageRoute(
+          builder: (_) => ProductDetailPage(productId: args.productId),
+        );
+      }
+      return MaterialPageRoute(builder: (_) => const LoginPage());
+
+    case AppRoutes.saved:
+      return MaterialPageRoute(
+        builder: (_) => const AuthGate(
+          child: SavedListingsPage(),
         ),
       );
 

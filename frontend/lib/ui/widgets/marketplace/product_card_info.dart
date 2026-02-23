@@ -17,26 +17,28 @@ class ProductCardInfo extends StatelessWidget {
         children: [
           Text(
             product.title,
-            style: textTheme.titleMedium?.copyWith(
+            style: textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
+              fontSize: 18,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
-            product.description,
-            style: textTheme.bodyMedium?.copyWith(
+            product.description ?? 'No description',
+            style: textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
-              height: 1.3,
+              height: 1.4,
+              fontSize: 13,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             product.timeAgo,
-            style: textTheme.bodyMedium?.copyWith(
+            style: textTheme.labelSmall?.copyWith(
               color: AppColors.textSecondary,
-              fontSize: 13,
+              fontSize: 12,
             ),
           ),
         ],

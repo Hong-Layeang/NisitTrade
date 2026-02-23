@@ -1,35 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../data/repositories/category_repository.dart';
-import '../../../data/repositories/product_repository.dart';
 import '../../../models/category.dart';
-import '../../../models/product.dart';
+import '../../../services/api/api_exception.dart';
 import '../../../utils/constants/colors.dart';
+import '../../../utils/routes/app_routes.dart';
+import '../../../providers/product_feed_provider.dart';
+import '../../widgets/common/app_refresh_indicator.dart';
 import '../../widgets/common/category_widgets.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/marketplace/product_card.dart';
+import 'product_detail_page.dart';
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
 
   @override
-  State<MarketplacePage> createState() => _MarketplacePageState();
+  State<MarketplacePage> createState() => MarketplacePageState();
 }
 
-class _MarketplacePageState extends State<MarketplacePage> {
+class MarketplacePageState extends State<MarketplacePage> {
   final PageController _pageController = PageController();
   final CategoryRepository _categoryRepository = CategoryRepositoryImpl();
-  final ProductRepository _productRepository = ProductRepositoryImpl();
+  
+  List<Category>? _categories;
   int? _selectedCategoryIndex;
-  late final List<Category> _categories;
-  late final List<Product> _products;
-  List<Product> _filteredProducts = [];
+  bool _isLoading = false;
+  String? _error;
+
+  Future<void> resetFilterAndRefresh() async {
+    if (!mounted) return;
+
+    setState(() => _selectedCategoryIndex = null);
+    if (_pageController.hasClients) {
+      await _pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+    await _loadData();
+    if (mounted) {
+      await context.read<ProductFeedProvider>().refresh();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _categories = _categoryRepository.getCategories();
-    _products = _productRepository.getProducts();
-    _filteredProducts = _products;
+    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<ProductFeedProvider>();
+      if (provider.products.isEmpty && !provider.isLoading) {
+        provider.load();
+      }
+    });
   }
 
   @override
@@ -38,27 +63,88 @@ class _MarketplacePageState extends State<MarketplacePage> {
     super.dispose();
   }
 
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Load categories
+      final categoriesResponse = await _categoryRepository.getCategories();
+      if (!categoriesResponse.isSuccess) {
+        throw categoriesResponse.error!;
+      }
+
+      if (mounted) {
+        setState(() {
+          _categories = categoriesResponse.data;
+          _isLoading = false;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   void _onCategorySelected(int? index) {
     setState(() {
       _selectedCategoryIndex = index;
-      if (index == null) {
-        _filteredProducts = _products;
-      } else {
-        final category = _categories[index];
-        _filteredProducts =
-            _productRepository.getProductsByCategoryId(category.id);
-      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final productProvider = context.watch<ProductFeedProvider>();
+    final products = productProvider.products;
+    final filteredProducts = _selectedCategoryIndex == null
+        ? products
+        : products
+            .where(
+              (product) =>
+                  product.categoryId == _categories?[_selectedCategoryIndex!].id,
+            )
+            .toList();
+
+    if (_isLoading || productProvider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null || productProvider.error != null) {
+      final message = _error ?? productProvider.error ?? 'Unknown error';
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Error: $message'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                _loadData();
+                productProvider.refresh();
+              },
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_categories == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 8),
           child: CategoryList(
-            categories: _categories,
+            categories: _categories!,
             selectedIndex: _selectedCategoryIndex,
             onCategorySelected: _onCategorySelected,
             height: 90,
@@ -67,20 +153,52 @@ class _MarketplacePageState extends State<MarketplacePage> {
         ),
         const Divider(height: 1, color: AppColors.surface),
         Expanded(
-          child: _filteredProducts.isEmpty
-              ? const EmptyState(
-                  icon: Icons.shopping_bag_outlined,
-                  title: 'No products found',
-                  subtitle: 'Try selecting a different category',
-                )
-              : PageView.builder(
-                  controller: _pageController,
-                  scrollDirection: Axis.vertical,
-                  itemCount: _filteredProducts.length,
-                  itemBuilder: (context, index) {
-                    return ProductCard(product: _filteredProducts[index]);
-                  },
-                ),
+          child: AppRefreshIndicator(
+            onRefresh: () async {
+              if (mounted) {
+                setState(() => _selectedCategoryIndex = null);
+              }
+              if (_pageController.hasClients) {
+                await _pageController.animateToPage(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              }
+              await _loadData();
+              await productProvider.refresh();
+            },
+            child: filteredProducts.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 24),
+                      EmptyState(
+                        icon: Icons.shopping_bag_outlined,
+                        title: 'No products found',
+                        subtitle: 'Try selecting a different category',
+                      ),
+                    ],
+                  )
+                : PageView.builder(
+                    controller: _pageController,
+                    scrollDirection: Axis.vertical,
+                    itemCount: filteredProducts.length,
+                    itemBuilder: (context, index) {
+                      final product = filteredProducts[index];
+                      return ProductCard(
+                        product: product,
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.productDetail,
+                            arguments: ProductDetailArgs(productId: product.id),
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
         ),
       ],
     );

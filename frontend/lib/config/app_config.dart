@@ -1,8 +1,8 @@
 class AppConfig {
   const AppConfig._();
 
-  static const String baseUrl = 'http://10.250.151.163:4000';
-  static const String fallbackBaseUrl = 'http://127.0.0.1:4000';
+  static const String baseUrl = 'http://localhost:4000';
+  static const String fallbackBaseUrl = 'http://10.0.2.2:4000';
   static const String apiPrefix = '/api';
 
   static const Duration connectTimeout = Duration(seconds: 30);

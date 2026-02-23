@@ -7,6 +7,7 @@ class ProductGridCard extends StatelessWidget {
   final bool isLiked;
   final VoidCallback? onTap;
   final VoidCallback? onLikeTap;
+  final VoidCallback? onLongPress;
 
   const ProductGridCard({
     super.key,
@@ -14,6 +15,7 @@ class ProductGridCard extends StatelessWidget {
     this.isLiked = false,
     this.onTap,
     this.onLikeTap,
+    this.onLongPress,
   });
 
   @override
@@ -22,6 +24,7 @@ class ProductGridCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Ink(
           decoration: BoxDecoration(
             color: AppColors.background,
@@ -43,24 +46,28 @@ class ProductGridCard extends StatelessWidget {
                       child: Container(
                         width: double.infinity,
                         color: AppColors.surface,
-                        child: Image.asset(
-                          product.images.first,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Image.network(
-                            'https://via.placeholder.com/200',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                              color: AppColors.surface,
-                              child: Icon(
-                                Icons.image,
-                                size: 40,
-                                color: AppColors.textSecondary,
+                        child: product.firstImageUrl != null
+                            ? Image.network(
+                                product.firstImageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  color: AppColors.surface,
+                                  child: Icon(
+                                    Icons.image,
+                                    size: 40,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                color: AppColors.surface,
+                                child: Icon(
+                                  Icons.image,
+                                  size: 40,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                     Padding(

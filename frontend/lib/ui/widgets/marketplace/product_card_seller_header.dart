@@ -5,8 +5,24 @@ import '../common/user_widgets.dart';
 
 class ProductCardSellerHeader extends StatelessWidget {
   final Product product;
+  final VoidCallback? onMoreTap;
 
-  const ProductCardSellerHeader({super.key, required this.product});
+  const ProductCardSellerHeader({
+    super.key,
+    required this.product,
+    this.onMoreTap,
+  });
+
+  String _extractUniversity(String email) {
+    final parts = email.split('@');
+    if (parts.length < 2) return email;
+    
+    final domainParts = parts[1].split('.');
+    if (domainParts.length >= 2) {
+      return '@${domainParts[1]}';
+    }
+    return email;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +31,7 @@ class ProductCardSellerHeader extends StatelessWidget {
       child: Row(
         children: [
           UserAvatar(
-            imageUrl: product.seller.avatarUrl,
+            imageUrl: product.sellerProfileImage ?? 'https://i.pravatar.cc/300?img=99',
             radius: 20,
           ),
           const SizedBox(width: 10),
@@ -24,7 +40,7 @@ class ProductCardSellerHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.seller.name,
+                  product.sellerName,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
@@ -32,7 +48,7 @@ class ProductCardSellerHeader extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  product.seller.username,
+                  _extractUniversity(product.user?.email ?? 'Unknown'),
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,
@@ -42,7 +58,7 @@ class ProductCardSellerHeader extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: onMoreTap,
             icon: const Icon(Icons.more_vert),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),

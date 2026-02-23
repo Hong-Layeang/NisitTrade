@@ -35,7 +35,7 @@ class AppBottomNav extends StatelessWidget {
                   icon: Icons.home_rounded,
                   label: 'Marketplace',
                   index: 0,
-                ),
+                ), 
               ),
               Expanded(
                 child: _buildNavItem(
@@ -78,9 +78,14 @@ class AppBottomNav extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        if (!isSelected) {
-          onTabSelected?.call(index);
+        if (isSelected) {
+          if (index == 0) {
+            onTabSelected?.call(index);
+          }
+          return;
         }
+
+        onTabSelected?.call(index);
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(

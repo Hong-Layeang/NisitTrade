@@ -1,4 +1,6 @@
-class Seller {
+import 'university.dart';
+
+class UserProfile {
   final int id;
   final String fullName;
   final String email;
@@ -8,8 +10,9 @@ class Seller {
   final int? universityId;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final University? university;
 
-  const Seller({
+  const UserProfile({
     required this.id,
     required this.fullName,
     required this.email,
@@ -19,10 +22,11 @@ class Seller {
     this.universityId,
     required this.createdAt,
     required this.updatedAt,
+    this.university,
   });
 
-  factory Seller.fromJson(Map<String, dynamic> json) {
-    return Seller(
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
       id: json['id'] as int? ?? 0,
       fullName: (json['full_name'] ?? '') as String,
       email: (json['email'] ?? '') as String,
@@ -36,44 +40,9 @@ class Seller {
       updatedAt: (json['updatedAt'] ?? json['updated_at']) != null
           ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
           : DateTime.now(),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'full_name': fullName,
-      'email': email,
-      'profile_image': profileImage,
-      'provider': provider,
-      'role': role,
-      'university_id': universityId,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
-
-  Seller copyWith({
-    int? id,
-    String? fullName,
-    String? email,
-    String? profileImage,
-    String? provider,
-    String? role,
-    int? universityId,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Seller(
-      id: id ?? this.id,
-      fullName: fullName ?? this.fullName,
-      email: email ?? this.email,
-      profileImage: profileImage ?? this.profileImage,
-      provider: provider ?? this.provider,
-      role: role ?? this.role,
-      universityId: universityId ?? this.universityId,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      university: json['University'] != null
+          ? University.fromJson(json['University'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

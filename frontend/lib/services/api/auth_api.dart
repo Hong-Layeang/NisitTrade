@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../api/api_client.dart';
+import 'api_client.dart';
 
 class AuthApiResponse {
   final bool isValid;
