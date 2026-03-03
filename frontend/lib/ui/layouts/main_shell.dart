@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../utils/constants/colors.dart';
-import '../../providers/product_feed_provider.dart';
 import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
 import '../screens/profile/profile_page.dart';
@@ -32,18 +30,11 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _onTabSelected(int index) {
-    final isMarketplace = index == 0;
     final shouldSwitch = _currentIndex != index;
 
     if (shouldSwitch) {
       setState(() {
         _currentIndex = index;
-      });
-    }
-
-    if (isMarketplace) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _marketplaceKey.currentState?.resetFilterAndRefresh();
       });
     }
   }

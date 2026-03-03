@@ -48,7 +48,7 @@ class MarketplacePageState extends State<MarketplacePage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadDataIfNeeded();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ProductFeedProvider>();
       if (provider.products.isEmpty && !provider.isLoading) {
@@ -61,6 +61,14 @@ class MarketplacePageState extends State<MarketplacePage> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// Only load categories if they haven't been loaded yet
+  Future<void> _loadDataIfNeeded() async {
+    if (_categories != null) {
+      return; // Already loaded, skip
+    }
+    await _loadData();
   }
 
   Future<void> _loadData() async {
@@ -188,12 +196,15 @@ class MarketplacePageState extends State<MarketplacePage> {
                       final product = filteredProducts[index];
                       return ProductCard(
                         product: product,
-                        onTap: () {
-                          Navigator.pushNamed(
+                        onTap: () async {
+                          await Navigator.pushNamed(
                             context,
                             AppRoutes.productDetail,
                             arguments: ProductDetailArgs(productId: product.id),
                           );
+                          if (!context.mounted) return;
+                          // Refresh the product data when returning to ensure like status is updated
+                          await context.read<ProductFeedProvider>().refreshProduct(product.id);
                         },
                       );
                     },

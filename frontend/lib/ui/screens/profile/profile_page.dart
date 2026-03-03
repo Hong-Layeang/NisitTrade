@@ -261,25 +261,39 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildFriendsTab() {
-    return const Padding(
-      padding: EdgeInsets.all(24),
-      child: EmptyState(
-        icon: Icons.group_outlined,
-        title: 'Friends coming soon',
-        subtitle: 'Stay tuned for updates.',
-      ),
+    return CustomScrollView(
+      slivers: const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: EmptyState(
+              icon: Icons.group_outlined,
+              title: 'Friends coming soon',
+              subtitle: 'Stay tuned for updates.',
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildProductGrid() {
     if (_products.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: EmptyState(
-          icon: Icons.inventory_2_outlined,
-          title: 'No items yet',
-          subtitle: 'List your first item for sale.',
-        ),
+      return CustomScrollView(
+        slivers: const [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: EmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'No items yet',
+                subtitle: 'List your first item for sale.',
+              ),
+            ),
+          ),
+        ],
       );
     }
 

@@ -50,6 +50,7 @@ class ProductGridCard extends StatelessWidget {
                             ? Image.network(
                                 product.firstImageUrl!,
                                 fit: BoxFit.cover,
+                                gaplessPlayback: true,
                                 errorBuilder: (context, error, stackTrace) =>
                                     Container(
                                   color: AppColors.surface,

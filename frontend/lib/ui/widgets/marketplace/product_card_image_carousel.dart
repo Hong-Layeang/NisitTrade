@@ -33,6 +33,7 @@ class ProductCardImageCarousel extends StatelessWidget {
               return Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
+                gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: AppColors.surface,
                   child: const Icon(

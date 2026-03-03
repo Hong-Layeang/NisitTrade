@@ -1,10 +1,14 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../data/repositories/category_repository.dart';
-import '../../../data/repositories/product_repository.dart';
+import '../../../data/repositories/user_repository.dart';
 import '../../../models/category.dart';
+import '../../../models/like.dart';
 import '../../../models/product.dart';
 import '../../../services/api/api_exception.dart';
+import '../../../providers/product_feed_provider.dart';
 import '../../widgets/common/category_widgets.dart';
 import '../../widgets/common/product_grid_card.dart';
 import '../../widgets/common/search_bar_widget.dart';
@@ -20,22 +24,24 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final CategoryRepository _categoryRepository = CategoryRepositoryImpl();
-  final ProductRepository _productRepository = ProductRepositoryImpl();
+  final UserRepository _userRepository = UserRepositoryImpl();
   final TextEditingController _searchController = TextEditingController();
-  
+
   List<Category>? _categories;
-  List<Product>? _allProducts;
-  List<Product> _filteredProducts = [];
   int? _selectedCategoryIndex;
-  final Set<int> _likedProducts = {}; // Changed to int for proper product IDs
-  
   bool _isLoading = false;
   String? _error;
+  int? _currentUserId;
+
+  // Optimistic like state for instant UI feedback
+  final Set<int> _optimisticallyLikedIds = {};
+  final Set<int> _optimisticallyUnlikedIds = {};
+  final Set<int> _likingProductIds = {};
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitialData();
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -45,30 +51,35 @@ class _SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadInitialData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
+      final userResponse = await _userRepository.getCurrentUser();
+      if (userResponse.isSuccess) {
+        _currentUserId = userResponse.data?.id;
+      }
+
       // Load categories
       final categoriesResponse = await _categoryRepository.getCategories();
       if (!categoriesResponse.isSuccess) {
         throw categoriesResponse.error!;
       }
 
-      // Load products
-      final productsResponse = await _productRepository.getProducts();
-      if (!productsResponse.isSuccess) {
-        throw productsResponse.error!;
+      // Ensure products are loaded in the shared provider
+      if (mounted) {
+        final provider = context.read<ProductFeedProvider>();
+        if (provider.products.isEmpty && !provider.isLoading) {
+          await provider.load();
+        }
       }
 
       if (mounted) {
         setState(() {
           _categories = categoriesResponse.data;
-          _allProducts = productsResponse.data;
-          _filteredProducts = _allProducts ?? [];
           _isLoading = false;
         });
       }
@@ -82,12 +93,31 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
-  void _onSearchChanged() {
-    _applyFilters();
+  Like? _findUserLike(Product product) {
+    final userId = _currentUserId;
+    if (userId == null) return null;
+
+    for (final like in product.likes) {
+      if (like.userId == userId) {
+        return like;
+      }
+    }
+    return null;
   }
 
-  void _applyFilters() {
-    List<Product> filtered = _allProducts ?? [];
+  /// Effective like status considering optimistic overrides
+  bool _isLiked(Product product) {
+    if (_optimisticallyLikedIds.contains(product.id)) return true;
+    if (_optimisticallyUnlikedIds.contains(product.id)) return false;
+    return _findUserLike(product) != null;
+  }
+
+  void _onSearchChanged() {
+    setState(() {}); // Trigger rebuild to recompute filtered list
+  }
+
+  List<Product> _getFilteredProducts(List<Product> allProducts) {
+    List<Product> filtered = allProducts;
 
     // Filter by search term
     if (_searchController.text.isNotEmpty) {
@@ -100,33 +130,104 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     // Filter by category
-    if (_selectedCategoryIndex != null) {
+    if (_selectedCategoryIndex != null && _categories != null) {
       final selectedCategory = _categories![_selectedCategoryIndex!];
       filtered = filtered
           .where((product) => product.categoryId == selectedCategory.id)
           .toList();
     }
 
+    return filtered;
+  }
+
+  Future<void> _handleLikeTap(Product product) async {
+    if (_likingProductIds.contains(product.id)) return;
+
+    final isCurrentlyLiked = _isLiked(product);
+
+    // Optimistic update — show change immediately
     setState(() {
-      _filteredProducts = filtered;
+      _likingProductIds.add(product.id);
+      if (isCurrentlyLiked) {
+        _optimisticallyLikedIds.remove(product.id);
+        _optimisticallyUnlikedIds.add(product.id);
+      } else {
+        _optimisticallyUnlikedIds.remove(product.id);
+        _optimisticallyLikedIds.add(product.id);
+      }
     });
+
+    HapticFeedback.lightImpact();
+
+    try {
+      final provider = context.read<ProductFeedProvider>();
+
+      if (isCurrentlyLiked) {
+        final likeRecord = _findUserLike(product);
+        if (likeRecord != null) {
+          await provider.unlikeProduct(
+            productId: product.id,
+            likeId: likeRecord.id,
+          );
+        }
+      } else {
+        await provider.likeProduct(product.id);
+      }
+    } catch (e) {
+      debugPrint('Like operation error: $e');
+      // Revert optimistic update on error
+      if (mounted) {
+        setState(() {
+          if (isCurrentlyLiked) {
+            _optimisticallyUnlikedIds.remove(product.id);
+          } else {
+            _optimisticallyLikedIds.remove(product.id);
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isCurrentlyLiked
+                ? 'Failed to unlike product'
+                : 'Failed to like product'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _likingProductIds.remove(product.id);
+          // Clear optimistic overrides — provider now has server data
+          _optimisticallyLikedIds.remove(product.id);
+          _optimisticallyUnlikedIds.remove(product.id);
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    // Watch provider so the search page rebuilds when likes change on any page
+    final provider = context.watch<ProductFeedProvider>();
+    final allProducts = provider.products;
+    final filteredProducts = _getFilteredProducts(allProducts);
+
+    if (_isLoading || provider.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error != null) {
+    if (_error != null || provider.error != null) {
+      final message = _error ?? provider.error ?? 'Unknown error';
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Error: $_error'),
+            Text('Error: $message'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadData,
+              onPressed: () {
+                _loadInitialData();
+                provider.refresh();
+              },
               child: const Text('Retry'),
             ),
           ],
@@ -134,7 +235,7 @@ class _SearchPageState extends State<SearchPage> {
       );
     }
 
-    if (_categories == null || _allProducts == null) {
+    if (_categories == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -142,7 +243,7 @@ class _SearchPageState extends State<SearchPage> {
       children: [
         _buildSearchBar(),
         _buildCategoryFilter(),
-        Expanded(child: _buildProductGrid()),
+        Expanded(child: _buildProductGrid(filteredProducts)),
       ],
     );
   }
@@ -165,7 +266,6 @@ class _SearchPageState extends State<SearchPage> {
         selectedIndex: _selectedCategoryIndex,
         onCategorySelected: (index) {
           setState(() => _selectedCategoryIndex = index);
-          _applyFilters();
         },
         onSeeAllTap: () {},
         height: 90,
@@ -174,8 +274,8 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildProductGrid() {
-    if (_filteredProducts.isEmpty) {
+  Widget _buildProductGrid(List<Product> filteredProducts) {
+    if (filteredProducts.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -210,28 +310,25 @@ class _SearchPageState extends State<SearchPage> {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: _filteredProducts.length,
+      itemCount: filteredProducts.length,
       itemBuilder: (context, index) {
-        final product = _filteredProducts[index];
+        final product = filteredProducts[index];
+        final isLiked = _isLiked(product);
+
         return ProductGridCard(
           product: product,
-          isLiked: _likedProducts.contains(product.id),
-          onTap: () {
-            Navigator.pushNamed(
+          isLiked: isLiked,
+          onTap: () async {
+            await Navigator.pushNamed(
               context,
               AppRoutes.productDetail,
               arguments: ProductDetailArgs(productId: product.id),
             );
+            if (!context.mounted) return;
+            // Refresh product data when returning from detail page
+            await context.read<ProductFeedProvider>().refreshProduct(product.id);
           },
-          onLikeTap: () {
-            setState(() {
-              if (_likedProducts.contains(product.id)) {
-                _likedProducts.remove(product.id);
-              } else {
-                _likedProducts.add(product.id);
-              }
-            });
-          },
+          onLikeTap: () => _handleLikeTap(product),
         );
       },
     );

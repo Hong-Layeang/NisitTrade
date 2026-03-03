@@ -215,12 +215,16 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
         return ProductGridCard(
           product: product,
           isLiked: false,
-          onTap: () {
-            Navigator.pushNamed(
+          onTap: () async {
+            await Navigator.pushNamed(
               context,
               AppRoutes.productDetail,
               arguments: ProductDetailArgs(productId: product.id),
             );
+            // Refresh saved products list when returning from detail page
+            if (mounted) {
+              _loadSavedListings();
+            }
           },
           onLikeTap: () => _removeSaved(product),
           onLongPress: () => _showOwnerActions(product),

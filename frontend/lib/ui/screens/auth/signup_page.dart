@@ -87,7 +87,7 @@ class _SignupPageState extends State<SignupPage> {
                         controller: _fullNameController,
                         keyboardType: TextInputType.name,
                         textCapitalization: TextCapitalization.words,
-                        hintText: 'John Doe',
+                        hintText: 'Virak Dara',
                         textInputAction: TextInputAction.next,
                         autofillHints: const [AutofillHints.name],
                       ),
@@ -99,7 +99,7 @@ class _SignupPageState extends State<SignupPage> {
                       AppTextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        hintText: 'John.doe@university.com',
+                        hintText: 'lastname.firstname@university.com',
                         textInputAction: TextInputAction.next,
                         autofillHints: const [AutofillHints.email],
                       ),

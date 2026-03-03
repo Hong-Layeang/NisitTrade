@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/utils/constants/colors.dart';
 import 'package:provider/provider.dart';
+import '../../../models/like.dart';
 import '../../../models/product.dart';
 import '../../../providers/product_feed_provider.dart';
 import '../../../services/api/user_api_service.dart';
@@ -65,10 +66,68 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   Future<void> _getCurrentUserId() async {
     final response = await _userApiService.getCurrentUser();
     if (response.isSuccess && response.data != null) {
+      if (!mounted) return;
       setState(() {
         _currentUserId = response.data!.id;
       });
     }
+  }
+
+  Future<bool> _ensureCurrentUserId() async {
+    if (_currentUserId != null) return true;
+
+    final response = await _userApiService.getCurrentUser();
+    if (!response.isSuccess || response.data == null) {
+      return false;
+    }
+
+    final userId = response.data!.id;
+    if (mounted) {
+      setState(() => _currentUserId = userId);
+    } else {
+      _currentUserId = userId;
+    }
+    return true;
+  }
+
+  int? _findCurrentUserLikeId() {
+    final userId = _currentUserId;
+    if (userId == null) return null;
+
+    for (final like in _product.likes) {
+      if (like.userId == userId) {
+        return like.id;
+      }
+    }
+    return null;
+  }
+
+  Product _buildOptimisticLikeProduct({required bool willBeLiked}) {
+    final now = DateTime.now();
+
+    if (willBeLiked) {
+      final userId = _currentUserId;
+      if (userId == null) return _product;
+
+      final likes = List<Like>.from(_product.likes)
+        ..add(
+          Like(
+            id: -now.microsecondsSinceEpoch,
+            userId: userId,
+            productId: _product.id,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+      return _product.copyWith(likes: likes, updatedAt: now);
+    }
+
+    final userId = _currentUserId;
+    if (userId == null) return _product;
+
+    final likes = _product.likes.where((like) => like.userId != userId).toList();
+    return _product.copyWith(likes: likes, updatedAt: now);
   }
 
   bool _isProductLikedByCurrentUser() {
@@ -259,6 +318,7 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
     setState(() => _isActionLoading = true);
 
     try {
+      if (!mounted) return;
       await context.read<ProductFeedProvider>().reportProduct(
             productId: _product.id,
             reason: reason,
@@ -322,7 +382,19 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   }
 
   Future<void> _handleLikeTap() async {
-    if (_currentUserId == null || _isLoading) return;
+    if (_isLoading) return;
+
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final canResolveUser = await _ensureCurrentUserId();
+    if (!canResolveUser) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Unable to load your account. Please try again.')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
 
     // Trigger animation
     _likeAnimationController.forward(from: 0.0);
@@ -330,54 +402,76 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
     // Provide haptic feedback for modern feel
     HapticFeedback.lightImpact();
 
+    final previousProduct = _product;
     setState(() => _isLoading = true);
 
     try {
+      final provider = context.read<ProductFeedProvider>();
       final isCurrentlyLiked = _isProductLikedByCurrentUser();
+      final unlikeLikeId = isCurrentlyLiked ? _findCurrentUserLikeId() : null;
+
+      final optimisticProduct = _buildOptimisticLikeProduct(
+        willBeLiked: !isCurrentlyLiked,
+      );
+      if (mounted) {
+        setState(() => _product = optimisticProduct);
+        widget.onProductUpdated?.call(_product);
+      }
+
+      Product? updatedProduct;
 
       if (isCurrentlyLiked) {
-        // Find the like ID for current user
-        try {
-          final likeRecord = _product.likes.firstWhere(
-            (like) => like.userId == _currentUserId,
-          );
+        var likeId = unlikeLikeId;
 
-          await context.read<ProductFeedProvider>().unlikeProduct(
-                productId: _product.id,
-                likeId: likeRecord.id,
-              );
-          // Provide success haptic feedback
-          HapticFeedback.mediumImpact();
-          await _refreshProduct();
-        } catch (e) {
-          print('Error unliking product: $e');
+        if (likeId == null) {
+          final refreshed = await provider.refreshProduct(_product.id);
+          if (refreshed != null && mounted) {
+            setState(() => _product = refreshed);
+          }
+          likeId = _findCurrentUserLikeId();
+        }
+
+        if (likeId == null) {
+          if (mounted) {
+            scaffoldMessenger.showSnackBar(
+              const SnackBar(content: Text('Unable to find your like. Please try again.')),
+            );
+          }
+        } else {
+          updatedProduct = await provider.unlikeProduct(
+            productId: _product.id,
+            likeId: likeId,
+          );
         }
       } else {
-        await context.read<ProductFeedProvider>().likeProduct(_product.id);
-        // Provide success haptic feedback
-        HapticFeedback.mediumImpact();
-        await _refreshProduct();
+        updatedProduct = await provider.likeProduct(_product.id);
       }
+
+      if (updatedProduct != null && mounted) {
+        setState(() => _product = updatedProduct!);
+        widget.onProductUpdated?.call(_product);
+      } else {
+        final refreshed = await provider.refreshProduct(_product.id);
+        if (refreshed != null && mounted) {
+          setState(() => _product = refreshed);
+          widget.onProductUpdated?.call(_product);
+        }
+      }
+
+      HapticFeedback.mediumImpact();
     } catch (e) {
-      print('Like operation error: $e');
+      debugPrint('Like operation error: $e');
+      if (mounted) {
+        setState(() => _product = previousProduct);
+        widget.onProductUpdated?.call(_product);
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Failed to update like. Please try again.')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    }
-  }
-
-  Future<void> _refreshProduct() async {
-    try {
-      final updatedProduct = await context
-          .read<ProductFeedProvider>()
-          .refreshProduct(_product.id);
-      if (updatedProduct != null && mounted) {
-        setState(() => _product = updatedProduct);
-        widget.onProductUpdated?.call(_product);
-      }
-    } catch (e) {
-      print('Error refreshing product: $e');
     }
   }
 
@@ -402,29 +496,63 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
               onMoreTap: _showProductActions,
             ),
             Expanded(
-              child: ProductCardImageCarousel(
-                images: _product.imageUrls,
-                currentIndex: _currentImageIndex,
-                pageController: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentImageIndex = index;
-                  });
-                },
+              child: RepaintBoundary(
+                child: ProductCardImageCarousel(
+                  key: ValueKey(_product.id),
+                  images: _product.imageUrls,
+                  currentIndex: _currentImageIndex,
+                  pageController: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentImageIndex = index;
+                    });
+                  },
+                ),
               ),
             ),
-            ProductCardActionRow(
+            _ProductCardActionSection(
               product: _product,
               isLiked: _isProductLikedByCurrentUser(),
               likeAnimationController: _likeAnimationController,
               onLikeTap: _handleLikeTap,
-              onCommentTap: () {},
-              onChatTap: () {},
+              onProductUpdated: (updated) {
+                setState(() => _product = updated);
+                widget.onProductUpdated?.call(updated);
+              },
             ),
             ProductCardInfo(product: _product),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Separate widget for action row to prevent image carousel rebuilds
+class _ProductCardActionSection extends StatelessWidget {
+  final Product product;
+  final bool isLiked;
+  final AnimationController likeAnimationController;
+  final VoidCallback onLikeTap;
+  final Function(Product) onProductUpdated;
+
+  const _ProductCardActionSection({
+    required this.product,
+    required this.isLiked,
+    required this.likeAnimationController,
+    required this.onLikeTap,
+    required this.onProductUpdated,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ProductCardActionRow(
+      product: product,
+      isLiked: isLiked,
+      likeAnimationController: likeAnimationController,
+      onLikeTap: onLikeTap,
+      onCommentTap: () {},
+      onChatTap: () {},
     );
   }
 }

@@ -517,8 +517,8 @@ class EditPhotoGrid extends StatefulWidget {
 }
 
 class _EditPhotoGridState extends State<EditPhotoGrid> {
-  int? _draggingIndex;
   int? _hoveringIndex;
+  int? _draggingIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -568,7 +568,6 @@ class _EditPhotoGridState extends State<EditPhotoGrid> {
         }
 
         final item = displayItems[index];
-        final isDragging = _draggingIndex == index;
         final isHovering = _hoveringIndex == index;
 
         return DragTarget<int>(
@@ -709,7 +708,6 @@ class EditPhotoTile extends StatelessWidget {
   final VoidCallback? onConfirmDelete;
 
   const EditPhotoTile._({
-    super.key,
     this.imageUrl,
     this.imagePath,
     this.isMarkedForDeletion = false,
