@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/product_feed_provider.dart';
 import '../../../services/auth/auth_service.dart';
 import '../../../services/auth/microsoft_auth_service.dart';
 import '../../../utils/constants/colors.dart';
@@ -64,6 +66,10 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     if (result.isAuthenticated) {
+      // Clear stale product data from any previous user session
+      if (mounted) {
+        context.read<ProductFeedProvider>().clear();
+      }
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRoutes.marketplace,
@@ -110,6 +116,10 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (result.isAuthenticated) {
+      // Clear stale product data from any previous user session
+      if (mounted) {
+        context.read<ProductFeedProvider>().clear();
+      }
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRoutes.marketplace,

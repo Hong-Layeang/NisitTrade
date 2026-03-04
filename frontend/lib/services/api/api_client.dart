@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 
 import '../../config/app_config.dart';
+import '../../utils/navigation/app_navigator.dart';
+import '../../utils/routes/app_routes.dart';
 import '../auth/auth_token_store.dart';
 
 class ApiClient {
@@ -57,6 +59,19 @@ class ApiClient {
                 ),
               );
             }
+          }
+
+          // Auto-logout on 401 (stale/invalid token)
+          if (error.response?.statusCode == 401) {
+            await _tokenStore.clearToken();
+            final nav = appNavigatorKey.currentState;
+            if (nav != null) {
+              nav.pushNamedAndRemoveUntil(
+                AppRoutes.welcome,
+                (route) => false,
+              );
+            }
+            return handler.reject(error);
           }
 
           handler.next(error);

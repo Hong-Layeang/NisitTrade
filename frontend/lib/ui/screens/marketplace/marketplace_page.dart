@@ -49,9 +49,12 @@ class MarketplacePageState extends State<MarketplacePage> {
   void initState() {
     super.initState();
     _loadDataIfNeeded();
+    // Always reload products to ensure fresh data for the current user session.
+    // This prevents stale cached data from a previous user being shown after
+    // a logout/login cycle.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ProductFeedProvider>();
-      if (provider.products.isEmpty && !provider.isLoading) {
+      if (!provider.isLoading) {
         provider.load();
       }
     });

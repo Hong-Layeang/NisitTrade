@@ -178,6 +178,15 @@ class ProductFeedProvider extends ChangeNotifier {
     }
   }
 
+  /// Clears all cached products and resets state.
+  /// Call this on logout or user switch to avoid showing stale data.
+  void clear() {
+    _products = [];
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+  }
+
   void _upsertProduct(Product product) {
     final index = _products.indexWhere((item) => item.id == product.id);
     if (index == -1) {

@@ -32,7 +32,6 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
   final _passwordFocus = FocusNode();
   final _confirmFocus = FocusNode();
   bool _obscurePassword = true;
-  bool _obscureConfirm = true;
   bool _isSubmitting = false;
   bool _hasAttemptedSubmit = false;
 
@@ -188,7 +187,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                 AppTextFormField(
                   controller: _confirmController,
                   focusNode: _confirmFocus,
-                  obscureText: _obscureConfirm,
+                  obscureText: _obscurePassword,
                   enabled: !_isSubmitting,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _handleSubmit(),
@@ -196,14 +195,14 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                   hintText: 'Confirm password',
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscureConfirm
+                      _obscurePassword
                           ? Icons.visibility_off
                           : Icons.visibility,
                       color: AppColors.textSecondary,
                     ),
                     onPressed: () {
                       setState(() {
-                        _obscureConfirm = !_obscureConfirm;
+                        _obscurePassword = !_obscurePassword;
                       });
                     },
                   ),

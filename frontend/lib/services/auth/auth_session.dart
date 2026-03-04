@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
+
+import '../api/api_client.dart';
 import 'auth_token_store.dart';
 
 class AuthSession {
@@ -18,6 +21,18 @@ class AuthSession {
     if (_isExpired(token)) {
       await _tokenStore.clearToken();
       return false;
+    }
+
+    // Verify the user still exists on the server.
+    // This catches cases where the DB was reset but the token is still valid.
+    try {
+      await ApiClient.instance.dio.get('/auth/me');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 404) {
+        await _tokenStore.clearToken();
+        return false;
+      }
+      // Network errors — allow through so the app doesn't block on offline.
     }
 
     return true;

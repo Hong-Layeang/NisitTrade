@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../../models/product.dart';
 import '../../../models/user_profile.dart';
+import '../../../providers/product_feed_provider.dart';
 import '../../../services/api/api_exception.dart';
+import '../../../services/auth/auth_service.dart';
 import '../../../utils/constants/colors.dart';
+import '../../../utils/routes/app_routes.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/profile/profile_widgets.dart';
 
@@ -124,11 +128,26 @@ class _ProfilePageState extends State<ProfilePage>
               color: Colors.black.withOpacity(0.35),
               shape: BoxShape.circle,
             ),
-            child: IconButton(
+            child: PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: Colors.white),
-              onPressed: () {},
               padding: const EdgeInsets.all(8),
-              constraints: const BoxConstraints(),
+              onSelected: (value) {
+                if (value == 'logout') {
+                  _handleLogout();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, size: 20, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Log out', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -338,6 +357,23 @@ class _ProfilePageState extends State<ProfilePage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogout() async {
+    // Clear cached product data
+    if (mounted) {
+      context.read<ProductFeedProvider>().clear();
+    }
+    // Clear auth token
+    await AuthService.instance.logout();
+    // Navigate to welcome page and clear route stack
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.welcome,
+        (route) => false,
+      );
+    }
   }
 
   Future<void> _loadProfile() async {
