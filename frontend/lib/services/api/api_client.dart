@@ -14,15 +14,17 @@ class ApiClient {
         baseUrl: AppConfig.apiBaseUrl,
         connectTimeout: AppConfig.connectTimeout,
         receiveTimeout: AppConfig.receiveTimeout,
-        headers: const {
-          'Content-Type': 'application/json',
-        },
+        contentType: 'application/json',
       ),
     );
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          if (options.data is FormData) {
+            options.headers.remove(Headers.contentTypeHeader); // 'content-type'
+            options.headers.remove('Content-Type'); // mixed-case variant
+          }
           if (!options.headers.containsKey('Authorization')) {
             final token = await _tokenStore.readToken();
             if (token != null && token.isNotEmpty) {

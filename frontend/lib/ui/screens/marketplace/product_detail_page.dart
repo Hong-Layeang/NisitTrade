@@ -8,19 +8,31 @@ import '../../../models/product.dart';
 import '../../../providers/product_feed_provider.dart';
 import '../../../services/api/api_exception.dart';
 import '../../../utils/constants/colors.dart';
+import '../../../utils/routes/app_routes.dart';
 import '../../widgets/common/app_action_chip.dart';
+import '../../widgets/common/full_screen_image_viewer.dart';
 import '../../widgets/marketplace/product_card_image_carousel.dart';
+import '../profile/other_profile_page.dart';
 
 class ProductDetailArgs {
   final int productId;
+  final bool focusComments;
 
-  const ProductDetailArgs({required this.productId});
+  const ProductDetailArgs({
+    required this.productId,
+    this.focusComments = false,
+  });
 }
 
 class ProductDetailPage extends StatefulWidget {
   final int productId;
+  final bool focusComments;
 
-  const ProductDetailPage({super.key, required this.productId});
+  const ProductDetailPage({
+    super.key,
+    required this.productId,
+    this.focusComments = false,
+  });
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
@@ -31,6 +43,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   final UserRepository _userRepository = UserRepositoryImpl();
   final TextEditingController _commentController = TextEditingController();
   final PageController _pageController = PageController();
+  final ScrollController _scrollController = ScrollController();
+  final FocusNode _commentFocusNode = FocusNode();
   late AnimationController _likeAnimationController;
 
   Product? _product;
@@ -51,10 +65,24 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     _loadData();
   }
 
+  void _scrollToComments() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   @override
   void dispose() {
     _commentController.dispose();
     _pageController.dispose();
+    _scrollController.dispose();
+    _commentFocusNode.dispose();
     _likeAnimationController.dispose();
     super.dispose();
   }
@@ -83,6 +111,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           _product = product;
           _isLoading = false;
         });
+        if (widget.focusComments) {
+          _scrollToComments();
+        }
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -225,6 +256,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       body: RefreshIndicator(
         onRefresh: _refreshProduct,
         child: SingleChildScrollView(
+          controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,28 +300,37 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   Widget _buildImageSection(Product product) {
     final images = product.imageUrls;
     if (images.isEmpty) {
-      return Container(
-        height: 280,
-        width: double.infinity,
-        color: AppColors.surface,
-        child: const Icon(
-          Icons.image,
-          size: 80,
-          color: AppColors.textSecondary,
+      return AspectRatio(
+        aspectRatio: 4 / 3,
+        child: Container(
+          width: double.infinity,
+          color: AppColors.surface,
+          child: const Icon(
+            Icons.image,
+            size: 80,
+            color: AppColors.textSecondary,
+          ),
         ),
       );
     }
 
-    return SizedBox(
-      height: 320,
-      width: double.infinity,
-      child: ProductCardImageCarousel(
-        images: images,
-        currentIndex: _currentImageIndex,
-        pageController: _pageController,
-        onPageChanged: (index) {
-          setState(() => _currentImageIndex = index);
-        },
+    return AspectRatio(
+      aspectRatio: 4 / 3,
+      child: GestureDetector(
+        onTap: () => FullScreenImageViewer.show(
+          context,
+          images[_currentImageIndex],
+          allImages: images,
+          initialIndex: _currentImageIndex,
+        ),
+        child: ProductCardImageCarousel(
+          images: images,
+          currentIndex: _currentImageIndex,
+          pageController: _pageController,
+          onPageChanged: (index) {
+            setState(() => _currentImageIndex = index);
+          },
+        ),
       ),
     );
   }
@@ -359,41 +400,55 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
+  void _navigateToUserProfile(int userId) {
+    Navigator.pushNamed(
+      context,
+      AppRoutes.userProfile,
+      arguments: OtherProfileArgs(userId: userId),
+    );
+  }
+
   Widget _buildSellerRow(Product product) {
     return Row(
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: AppColors.surface,
-          backgroundImage: product.sellerProfileImage != null
-              ? NetworkImage(product.sellerProfileImage!)
-              : null,
-          child: product.sellerProfileImage == null
-              ? const Icon(Icons.person, color: AppColors.textSecondary)
-              : null,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        GestureDetector(
+          onTap: () => _navigateToUserProfile(product.userId),
+          child: Row(
             children: [
-              Text(
-                product.sellerName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.surface,
+                backgroundImage: product.sellerProfileImage != null
+                    ? NetworkImage(product.sellerProfileImage!)
+                    : null,
+                child: product.sellerProfileImage == null
+                    ? const Icon(Icons.person, color: AppColors.textSecondary)
+                    : null,
               ),
-              Text(
-                _extractUniversity(product.user?.email ?? ''),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.sellerName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    _extractUniversity(product.user?.email ?? ''),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
+        const Spacer(),
         OutlinedButton(
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -438,7 +493,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           ),
           label: product.commentsCount.toString(),
           labelColor: AppColors.textSecondary,
-          onTap: () {},
+          onTap: _scrollToComments,
         ),
       ],
     );
@@ -513,26 +568,32 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.surface,
-              backgroundImage: comment.user?.profileImage != null
-                  ? NetworkImage(comment.user!.profileImage!)
-                  : null,
-              child: comment.user?.profileImage == null
-                  ? const Icon(Icons.person, color: AppColors.textSecondary)
-                  : null,
+            GestureDetector(
+              onTap: () => _navigateToUserProfile(comment.userId),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.surface,
+                backgroundImage: comment.user?.profileImage != null
+                    ? NetworkImage(comment.user!.profileImage!)
+                    : null,
+                child: comment.user?.profileImage == null
+                    ? const Icon(Icons.person, color: AppColors.textSecondary)
+                    : null,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    comment.user?.fullName ?? 'User',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                  GestureDetector(
+                    onTap: () => _navigateToUserProfile(comment.userId),
+                    child: Text(
+                      comment.user?.fullName ?? 'User',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -565,6 +626,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           Expanded(
             child: TextField(
               controller: _commentController,
+              focusNode: _commentFocusNode,
               minLines: 1,
               maxLines: 3,
               decoration: InputDecoration(

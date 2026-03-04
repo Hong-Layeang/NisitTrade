@@ -179,9 +179,12 @@ class Product {
   /// Get category name
   String get categoryName => category?.name ?? 'Uncategorized';
 
-  /// Format price for display
+  /// Format price for display — decimals only when non-zero
   String get formattedPrice {
-    return '\$${price.toStringAsFixed(2)}';
+    final truncated = price.truncateToDouble();
+    return truncated == price
+        ? '\$${price.toStringAsFixed(0)}'
+        : '\$${price.toStringAsFixed(2)}';
   }
 
   /// Get time ago from creation

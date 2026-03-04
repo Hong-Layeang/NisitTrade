@@ -20,6 +20,11 @@ class NisitTradeApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         initialRoute: AppRoutes.splash,
         onGenerateRoute: controlRoute,
+        builder: (context, child) => GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: child,
+        ),
       ),
     );
   }

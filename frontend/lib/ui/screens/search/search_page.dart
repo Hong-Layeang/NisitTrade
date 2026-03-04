@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/constants/colors.dart';
@@ -7,13 +7,16 @@ import '../../../data/repositories/user_repository.dart';
 import '../../../models/category.dart';
 import '../../../models/like.dart';
 import '../../../models/product.dart';
+import '../../../models/user_profile.dart';
 import '../../../services/api/api_exception.dart';
 import '../../../providers/product_feed_provider.dart';
-import '../../widgets/common/category_widgets.dart';
 import '../../widgets/common/product_grid_card.dart';
+import '../../widgets/common/category_filter_strip.dart';
 import '../../widgets/common/search_bar_widget.dart';
+import '../../widgets/common/user_widgets.dart';
 import '../../../utils/routes/app_routes.dart';
 import '../marketplace/product_detail_page.dart';
+import '../profile/other_profile_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -22,13 +25,26 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _SearchPageState extends State<SearchPage>
+    with SingleTickerProviderStateMixin {
+  bool _showCategoryFilter = false;
   final CategoryRepository _categoryRepository = CategoryRepositoryImpl();
   final UserRepository _userRepository = UserRepositoryImpl();
   final TextEditingController _searchController = TextEditingController();
+  late final FocusNode _searchFocusNode;
+  bool _searchFocused = false;
 
+  late final TabController _tabController;
+
+  // Products tab state
   List<Category>? _categories;
   int? _selectedCategoryIndex;
+
+  // Students tab state
+  List<UserProfile> _allUsers = [];
+  bool _usersLoaded = false;
+
+  // Shared state
   bool _isLoading = false;
   String? _error;
   int? _currentUserId;
@@ -41,14 +57,34 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _loadInitialData();
     _searchController.addListener(_onSearchChanged);
+    _searchFocusNode = FocusNode();
+    _searchFocusNode.addListener(_onSearchFocusChanged);
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
     _searchController.dispose();
+    _searchFocusNode.removeListener(_onSearchFocusChanged);
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onTabChanged() {
+    // Load students lazily when the tab is first visited
+    if (_tabController.index == 1 && !_usersLoaded) {
+      _loadUsers();
+    }
+    setState(() {});
+  }
+
+  void _onSearchFocusChanged() {
+    setState(() => _searchFocused = _searchFocusNode.hasFocus);
   }
 
   Future<void> _loadInitialData() async {
@@ -93,6 +129,20 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
+  Future<void> _loadUsers() async {
+    try {
+      final response = await _userRepository.getAllUsers(limit: 100);
+      if (response.isSuccess && mounted) {
+        setState(() {
+          _allUsers = response.data ?? [];
+          _usersLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _usersLoaded = true);
+    }
+  }
+
   Like? _findUserLike(Product product) {
     final userId = _currentUserId;
     if (userId == null) return null;
@@ -113,23 +163,22 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _onSearchChanged() {
-    setState(() {}); // Trigger rebuild to recompute filtered list
+    setState(() {}); // Trigger rebuild to recompute filtered lists
   }
 
   List<Product> _getFilteredProducts(List<Product> allProducts) {
     List<Product> filtered = allProducts;
 
-    // Filter by search term
     if (_searchController.text.isNotEmpty) {
       final searchTerm = _searchController.text.toLowerCase();
       filtered = filtered
           .where((product) =>
               product.title.toLowerCase().contains(searchTerm) ||
-              (product.description?.toLowerCase().contains(searchTerm) ?? false))
+              (product.description?.toLowerCase().contains(searchTerm) ??
+                  false))
           .toList();
     }
 
-    // Filter by category
     if (_selectedCategoryIndex != null && _categories != null) {
       final selectedCategory = _categories![_selectedCategoryIndex!];
       filtered = filtered
@@ -140,12 +189,21 @@ class _SearchPageState extends State<SearchPage> {
     return filtered;
   }
 
+  List<UserProfile> _getFilteredUsers() {
+    if (_searchController.text.isEmpty) return _allUsers;
+    final searchTerm = _searchController.text.toLowerCase();
+    return _allUsers.where((user) {
+      return user.fullName.toLowerCase().contains(searchTerm) ||
+          user.email.toLowerCase().contains(searchTerm) ||
+          (user.university?.name.toLowerCase().contains(searchTerm) ?? false);
+    }).toList();
+  }
+
   Future<void> _handleLikeTap(Product product) async {
     if (_likingProductIds.contains(product.id)) return;
 
     final isCurrentlyLiked = _isLiked(product);
 
-    // Optimistic update — show change immediately
     setState(() {
       _likingProductIds.add(product.id);
       if (isCurrentlyLiked) {
@@ -196,7 +254,6 @@ class _SearchPageState extends State<SearchPage> {
       if (mounted) {
         setState(() {
           _likingProductIds.remove(product.id);
-          // Clear optimistic overrides — provider now has server data
           _optimisticallyLikedIds.remove(product.id);
           _optimisticallyUnlikedIds.remove(product.id);
         });
@@ -241,37 +298,84 @@ class _SearchPageState extends State<SearchPage> {
 
     return Column(
       children: [
-        _buildSearchBar(),
-        _buildCategoryFilter(),
-        Expanded(child: _buildProductGrid(filteredProducts)),
+        _buildHeader(),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildProductsTab(filteredProducts),
+              _buildStudentsTab(),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: SearchBarWidget(
-        controller: _searchController,
-        padding: EdgeInsets.zero,
-      ),
+  Widget _buildHeader() {
+    final onProductsTab = _tabController.index == 0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: AppColors.background,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                child: _searchFocused
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: TabBar(
+                          controller: _tabController,
+                          isScrollable: true,
+                          tabAlignment: TabAlignment.start,
+                          labelColor: AppColors.primary,
+                          unselectedLabelColor: AppColors.textSecondary,
+                          indicatorColor: AppColors.primary,
+                          indicatorWeight: 3,
+                          dividerColor: Colors.transparent,
+                          tabs: const [
+                            Tab(text: 'Products'),
+                            Tab(text: 'Students'),
+                          ],
+                        ),
+                      ),
+              ),
+              // Search bar always visible on the right
+              Expanded(
+                child: SearchBarWidget(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 1, thickness: 1, color: AppColors.border),
+        // Category filter strip
+        if (onProductsTab && _categories != null)
+          CategoryFilterStrip(
+            categories: _categories!,
+            selectedIndex: _selectedCategoryIndex,
+            onCategorySelected: (index) =>
+                setState(() => _selectedCategoryIndex = index),
+            isOpen: _showCategoryFilter,
+            onToggle: () =>
+                setState(() => _showCategoryFilter = !_showCategoryFilter),
+          ),
+      ],
     );
   }
 
-  Widget _buildCategoryFilter() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: CategoryList(
-        categories: _categories!,
-        selectedIndex: _selectedCategoryIndex,
-        onCategorySelected: (index) {
-          setState(() => _selectedCategoryIndex = index);
-        },
-        onSeeAllTap: () {},
-        height: 90,
-        circleSize: 56,
-      ),
-    );
+  // Products tab
+  Widget _buildProductsTab(List<Product> filteredProducts) {
+    return _buildProductGrid(filteredProducts);
   }
 
   Widget _buildProductGrid(List<Product> filteredProducts) {
@@ -306,7 +410,7 @@ class _SearchPageState extends State<SearchPage> {
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.85,
+        childAspectRatio: 0.72,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
@@ -326,9 +430,64 @@ class _SearchPageState extends State<SearchPage> {
             );
             if (!context.mounted) return;
             // Refresh product data when returning from detail page
-            await context.read<ProductFeedProvider>().refreshProduct(product.id);
+            await context
+                .read<ProductFeedProvider>()
+                .refreshProduct(product.id);
           },
           onLikeTap: () => _handleLikeTap(product),
+        );
+      },
+    );
+  }
+
+  // Students tab
+  Widget _buildStudentsTab() {
+    if (!_usersLoaded) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final filtered = _getFilteredUsers();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.person_search,
+              size: 64,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No students found',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try a different name or university',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final user = filtered[index];
+        return UserProfileListTile(
+          user: user,
+          onTap: () {
+            Navigator.pushNamed(
+              context,
+              AppRoutes.userProfile,
+              arguments: OtherProfileArgs(userId: user.id),
+            );
+          },
         );
       },
     );

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../utils/constants/colors.dart';
 
-/// Circular profile avatar with a colored border ring and white gap.
-/// Extends the pattern from [UserAvatar] with an outer ring decoration.
-class ProfileAvatar extends StatelessWidget {
-  final String imageUrl;
+class ProfileAvatar extends StatefulWidget {
+  final String? imageUrl;
+  final String? displayName;
   final double radius;
   final double borderWidth;
   final double gapWidth;
@@ -12,7 +11,8 @@ class ProfileAvatar extends StatelessWidget {
 
   const ProfileAvatar({
     super.key,
-    required this.imageUrl,
+    this.imageUrl,
+    this.displayName,
     this.radius = 65,
     this.borderWidth = 3,
     this.gapWidth = 3,
@@ -23,26 +23,62 @@ class ProfileAvatar extends StatelessWidget {
   double get totalRadius => radius + gapWidth + borderWidth;
 
   @override
+  State<ProfileAvatar> createState() => _ProfileAvatarState();
+}
+
+class _ProfileAvatarState extends State<ProfileAvatar> {
+  bool _imageError = false;
+
+  String _initials() {
+    final name = widget.displayName?.trim() ?? '';
+    final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  @override
+  void didUpdateWidget(ProfileAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      setState(() => _imageError = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final hasImage = !_imageError &&
+        widget.imageUrl != null &&
+        widget.imageUrl!.isNotEmpty;
     return Container(
-      padding: EdgeInsets.all(gapWidth),
+      padding: EdgeInsets.all(widget.gapWidth),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppColors.background,
-        border: Border.all(color: borderColor, width: borderWidth),
+        border: Border.all(color: widget.borderColor, width: widget.borderWidth),
       ),
       child: CircleAvatar(
-        radius: radius,
-        backgroundColor: AppColors.surface,
-        backgroundImage: NetworkImage(imageUrl),
-        onBackgroundImageError: (exception, stackTrace) {},
+        radius: widget.radius,
+        backgroundColor: AppColors.primary.withOpacity(0.15),
+        backgroundImage: hasImage ? NetworkImage(widget.imageUrl!) : null,
+        onBackgroundImageError: hasImage
+            ? (_, __) => setState(() => _imageError = true)
+            : null,
+        child: !hasImage
+            ? Text(
+                _initials(),
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: widget.radius * 0.42,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : null,
       ),
     );
   }
 }
 
-/// Reusable stat row: icon + highlighted value + optional plain label.
-/// Used for profile metrics like "13k Friends" or "CADT".
 class ProfileStatItem extends StatelessWidget {
   final IconData icon;
   final String value;
@@ -94,7 +130,7 @@ class ProfileStatItem extends StatelessWidget {
   }
 }
 
-/// Icon-only tab bar for switching between profile content sections.
+/// Icon-only tab bar
 class ProfileSectionTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTabChanged;

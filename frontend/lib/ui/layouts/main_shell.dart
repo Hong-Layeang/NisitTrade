@@ -9,6 +9,7 @@ import '../widgets/common/app_app_bar.dart';
 import '../widgets/common/app_bottom_nav.dart';
 import '../../utils/routes/app_routes.dart';
 
+
 class MainShell extends StatefulWidget {
   final int initialIndex;
 
@@ -22,6 +23,8 @@ class _MainShellState extends State<MainShell> {
   late int _currentIndex;
   final GlobalKey<MarketplacePageState> _marketplaceKey =
       GlobalKey<MarketplacePageState>();
+  final GlobalKey<ProfilePageState> _profileKey =
+      GlobalKey<ProfilePageState>();
 
   @override
   void initState() {
@@ -36,6 +39,10 @@ class _MainShellState extends State<MainShell> {
       setState(() {
         _currentIndex = index;
       });
+      // Refresh profile data from server whenever the profile tab is (re)selected.
+      if (index == 4) {
+        _profileKey.currentState?.refresh();
+      }
     }
   }
 
@@ -60,7 +67,7 @@ class _MainShellState extends State<MainShell> {
           const SearchPage(),
           const SellPage(),
           const CommunityPage(),
-          const ProfilePage(),
+          ProfilePage(key: _profileKey),
         ],
       ),
       bottomNavigationBar: AppBottomNav(

@@ -7,6 +7,7 @@ import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
 import '../../../providers/product_feed_provider.dart';
 import '../../widgets/common/app_refresh_indicator.dart';
+import '../../widgets/common/category_filter_strip.dart';
 import '../../widgets/common/category_widgets.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/marketplace/product_card.dart';
@@ -27,11 +28,15 @@ class MarketplacePageState extends State<MarketplacePage> {
   int? _selectedCategoryIndex;
   bool _isLoading = false;
   String? _error;
+  bool _showCategoryFilter = false;
 
   Future<void> resetFilterAndRefresh() async {
     if (!mounted) return;
 
-    setState(() => _selectedCategoryIndex = null);
+    setState(() {
+      _selectedCategoryIndex = null;
+      _showCategoryFilter = false;
+    });
     if (_pageController.hasClients) {
       await _pageController.animateToPage(
         0,
@@ -152,22 +157,22 @@ class MarketplacePageState extends State<MarketplacePage> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 8),
-          child: CategoryList(
-            categories: _categories!,
-            selectedIndex: _selectedCategoryIndex,
-            onCategorySelected: _onCategorySelected,
-            height: 90,
-            circleSize: 56,
-          ),
+        CategoryFilterStrip(
+          categories: _categories!,
+          selectedIndex: _selectedCategoryIndex,
+          onCategorySelected: _onCategorySelected,
+          isOpen: _showCategoryFilter,
+          onToggle: () =>
+              setState(() => _showCategoryFilter = !_showCategoryFilter),
         ),
-        const Divider(height: 1, color: AppColors.surface),
         Expanded(
           child: AppRefreshIndicator(
             onRefresh: () async {
               if (mounted) {
-                setState(() => _selectedCategoryIndex = null);
+                setState(() {
+                  _selectedCategoryIndex = null;
+                  _showCategoryFilter = false;
+                });
               }
               if (_pageController.hasClients) {
                 await _pageController.animateToPage(

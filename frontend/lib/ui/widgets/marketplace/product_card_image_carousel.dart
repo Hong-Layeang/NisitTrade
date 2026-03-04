@@ -33,6 +33,8 @@ class ProductCardImageCarousel extends StatelessWidget {
               return Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
                 gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: AppColors.surface,
@@ -48,6 +50,8 @@ class ProductCardImageCarousel extends StatelessWidget {
             return Image.asset(
               imageUrl,
               fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
               errorBuilder: (context, error, stackTrace) => Container(
                 color: AppColors.surface,
                 child: const Icon(

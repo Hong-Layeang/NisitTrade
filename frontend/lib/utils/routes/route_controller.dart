@@ -7,6 +7,7 @@ import '../../ui/screens/auth/welcome_page.dart';
 import '../../ui/Screens/splash/splash_page.dart';
 import '../../ui/screens/marketplace/product_detail_page.dart';
 import '../../ui/layouts/main_shell.dart';
+import '../../ui/screens/profile/other_profile_page.dart';
 import '../../ui/screens/saved/saved_listings_page.dart';
 import 'app_routes.dart';
 import 'auth_gate.dart';
@@ -74,7 +75,10 @@ Route<dynamic> controlRoute(RouteSettings settings) {
       final args = settings.arguments;
       if (args is ProductDetailArgs) {
         return MaterialPageRoute(
-          builder: (_) => ProductDetailPage(productId: args.productId),
+          builder: (_) => ProductDetailPage(
+            productId: args.productId,
+            focusComments: args.focusComments,
+          ),
         );
       }
       return MaterialPageRoute(builder: (_) => const LoginPage());
@@ -85,6 +89,17 @@ Route<dynamic> controlRoute(RouteSettings settings) {
           child: SavedListingsPage(),
         ),
       );
+
+    case AppRoutes.userProfile:
+      final args = settings.arguments;
+      if (args is OtherProfileArgs) {
+        return MaterialPageRoute(
+          builder: (_) => AuthGate(
+            child: OtherProfilePage(userId: args.userId),
+          ),
+        );
+      }
+      return MaterialPageRoute(builder: (_) => const LoginPage());
 
     default:
       return MaterialPageRoute(builder: (_) => const LoginPage());

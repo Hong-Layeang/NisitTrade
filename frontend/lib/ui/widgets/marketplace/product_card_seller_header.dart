@@ -6,11 +6,13 @@ import '../common/user_widgets.dart';
 class ProductCardSellerHeader extends StatelessWidget {
   final Product product;
   final VoidCallback? onMoreTap;
+  final VoidCallback? onSellerTap;
 
   const ProductCardSellerHeader({
     super.key,
     required this.product,
     this.onMoreTap,
+    this.onSellerTap,
   });
 
   String _extractUniversity(String email) {
@@ -30,33 +32,39 @@ class ProductCardSellerHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Row(
         children: [
-          UserAvatar(
-            imageUrl: product.sellerProfileImage ?? 'https://i.pravatar.cc/300?img=99',
-            radius: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          GestureDetector(
+            onTap: onSellerTap,
+            child: Row(
               children: [
-                Text(
-                  product.sellerName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: AppColors.textPrimary,
-                  ),
+                UserAvatar(
+                  imageUrl: product.sellerProfileImage ?? 'https://i.pravatar.cc/300?img=99',
+                  radius: 20,
                 ),
-                Text(
-                  _extractUniversity(product.user?.email ?? 'Unknown'),
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.sellerName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      _extractUniversity(product.user?.email ?? 'Unknown'),
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          const Spacer(),
           IconButton(
             onPressed: onMoreTap,
             icon: const Icon(Icons.more_vert),

@@ -17,4 +17,5 @@ class AppRoutes {
   static const saved = '/saved';
   static const productDetail = '/product-detail';
   static const account = '/account';
+  static const userProfile = '/user-profile';
 }

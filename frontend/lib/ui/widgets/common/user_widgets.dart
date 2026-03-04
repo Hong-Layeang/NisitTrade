@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../models/student.dart';
+import '../../../models/user_profile.dart';
 
 class StudentListTile extends StatelessWidget {
   final Student student;
@@ -156,6 +157,68 @@ class FollowButton extends StatelessWidget {
           isFollowing ? Icons.person : Icons.person_add_outlined,
           color: isFollowing ? AppColors.primary : AppColors.textSecondary,
           size: 24,
+        ),
+      ),
+    );
+  }
+}
+
+/// List tile for a [UserProfile] — used on the Students search tab.
+class UserProfileListTile extends StatelessWidget {
+  final UserProfile user;
+  final VoidCallback? onTap;
+
+  const UserProfileListTile({
+    super.key,
+    required this.user,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarUrl = user.profileImage ?? '';
+    final university = user.university?.name ?? '';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: AppColors.surface, width: 1),
+          ),
+        ),
+        child: Row(
+          children: [
+            UserAvatar(imageUrl: avatarUrl, radius: 28),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.fullName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (university.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      university,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+          ],
         ),
       ),
     );

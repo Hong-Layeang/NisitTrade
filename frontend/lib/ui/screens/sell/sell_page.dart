@@ -153,7 +153,7 @@ class _SellPageState extends State<SellPage> {
       }
 
       context.read<ProductFeedProvider>().refresh();
-      _showSnack('Listing created successfully.');
+      _showSnack('Product created successfully.');
       _clearForm();
     } on ApiException catch (e) {
       if (mounted) {
@@ -319,7 +319,7 @@ class _SellPageState extends State<SellPage> {
               onAddTap: _pickImages,
               onRemoveTap: _removeImage,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             AppPrimaryButton(
               label: _isLoading ? 'Adding...' : 'Add',
               isLoading: _isLoading,

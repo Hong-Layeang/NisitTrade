@@ -50,6 +50,8 @@ class ProductGridCard extends StatelessWidget {
                             ? Image.network(
                                 product.firstImageUrl!,
                                 fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
                                 gaplessPlayback: true,
                                 errorBuilder: (context, error, stackTrace) =>
                                     Container(
@@ -89,7 +91,7 @@ class ProductGridCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '\$ ${product.price.toStringAsFixed(0)}',
+                            product.formattedPrice,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

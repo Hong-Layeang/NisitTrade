@@ -5,24 +5,36 @@ class UserProfile {
   final String fullName;
   final String email;
   final String? profileImage;
+  final String? coverImage;
+  final String? bio;
+  final String? major;
   final String? provider;
   final String role;
   final int? universityId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final University? university;
+  final int followerCount;
+  final int followingCount;
+  final bool isFollowing;
 
   const UserProfile({
     required this.id,
     required this.fullName,
     required this.email,
     this.profileImage,
+    this.coverImage,
+    this.bio,
+    this.major,
     this.provider,
     required this.role,
     this.universityId,
     required this.createdAt,
     required this.updatedAt,
     this.university,
+    this.followerCount = 0,
+    this.followingCount = 0,
+    this.isFollowing = false,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -31,6 +43,9 @@ class UserProfile {
       fullName: (json['full_name'] ?? '') as String,
       email: (json['email'] ?? '') as String,
       profileImage: json['profile_image'] as String?,
+      coverImage: json['cover_image'] as String?,
+      bio: json['bio'] as String?,
+      major: json['major'] as String?,
       provider: json['provider'] as String?,
       role: (json['role'] ?? 'user') as String,
       universityId: json['university_id'] as int?,
@@ -43,6 +58,36 @@ class UserProfile {
       university: json['University'] != null
           ? University.fromJson(json['University'] as Map<String, dynamic>)
           : null,
+      followerCount: json['follower_count'] as int? ?? 0,
+      followingCount: json['following_count'] as int? ?? 0,
+      isFollowing: json['is_following'] as bool? ?? false,
+    );
+  }
+
+  UserProfile copyWith({
+    bool? isFollowing,
+    int? followerCount,
+    int? followingCount,
+    String? coverImage,
+    String? profileImage,
+  }) {
+    return UserProfile(
+      id: id,
+      fullName: fullName,
+      email: email,
+      profileImage: profileImage ?? this.profileImage,
+      coverImage: coverImage ?? this.coverImage,
+      bio: bio,
+      major: major,
+      provider: provider,
+      role: role,
+      universityId: universityId,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      university: university,
+      followerCount: followerCount ?? this.followerCount,
+      followingCount: followingCount ?? this.followingCount,
+      isFollowing: isFollowing ?? this.isFollowing,
     );
   }
 }

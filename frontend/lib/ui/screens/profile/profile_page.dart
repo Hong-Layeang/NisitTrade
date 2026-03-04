@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../../models/product.dart';
@@ -9,27 +10,27 @@ import '../../../services/auth/auth_service.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
 import '../../widgets/common/empty_state.dart';
+import '../../widgets/common/full_screen_image_viewer.dart';
 import '../../widgets/profile/profile_widgets.dart';
+import '../marketplace/product_detail_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<ProfilePage> createState() => ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage>
+class ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final UserRepository _userRepository = UserRepositoryImpl();
 
-  static const _coverImageUrl =
-      'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800';
-  static const _placeholderAvatar = 'https://i.pravatar.cc/300?img=12';
-
   UserProfile? _profile;
   List<Product> _products = [];
   bool _isLoading = false;
+  bool _isUploadingCover = false;
+  bool _isUploadingAvatar = false;
   String? _error;
 
   // ── Layout constants ──
@@ -92,7 +93,7 @@ class _ProfilePageState extends State<ProfilePage>
             },
             body: TabBarView(
               controller: _tabController,
-              children: [_buildProductGrid(), _buildFriendsTab()],
+              children: [_buildProductGrid(), _buildPostsTab()],
             ),
           ),
         ),
@@ -100,25 +101,96 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
+  /// Reload profile data from the server.
+  Future<void> refresh() => _loadProfile();
+
   /// Cover image with overlapping avatar and three-dot menu
   Widget _buildCoverAndAvatar() {
-    final avatarUrl = _profile?.profileImage ?? _placeholderAvatar;
+    final coverUrl = _profile?.coverImage;
+    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+    final avatarUrl = _profile?.profileImage;
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Cover image
-        SizedBox(
-          height: _coverHeight,
-          width: double.infinity,
-          child: Image.network(
-            _coverImageUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: AppColors.accent.withOpacity(0.3),
-              child: const Icon(Icons.image, size: 48, color: Colors.white54),
+        // Cover
+        GestureDetector(
+          onTap: hasCover && !_isUploadingCover
+              ? () => _viewFullScreen(coverUrl)
+              : null,
+          child: SizedBox(
+            height: _coverHeight,
+            width: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Background
+                hasCover
+                    ? Image.network(
+                        coverUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildCoverPlaceholder(),
+                      )
+                    : _buildCoverPlaceholder(),
+
+                // Dim + spinner while uploading
+                if (_isUploadingCover)
+                  const ColoredBox(
+                    color: Colors.black54,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  ),
+
+                // Add / Edit cover button
+                if (!_isUploadingCover)
+                  Positioned(
+                    bottom: _avatarTotalRadius + 10,
+                    right: 14,
+                    child: GestureDetector(
+                      onTap: _pickAndUploadCover,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(20),
+                          border:
+                              Border.all(color: Colors.white24, width: 0.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              hasCover
+                                  ? Icons.camera_alt_outlined
+                                  : Icons.add_photo_alternate_outlined,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              hasCover ? 'Edit' : 'Add cover',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
+
         // Three-dot menu
         Positioned(
           top: 12,
@@ -132,9 +204,7 @@ class _ProfilePageState extends State<ProfilePage>
               icon: const Icon(Icons.more_vert, color: Colors.white),
               padding: const EdgeInsets.all(8),
               onSelected: (value) {
-                if (value == 'logout') {
-                  _handleLogout();
-                }
+                if (value == 'logout') _handleLogout();
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(
@@ -143,7 +213,8 @@ class _ProfilePageState extends State<ProfilePage>
                     children: [
                       Icon(Icons.logout, size: 20, color: Colors.red),
                       SizedBox(width: 8),
-                      Text('Log out', style: TextStyle(color: Colors.red)),
+                      Text('Log out',
+                          style: TextStyle(color: Colors.red)),
                     ],
                   ),
                 ),
@@ -151,17 +222,66 @@ class _ProfilePageState extends State<ProfilePage>
             ),
           ),
         ),
-        // Profile avatar overlapping bottom of cover
+
+        // Avatar 
         Positioned(
           bottom: -_avatarTotalRadius,
           left: 0,
           right: 0,
           child: Center(
-            child: ProfileAvatar(
-              imageUrl: avatarUrl,
-              radius: _avatarRadius,
-              borderWidth: _avatarBorder,
-              gapWidth: _avatarGap,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Tap avatar → full-screen viewer
+                GestureDetector(
+                  onTap: hasAvatar && !_isUploadingAvatar
+                      ? () => _viewFullScreen(avatarUrl)
+                      : null,
+                  child: ProfileAvatar(
+                    imageUrl: _profile?.profileImage,
+                    displayName: _profile?.fullName,
+                    radius: _avatarRadius,
+                    borderWidth: _avatarBorder,
+                    gapWidth: _avatarGap,
+                  ),
+                ),
+                // Upload spinner over avatar
+                if (_isUploadingAvatar)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.black38,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  // Camera badge → edit/upload
+                  Positioned(
+                    bottom: _avatarGap + 2,
+                    right: _avatarGap + 2,
+                    child: GestureDetector(
+                      onTap: _pickAndUploadAvatar,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: AppColors.textPrimary,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppColors.background, width: 2),
+                        ),
+                        child: const Icon(Icons.camera_alt,
+                            color: Colors.white, size: 13),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -171,57 +291,52 @@ class _ProfilePageState extends State<ProfilePage>
 
   /// Stats flanking the avatar overlap area
   Widget _buildStatsRow() {
-    final institution = _profile?.university?.name ?? 'Unknown';
-    final role = _profile?.role ?? 'User';
-    final itemsSold = _products.length.toString();
+    final schoolShort = _getSchoolShortName(_profile);
     return SizedBox(
       height: _avatarTotalRadius + 24,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Left stats
+            // Left: followers + following, right-aligned towards avatar
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const ProfileStatItem(
-                    icon: Icons.people_outline,
-                    value: '0',
-                    label: 'Friends',
+                  _buildCountStat(
+                    Icons.person_add_outlined,
+                    '${_profile?.followerCount ?? 0}',
+                    'Followers',
                   ),
-                  const SizedBox(height: 6),
-                  ProfileStatItem(
-                    icon: Icons.shopping_cart_outlined,
-                    value: itemsSold,
-                    label: 'items sold',
+                  const SizedBox(height: 10),
+                  _buildCountStat(
+                    Icons.people_outline,
+                    '${_profile?.followingCount ?? 0}',
+                    'Following',
                   ),
                 ],
-              ),
               ),
             ),
             // Center gap for avatar
-            SizedBox(width: _avatarTotalRadius * 2),
-            // Right stats
+            SizedBox(width: _avatarTotalRadius * 2 + 16),
+            // Right: major + school, left-aligned towards avatar
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.end,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ProfileStatItem(
-                    icon: Icons.inventory_2_outlined,
-                    value: institution,
+                    icon: Icons.school_outlined,
+                    value: _profile?.major ?? 'N/A',
                   ),
-                  const SizedBox(height: 6),
-                  ProfileStatItem(icon: Icons.verified_outlined, value: role),
+                  const SizedBox(height: 10),
+                  ProfileStatItem(
+                    icon: Icons.verified_outlined,
+                    value: schoolShort,
+                  ),
                 ],
-              ),
               ),
             ),
           ],
@@ -230,11 +345,70 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
+  /// Count stat with icon: [icon] bold-number / small-label
+  Widget _buildCountStat(IconData icon, String count, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              count,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Extract a short school abbreviation from the university's name.
+  /// e.g. "Cambodian Academy of Digital Technology" → "CADT"
+  String _getSchoolShortName(UserProfile? profile) {
+    final university = profile?.university;
+    if (university == null) return 'N/A';
+
+    // Try abbreviation from name first (first letter of each significant word)
+    const skipWords = {'of', 'the', 'and', 'in', 'at', 'for', 'a', 'an', 'to'};
+    final nameParts = university.name.trim().split(RegExp(r'\s+'));
+    final initials = nameParts
+        .where((w) => w.isNotEmpty && !skipWords.contains(w.toLowerCase()))
+        .map((w) => w[0].toUpperCase())
+        .join();
+    if (initials.isNotEmpty) return initials;
+
+    // Fallback: parse domain
+    const excluded = {'student', 'mail', 'www', 'edu', 'ac', 'com', 'org', 'net', 'kh'};
+    final domainParts = university.domain.split('.');
+    final meaningful = domainParts.where(
+      (p) => p.length > 2 && !excluded.contains(p.toLowerCase()),
+    );
+    if (meaningful.isNotEmpty) return meaningful.first.toUpperCase();
+    return domainParts.isNotEmpty ? domainParts.first.toUpperCase() : 'N/A';
+  }
+
   /// Profile name and bio text
   Widget _buildNameAndBio(TextTheme textTheme) {
     final profile = _profile;
     final name = profile?.fullName ?? 'User';
-    final bio = profile?.email ?? 'No bio available.';
+    final bio = (profile?.bio != null && profile!.bio!.isNotEmpty)
+        ? profile.bio!
+        : 'No bio yet.';
     return Column(
       children: [
         const SizedBox(height: 8),
@@ -249,8 +423,9 @@ class _ProfilePageState extends State<ProfilePage>
             bio,
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
-              color: AppColors.textPrimary,
+              color: AppColors.textSecondary,
               height: 1.4,
+              fontStyle: FontStyle.italic,
             ),
           ),
         ),
@@ -259,6 +434,7 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildTabBar(BuildContext context) {
+    final productCount = _products.length;
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.background,
@@ -268,18 +444,29 @@ class _ProfilePageState extends State<ProfilePage>
         controller: _tabController,
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textSecondary,
-        indicatorColor: AppColors.primary,
-        indicatorWeight: 3,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: const UnderlineTabIndicator(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(3)),
+          borderSide: BorderSide(color: AppColors.primary, width: 3),
+        ),
         dividerColor: Colors.transparent,
-        tabs: const [
-          Tab(icon: Icon(Icons.grid_on, size: 28)),
-          Tab(icon: Icon(Icons.people_outline, size: 28)),
+        tabs: [
+          Tab(
+            icon: Badge(
+              label: Text('$productCount'),
+              backgroundColor: AppColors.primary,
+              textColor: Colors.white,
+              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              child: const Icon(Icons.shopping_bag_outlined, size: 24),
+            ),
+          ),
+          const Tab(icon: Icon(Icons.article_outlined, size: 24)),
         ],
       ),
     );
   }
 
-  Widget _buildFriendsTab() {
+  Widget _buildPostsTab() {
     return CustomScrollView(
       slivers: const [
         SliverFillRemaining(
@@ -287,8 +474,8 @@ class _ProfilePageState extends State<ProfilePage>
           child: Padding(
             padding: EdgeInsets.all(24),
             child: EmptyState(
-              icon: Icons.group_outlined,
-              title: 'Friends coming soon',
+              icon: Icons.article_outlined,
+              title: 'Posts coming soon',
               subtitle: 'Stay tuned for updates.',
             ),
           ),
@@ -317,7 +504,7 @@ class _ProfilePageState extends State<ProfilePage>
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.only(top: 8, left: 2, right: 2, bottom: 2),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 2,
@@ -328,21 +515,35 @@ class _ProfilePageState extends State<ProfilePage>
         final product = _products[index];
         final imageUrl = product.firstImageUrl;
         if (imageUrl == null || imageUrl.isEmpty) {
-          return Container(
-            color: AppColors.surface,
-            child: const Icon(Icons.image, color: AppColors.textSecondary),
+          return GestureDetector(
+            onTap: () => _openProduct(product),
+            child: Container(
+              color: AppColors.surface,
+              child: const Icon(Icons.image, color: AppColors.textSecondary),
+            ),
           );
         }
 
-        return Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            color: AppColors.surface,
-            child: const Icon(Icons.image, color: AppColors.textSecondary),
+        return GestureDetector(
+          onTap: () => _openProduct(product),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: AppColors.surface,
+              child: const Icon(Icons.image, color: AppColors.textSecondary),
+            ),
           ),
         );
       },
+    );
+  }
+
+  void _openProduct(Product product) {
+    Navigator.pushNamed(
+      context,
+      AppRoutes.productDetail,
+      arguments: ProductDetailArgs(productId: product.id),
     );
   }
 
@@ -357,6 +558,82 @@ class _ProfilePageState extends State<ProfilePage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Widget _buildCoverPlaceholder() {
+    return const ColoredBox(color: Colors.black);
+  }
+
+  void _viewFullScreen(String imageUrl) {
+    FullScreenImageViewer.show(context, imageUrl);
+  }
+
+  Future<void> _pickAndUploadCover() async {
+    if (_profile == null || _isUploadingCover) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _isUploadingCover = true);
+
+    try {
+      final response = await _userRepository.updateCoverImage(
+        userId: _profile!.id,
+        filePath: picked.path,
+      );
+
+      if (!mounted) return;
+
+      if (response.isSuccess) {
+        setState(() {
+          _profile = _profile!.copyWith(coverImage: response.data);
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.error?.message ?? 'Failed to update cover')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingCover = false);
+    }
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    if (_profile == null || _isUploadingAvatar) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _isUploadingAvatar = true);
+
+    try {
+      final response = await _userRepository.updateAvatarImage(
+        userId: _profile!.id,
+        filePath: picked.path,
+      );
+
+      if (!mounted) return;
+
+      if (response.isSuccess) {
+        setState(() {
+          _profile = _profile!.copyWith(profileImage: response.data);
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.error?.message ?? 'Failed to update photo')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
   }
 
   Future<void> _handleLogout() async {

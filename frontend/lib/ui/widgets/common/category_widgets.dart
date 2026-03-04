@@ -127,15 +127,70 @@ class SeeAllCircle extends StatelessWidget {
   }
 }
 
-/// A horizontal scrollable list of category circles with optional "See All" button
+class SeeLessCircle extends StatelessWidget {
+  final VoidCallback? onTap;
+  final double size;
+
+  const SeeLessCircle({
+    super.key,
+    this.onTap,
+    this.size = 70,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size + 15,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.textSecondary,
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                Icons.expand_less_rounded,
+                color: AppColors.textSecondary,
+                size: size * 0.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'See Less',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A horizontal scrollable list of category circles with optional "See All" / "See Less" button
 class CategoryList extends StatelessWidget {
   final List<Category> categories;
   final int? selectedIndex;
   final ValueChanged<int?>? onCategorySelected;
   final VoidCallback? onSeeAllTap;
+  final VoidCallback? onSeeLessTap;
   final double height;
   final double circleSize;
   final bool showSeeAll;
+  final bool showSeeLess;
 
   const CategoryList({
     super.key,
@@ -143,21 +198,27 @@ class CategoryList extends StatelessWidget {
     this.selectedIndex,
     this.onCategorySelected,
     this.onSeeAllTap,
+    this.onSeeLessTap,
     this.height = 110,
     this.circleSize = 70,
     this.showSeeAll = true,
+    this.showSeeLess = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bool hasExtra = showSeeAll || showSeeLess;
     return SizedBox(
       height: height,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        itemCount: categories.length + (showSeeAll ? 1 : 0),
+        itemCount: categories.length + (hasExtra ? 1 : 0),
         itemBuilder: (context, index) {
-          if (showSeeAll && index == categories.length) {
+          if (hasExtra && index == categories.length) {
+            if (showSeeLess) {
+              return SeeLessCircle(size: circleSize, onTap: onSeeLessTap);
+            }
             return SeeAllCircle(size: circleSize, onTap: onSeeAllTap);
           }
           return CategoryCircle(

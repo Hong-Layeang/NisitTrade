@@ -9,6 +9,9 @@ import '../../../services/api/user_api_service.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../common/app_action_sheet.dart';
 import '../../screens/edit/edit_product_page.dart';
+import '../../screens/marketplace/product_detail_page.dart';
+import '../../screens/profile/other_profile_page.dart';
+import '../../../utils/routes/app_routes.dart';
 import 'product_card_action_row.dart';
 import 'product_card_image_carousel.dart';
 import 'product_card_info.dart';
@@ -88,6 +91,19 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
       _currentUserId = userId;
     }
     return true;
+  }
+
+  Future<void> _handleCommentTap() async {
+    await Navigator.pushNamed(
+      context,
+      AppRoutes.productDetail,
+      arguments: ProductDetailArgs(
+        productId: _product.id,
+        focusComments: true,
+      ),
+    );
+    if (!mounted) return;
+    await context.read<ProductFeedProvider>().refreshProduct(_product.id);
   }
 
   int? _findCurrentUserLikeId() {
@@ -494,6 +510,11 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
             ProductCardSellerHeader(
               product: _product,
               onMoreTap: _showProductActions,
+              onSellerTap: () => Navigator.pushNamed(
+                context,
+                AppRoutes.userProfile,
+                arguments: OtherProfileArgs(userId: _product.userId),
+              ),
             ),
             Expanded(
               child: RepaintBoundary(
@@ -515,6 +536,7 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
               isLiked: _isProductLikedByCurrentUser(),
               likeAnimationController: _likeAnimationController,
               onLikeTap: _handleLikeTap,
+              onCommentTap: _handleCommentTap,
               onProductUpdated: (updated) {
                 setState(() => _product = updated);
                 widget.onProductUpdated?.call(updated);
@@ -534,6 +556,7 @@ class _ProductCardActionSection extends StatelessWidget {
   final bool isLiked;
   final AnimationController likeAnimationController;
   final VoidCallback onLikeTap;
+  final VoidCallback onCommentTap;
   final Function(Product) onProductUpdated;
 
   const _ProductCardActionSection({
@@ -541,6 +564,7 @@ class _ProductCardActionSection extends StatelessWidget {
     required this.isLiked,
     required this.likeAnimationController,
     required this.onLikeTap,
+    required this.onCommentTap,
     required this.onProductUpdated,
   });
 
@@ -551,7 +575,7 @@ class _ProductCardActionSection extends StatelessWidget {
       isLiked: isLiked,
       likeAnimationController: likeAnimationController,
       onLikeTap: onLikeTap,
-      onCommentTap: () {},
+      onCommentTap: onCommentTap,
       onChatTap: () {},
     );
   }
