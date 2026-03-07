@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../providers/user_provider.dart';
 import '../../../services/auth/microsoft_auth_service.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
@@ -118,6 +120,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     });
 
     if (result.isSuccess) {
+      if (mounted) context.read<UserProvider>().load();
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRoutes.marketplace,

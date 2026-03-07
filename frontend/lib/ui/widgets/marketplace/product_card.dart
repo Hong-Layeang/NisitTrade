@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../models/like.dart';
 import '../../../models/product.dart';
 import '../../../providers/product_feed_provider.dart';
-import '../../../services/api/user_api_service.dart';
+import '../../../providers/user_provider.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../common/app_action_sheet.dart';
 import '../../screens/edit/edit_product_page.dart';
@@ -40,8 +40,6 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   late Product _product;
   bool _isLoading = false;
   bool _isActionLoading = false;
-  int? _currentUserId;
-  final UserApiService _userApiService = UserApiService.instance;
   final ProductRepository _productRepository = ProductRepositoryImpl();
 
   @override
@@ -53,7 +51,6 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
       vsync: this,
     );
     _product = widget.product;
-    _getCurrentUserId();
   }
 
   @override
@@ -64,33 +61,6 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
     if (oldWidget.product != widget.product) {
       _product = widget.product;
     }
-  }
-
-  Future<void> _getCurrentUserId() async {
-    final response = await _userApiService.getCurrentUser();
-    if (response.isSuccess && response.data != null) {
-      if (!mounted) return;
-      setState(() {
-        _currentUserId = response.data!.id;
-      });
-    }
-  }
-
-  Future<bool> _ensureCurrentUserId() async {
-    if (_currentUserId != null) return true;
-
-    final response = await _userApiService.getCurrentUser();
-    if (!response.isSuccess || response.data == null) {
-      return false;
-    }
-
-    final userId = response.data!.id;
-    if (mounted) {
-      setState(() => _currentUserId = userId);
-    } else {
-      _currentUserId = userId;
-    }
-    return true;
   }
 
   Future<void> _handleCommentTap() async {
@@ -107,7 +77,7 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   }
 
   int? _findCurrentUserLikeId() {
-    final userId = _currentUserId;
+    final userId = context.read<UserProvider>().userId;
     if (userId == null) return null;
 
     for (final like in _product.likes) {
@@ -120,9 +90,9 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
 
   Product _buildOptimisticLikeProduct({required bool willBeLiked}) {
     final now = DateTime.now();
+    final userId = context.read<UserProvider>().userId;
 
     if (willBeLiked) {
-      final userId = _currentUserId;
       if (userId == null) return _product;
 
       final likes = List<Like>.from(_product.likes)
@@ -139,7 +109,6 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
       return _product.copyWith(likes: likes, updatedAt: now);
     }
 
-    final userId = _currentUserId;
     if (userId == null) return _product;
 
     final likes = _product.likes.where((like) => like.userId != userId).toList();
@@ -147,13 +116,15 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   }
 
   bool _isProductLikedByCurrentUser() {
-    if (_currentUserId == null) return false;
-    return _product.likes.any((like) => like.userId == _currentUserId);
+    final userId = context.read<UserProvider>().userId;
+    if (userId == null) return false;
+    return _product.likes.any((like) => like.userId == userId);
   }
 
   bool _isOwner() {
-    if (_currentUserId == null) return false;
-    return _product.userId == _currentUserId;
+    final userId = context.read<UserProvider>().userId;
+    if (userId == null) return false;
+    return _product.userId == userId;
   }
 
   void _showSnack(String message) {
@@ -401,16 +372,12 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
     if (_isLoading) return;
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final canResolveUser = await _ensureCurrentUserId();
-    if (!canResolveUser) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Unable to load your account. Please try again.')),
-        );
-      }
+    if (context.read<UserProvider>().userId == null) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Unable to load your account. Please try again.')),
+      );
       return;
     }
-    if (!mounted) return;
 
     // Trigger animation
     _likeAnimationController.forward(from: 0.0);

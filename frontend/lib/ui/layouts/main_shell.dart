@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants/colors.dart';
+import '../../providers/user_provider.dart';
+import 'package:provider/provider.dart';
 import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
 import '../screens/profile/profile_page.dart';
@@ -30,6 +32,13 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    // Ensure user info is loaded when the main shell first mounts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProvider = context.read<UserProvider>();
+      if (userProvider.profile == null && !userProvider.isLoading) {
+        userProvider.load();
+      }
+    });
   }
 
   void _onTabSelected(int index) {
@@ -39,10 +48,6 @@ class _MainShellState extends State<MainShell> {
       setState(() {
         _currentIndex = index;
       });
-      // Refresh profile data from server whenever the profile tab is (re)selected.
-      if (index == 4) {
-        _profileKey.currentState?.refresh();
-      }
     }
   }
 

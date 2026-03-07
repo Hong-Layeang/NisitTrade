@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../../models/product.dart';
 import '../../../models/user_profile.dart';
 import '../../../providers/product_feed_provider.dart';
+import '../../../providers/user_provider.dart';
 import '../../../services/api/api_exception.dart';
 import '../../../services/auth/auth_service.dart';
 import '../../../utils/constants/colors.dart';
@@ -26,12 +28,12 @@ class ProfilePageState extends State<ProfilePage>
   late final TabController _tabController;
   final UserRepository _userRepository = UserRepositoryImpl();
 
-  UserProfile? _profile;
   List<Product> _products = [];
   bool _isLoading = false;
   bool _isUploadingCover = false;
   bool _isUploadingAvatar = false;
   String? _error;
+  bool _productsLoaded = false;
 
   // ── Layout constants ──
   static const double _coverHeight = 220;
@@ -44,8 +46,10 @@ class ProfilePageState extends State<ProfilePage>
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final userProvider = context.watch<UserProvider>();
+    final profile = userProvider.profile;
 
-    if (_isLoading) {
+    if (profile == null && userProvider.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -62,7 +66,6 @@ class ProfilePageState extends State<ProfilePage>
       );
     }
 
-    final profile = _profile;
     if (profile == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -74,12 +77,27 @@ class ProfilePageState extends State<ProfilePage>
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
                 SliverToBoxAdapter(
-                  child: Column(
+                  child: Stack(
                     children: [
-                      _buildCoverAndAvatar(),
-                      _buildStatsRow(),
-                      _buildNameAndBio(textTheme),
-                      const SizedBox(height: 16),
+                      Column(
+                        children: [
+                          _buildCoverAndAvatar(),
+                          _buildStatsRow(),
+                          _buildNameAndBio(textTheme),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                      // Avatar + camera button live here so they are inside
+                      // this Stack's layout bounds and are always hittable.
+                      // (If placed inside _buildCoverAndAvatar with a negative
+                      // bottom offset they fall outside that Stack's 220 px
+                      // layout height and Flutter's hit-test ignores them.)
+                      Positioned(
+                        top: _coverHeight - _avatarTotalRadius,
+                        left: 0,
+                        right: 0,
+                        child: Center(child: _buildAvatarWithCamera()),
+                      ),
                     ],
                   ),
                 ),
@@ -87,6 +105,7 @@ class ProfilePageState extends State<ProfilePage>
                   pinned: true,
                   delegate: _StickyTabBarDelegate(
                     tabBar: _buildTabBar(context),
+                    productCount: _products.length,
                   ),
                 ),
               ];
@@ -101,18 +120,18 @@ class ProfilePageState extends State<ProfilePage>
     );
   }
 
-  /// Reload profile data from the server.
-  Future<void> refresh() => _loadProfile();
+  /// Reload product listings
+  Future<void> refresh() async {
+    await _loadProducts();
+  }
 
-  /// Cover image with overlapping avatar and three-dot menu
+  /// Cover image (no avatar – avatar is overlaid at the SliverToBoxAdapter level)
   Widget _buildCoverAndAvatar() {
-    final coverUrl = _profile?.coverImage;
+    final profile = context.read<UserProvider>().profile;
+    final coverUrl = profile?.coverImage;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-    final avatarUrl = _profile?.profileImage;
-    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
 
     return Stack(
-      clipBehavior: Clip.none,
       children: [
         // Cover
         GestureDetector(
@@ -222,76 +241,77 @@ class ProfilePageState extends State<ProfilePage>
             ),
           ),
         ),
+      ],
+    );
+  }
 
-        // Avatar 
-        Positioned(
-          bottom: -_avatarTotalRadius,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Tap avatar → full-screen viewer
-                GestureDetector(
-                  onTap: hasAvatar && !_isUploadingAvatar
-                      ? () => _viewFullScreen(avatarUrl)
-                      : null,
-                  child: ProfileAvatar(
-                    imageUrl: _profile?.profileImage,
-                    displayName: _profile?.fullName,
-                    radius: _avatarRadius,
-                    borderWidth: _avatarBorder,
-                    gapWidth: _avatarGap,
-                  ),
-                ),
-                // Upload spinner over avatar
-                if (_isUploadingAvatar)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.black38,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  // Camera badge → edit/upload
-                  Positioned(
-                    bottom: _avatarGap + 2,
-                    right: _avatarGap + 2,
-                    child: GestureDetector(
-                      onTap: _pickAndUploadAvatar,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: AppColors.textPrimary,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: AppColors.background, width: 2),
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            color: Colors.white, size: 13),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+  /// Avatar circle + camera-badge button.
+  /// Rendered as a Positioned overlay at the SliverToBoxAdapter Stack level
+  /// so the camera badge is always within hit-test bounds.
+  Widget _buildAvatarWithCamera() {
+    final userProvider = context.read<UserProvider>();
+    final profile = userProvider.profile;
+    final avatarUrl = profile?.profileImage;
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Tap avatar → full-screen viewer
+        GestureDetector(
+          onTap: hasAvatar && !_isUploadingAvatar
+              ? () => _viewFullScreen(avatarUrl)
+              : null,
+          child: ProfileAvatar(
+            imageUrl: profile?.profileImage,
+            displayName: profile?.fullName,
+            radius: _avatarRadius,
+            borderWidth: _avatarBorder,
+            gapWidth: _avatarGap,
           ),
         ),
+        // Upload spinner over avatar
+        if (_isUploadingAvatar)
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.black38,
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              ),
+            ),
+          )
+        else
+          // Camera badge → edit/upload
+          Positioned(
+            bottom: _avatarGap + 2,
+            right: _avatarGap + 2,
+            child: GestureDetector(
+              onTap: _pickAndUploadAvatar,
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: AppColors.textPrimary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.background, width: 2),
+                ),
+                child: const Icon(Icons.camera_alt, color: Colors.white, size: 13),
+              ),
+            ),
+          ),
       ],
     );
   }
 
   /// Stats flanking the avatar overlap area
   Widget _buildStatsRow() {
-    final schoolShort = _getSchoolShortName(_profile);
+    final profile = context.read<UserProvider>().profile;
+    final schoolShort = _getSchoolShortName(profile);
     return SizedBox(
       height: _avatarTotalRadius + 24,
       child: Padding(
@@ -307,13 +327,13 @@ class ProfilePageState extends State<ProfilePage>
                 children: [
                   _buildCountStat(
                     Icons.person_add_outlined,
-                    '${_profile?.followerCount ?? 0}',
+                    '${profile?.followerCount ?? 0}',
                     'Followers',
                   ),
                   const SizedBox(height: 10),
                   _buildCountStat(
                     Icons.people_outline,
-                    '${_profile?.followingCount ?? 0}',
+                    '${profile?.followingCount ?? 0}',
                     'Following',
                   ),
                 ],
@@ -329,7 +349,7 @@ class ProfilePageState extends State<ProfilePage>
                 children: [
                   ProfileStatItem(
                     icon: Icons.school_outlined,
-                    value: _profile?.major ?? 'N/A',
+                    value: profile?.major ?? 'N/A',
                   ),
                   const SizedBox(height: 10),
                   ProfileStatItem(
@@ -404,7 +424,7 @@ class ProfilePageState extends State<ProfilePage>
 
   /// Profile name and bio text
   Widget _buildNameAndBio(TextTheme textTheme) {
-    final profile = _profile;
+    final profile = context.read<UserProvider>().profile;
     final name = profile?.fullName ?? 'User';
     final bio = (profile?.bio != null && profile!.bio!.isNotEmpty)
         ? profile.bio!
@@ -485,6 +505,10 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildProductGrid() {
+    if (_isLoading && _products.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (_products.isEmpty) {
       return CustomScrollView(
         slivers: const [
@@ -551,7 +575,20 @@ class ProfilePageState extends State<ProfilePage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadProfile();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_productsLoaded) {
+      final userId = context.read<UserProvider>().userId;
+      if (userId != null) {
+        _productsLoaded = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadProducts();
+        });
+      }
+    }
   }
 
   @override
@@ -569,7 +606,8 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _pickAndUploadCover() async {
-    if (_profile == null || _isUploadingCover) return;
+    final userProvider = context.read<UserProvider>();
+    if (userProvider.profile == null || _isUploadingCover) return;
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -581,20 +619,16 @@ class ProfilePageState extends State<ProfilePage>
     setState(() => _isUploadingCover = true);
 
     try {
-      final response = await _userRepository.updateCoverImage(
-        userId: _profile!.id,
+      final newUrl = await userProvider.updateCover(
+        userId: userProvider.profile!.id,
         filePath: picked.path,
       );
 
       if (!mounted) return;
 
-      if (response.isSuccess) {
-        setState(() {
-          _profile = _profile!.copyWith(coverImage: response.data);
-        });
-      } else {
+      if (newUrl == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.error?.message ?? 'Failed to update cover')),
+          const SnackBar(content: Text('Failed to update cover')),
         );
       }
     } finally {
@@ -603,7 +637,8 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _pickAndUploadAvatar() async {
-    if (_profile == null || _isUploadingAvatar) return;
+    final userProvider = context.read<UserProvider>();
+    if (userProvider.profile == null || _isUploadingAvatar) return;
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -612,38 +647,82 @@ class ProfilePageState extends State<ProfilePage>
     );
     if (picked == null || !mounted) return;
 
+    // Crop the selected image
+    final cropper = ImageCropper();
+    final croppedFile = await cropper.cropImage(
+      sourcePath: picked.path,
+      compressQuality: 90,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Avatar',
+          toolbarColor: AppColors.primary,
+          toolbarWidgetColor: Colors.white,
+          statusBarColor: AppColors.primary,
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+          hideBottomControls: false,
+          showCropGrid: true,
+          cropFrameColor: AppColors.primary,
+          cropGridColor: AppColors.primary.withOpacity(0.5),
+          activeControlsWidgetColor: AppColors.primary,
+          dimmedLayerColor: Colors.black.withOpacity(0.5),
+          cropGridRowCount: 3,
+          cropGridColumnCount: 3,
+          cropStyle: CropStyle.rectangle,
+        ),
+        IOSUiSettings(
+          title: 'Crop Avatar',
+          cancelButtonTitle: 'Cancel',
+          doneButtonTitle: 'Done',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          aspectRatioPickerButtonHidden: true,
+        ),
+      ],
+    );
+
+    if (croppedFile == null || !mounted) return;
+
     setState(() => _isUploadingAvatar = true);
 
     try {
-      final response = await _userRepository.updateAvatarImage(
-        userId: _profile!.id,
-        filePath: picked.path,
+      final newUrl = await userProvider.updateAvatar(
+        userId: userProvider.profile!.id,
+        filePath: croppedFile.path,
       );
 
       if (!mounted) return;
 
-      if (response.isSuccess) {
-        setState(() {
-          _profile = _profile!.copyWith(profileImage: response.data);
-        });
-      } else {
+      if (newUrl == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.error?.message ?? 'Failed to update photo')),
+          const SnackBar(content: Text('Failed to update photo. Please try again.')),
+        );
+      } else {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo updated successfully!'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading photo: $e')),
+      );
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
   }
 
   Future<void> _handleLogout() async {
-    // Clear cached product data
     if (mounted) {
       context.read<ProductFeedProvider>().clear();
+      context.read<UserProvider>().clear();
     }
-    // Clear auth token
     await AuthService.instance.logout();
-    // Navigate to welcome page and clear route stack
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(
         context,
@@ -654,20 +733,26 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _loadProfile() async {
+    final userProvider = context.read<UserProvider>();
+    // Ensure user profile is loaded in the provider
+    if (userProvider.profile == null && !userProvider.isLoading) {
+      await userProvider.load();
+    }
+    await _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    final userId = context.read<UserProvider>().userId;
+    if (userId == null) return;
+
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final userResponse = await _userRepository.getCurrentUser();
-      if (!userResponse.isSuccess) {
-        throw userResponse.error!;
-      }
-
-      final profile = userResponse.data;
       final productsResponse = await _userRepository.getUserProducts(
-        userId: profile!.id,
+        userId: userId,
         limit: 50,
         offset: 0,
       );
@@ -678,7 +763,6 @@ class ProfilePageState extends State<ProfilePage>
 
       if (mounted) {
         setState(() {
-          _profile = profile;
           _products = productsResponse.data ?? [];
           _isLoading = false;
         });
@@ -696,9 +780,13 @@ class ProfilePageState extends State<ProfilePage>
 
 // Delegate for sticky tab bar in NestedScrollView
 class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
-  const _StickyTabBarDelegate({required this.tabBar});
+  const _StickyTabBarDelegate({
+    required this.tabBar,
+    required this.productCount,
+  });
 
   final Widget tabBar;
+  final int productCount;
 
   @override
   double get minExtent => 48;
@@ -717,6 +805,6 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_StickyTabBarDelegate oldDelegate) {
-    return false;
+    return productCount != oldDelegate.productCount;
   }
 }

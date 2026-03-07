@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../models/product.dart';
+import '../../../providers/user_provider.dart';
 import '../../../utils/constants/colors.dart';
 import '../common/user_widgets.dart';
 
@@ -28,6 +30,16 @@ class ProductCardSellerHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // If this product belongs to the current user, use the live profile image
+    // from UserProvider so avatar updates are reflected immediately without
+    // waiting for the product feed to be re-fetched.
+    final userProvider = context.watch<UserProvider>();
+    final isCurrentUser = userProvider.userId != null &&
+        product.userId == userProvider.userId;
+    final avatarUrl = isCurrentUser
+        ? userProvider.profile?.profileImage
+        : product.sellerProfileImage;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Row(
@@ -37,7 +49,7 @@ class ProductCardSellerHeader extends StatelessWidget {
             child: Row(
               children: [
                 UserAvatar(
-                  imageUrl: product.sellerProfileImage ?? 'https://i.pravatar.cc/300?img=99',
+                  imageUrl: avatarUrl ?? 'https://i.pravatar.cc/300?img=99',
                   radius: 20,
                 ),
                 const SizedBox(width: 10),

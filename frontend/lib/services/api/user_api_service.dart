@@ -203,7 +203,12 @@ class UserApiService {
         '/users/$userId/avatar',
         data: formData,
       );
-      final profileImage = (response.data as Map<String, dynamic>)['profile_image'] as String;
+      final profileImage = (response.data as Map<String, dynamic>)['profile_image'] as String?;
+      if (profileImage == null) {
+        return ApiResponse.error(
+          ApiException(message: 'Server did not return profile_image'),
+        );
+      }
       return ApiResponse.success(profileImage);
     } on DioException catch (e) {
       return ApiResponse.error(ApiException.fromDioException(e));

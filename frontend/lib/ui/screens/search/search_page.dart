@@ -10,6 +10,7 @@ import '../../../models/product.dart';
 import '../../../models/user_profile.dart';
 import '../../../services/api/api_exception.dart';
 import '../../../providers/product_feed_provider.dart';
+import '../../../providers/user_provider.dart';
 import '../../widgets/common/product_grid_card.dart';
 import '../../widgets/common/category_filter_strip.dart';
 import '../../widgets/common/search_bar_widget.dart';
@@ -47,7 +48,6 @@ class _SearchPageState extends State<SearchPage>
   // Shared state
   bool _isLoading = false;
   String? _error;
-  int? _currentUserId;
 
   // Optimistic like state for instant UI feedback
   final Set<int> _optimisticallyLikedIds = {};
@@ -94,11 +94,6 @@ class _SearchPageState extends State<SearchPage>
     });
 
     try {
-      final userResponse = await _userRepository.getCurrentUser();
-      if (userResponse.isSuccess) {
-        _currentUserId = userResponse.data?.id;
-      }
-
       // Load categories
       final categoriesResponse = await _categoryRepository.getCategories();
       if (!categoriesResponse.isSuccess) {
@@ -144,7 +139,7 @@ class _SearchPageState extends State<SearchPage>
   }
 
   Like? _findUserLike(Product product) {
-    final userId = _currentUserId;
+    final userId = context.read<UserProvider>().userId;
     if (userId == null) return null;
 
     for (final like in product.likes) {

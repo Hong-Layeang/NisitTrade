@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../data/repositories/user_repository.dart';
 import '../../../models/comment.dart';
 import '../../../models/like.dart';
 import '../../../models/product.dart';
 import '../../../providers/product_feed_provider.dart';
+import '../../../providers/user_provider.dart';
 import '../../../services/api/api_exception.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
@@ -40,7 +40,6 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage>
     with TickerProviderStateMixin {
-  final UserRepository _userRepository = UserRepositoryImpl();
   final TextEditingController _commentController = TextEditingController();
   final PageController _pageController = PageController();
   final ScrollController _scrollController = ScrollController();
@@ -48,7 +47,6 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   late AnimationController _likeAnimationController;
 
   Product? _product;
-  int? _currentUserId;
   String? _error;
   bool _isLoading = false;
   bool _isSubmittingComment = false;
@@ -94,11 +92,6 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     });
 
     try {
-      final userResponse = await _userRepository.getCurrentUser();
-      if (userResponse.isSuccess) {
-        _currentUserId = userResponse.data?.id;
-      }
-
       final product = await context
           .read<ProductFeedProvider>()
           .refreshProduct(widget.productId);
@@ -143,7 +136,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Like? _findUserLike() {
-    final userId = _currentUserId;
+    final userId = context.read<UserProvider>().userId;
     if (userId == null) return null;
     final likes = _product?.likes ?? [];
     for (final like in likes) {
@@ -156,7 +149,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
   Future<void> _toggleLike() async {
     if (_isTogglingLike) return;
-    if (_currentUserId == null) return;
+    if (context.read<UserProvider>().userId == null) return;
     final like = _findUserLike();
 
     _likeAnimationController.forward(from: 0.0);
@@ -409,6 +402,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Widget _buildSellerRow(Product product) {
+    final userProvider = context.watch<UserProvider>();
+    final isCurrentUser =
+        userProvider.userId != null && product.userId == userProvider.userId;
+    final avatarUrl = isCurrentUser
+        ? userProvider.profile?.profileImage
+        : product.sellerProfileImage;
+
     return Row(
       children: [
         GestureDetector(
@@ -418,10 +418,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
               CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.surface,
-                backgroundImage: product.sellerProfileImage != null
-                    ? NetworkImage(product.sellerProfileImage!)
-                    : null,
-                child: product.sellerProfileImage == null
+                backgroundImage:
+                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                child: avatarUrl == null
                     ? const Icon(Icons.person, color: AppColors.textSecondary)
                     : null,
               ),
@@ -565,6 +564,12 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       separatorBuilder: (_, __) => const Divider(height: 16, color: AppColors.border),
       itemBuilder: (context, index) {
         final comment = comments[index];
+        final userProvider = context.watch<UserProvider>();
+        final isCurrentUser = userProvider.userId != null &&
+            comment.userId == userProvider.userId;
+        final commentAvatarUrl = isCurrentUser
+            ? userProvider.profile?.profileImage
+            : comment.user?.profileImage;
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -573,10 +578,10 @@ class _ProductDetailPageState extends State<ProductDetailPage>
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: AppColors.surface,
-                backgroundImage: comment.user?.profileImage != null
-                    ? NetworkImage(comment.user!.profileImage!)
+                backgroundImage: commentAvatarUrl != null
+                    ? NetworkImage(commentAvatarUrl)
                     : null,
-                child: comment.user?.profileImage == null
+                child: commentAvatarUrl == null
                     ? const Icon(Icons.person, color: AppColors.textSecondary)
                     : null,
               ),

@@ -5,6 +5,7 @@ import '../../../data/repositories/user_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../models/product.dart';
 import '../../../providers/product_feed_provider.dart';
+import '../../../providers/user_provider.dart';
 import '../../../services/api/api_exception.dart';
 import '../../../utils/constants/colors.dart';
 import '../../../utils/routes/app_routes.dart';
@@ -28,7 +29,6 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
   List<Product> _savedProducts = [];
   bool _isLoading = false;
   String? _error;
-  int? _currentUserId;
   bool _isActionLoading = false;
 
   @override
@@ -38,21 +38,17 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
   }
 
   Future<void> _loadSavedListings() async {
+    final userId = context.read<UserProvider>().userId;
+    if (userId == null) return;
+
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final userResponse = await _userRepository.getCurrentUser();
-      if (!userResponse.isSuccess) {
-        throw userResponse.error!;
-      }
-
-      final profile = userResponse.data;
-      _currentUserId = profile?.id;
       final savedResponse = await _userRepository.getUserSavedListings(
-        userId: profile!.id,
+        userId: userId,
         limit: 50,
         offset: 0,
       );
@@ -96,8 +92,9 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
   }
 
   bool _isOwner(Product product) {
-    if (_currentUserId == null) return false;
-    return product.userId == _currentUserId;
+    final userId = context.read<UserProvider>().userId;
+    if (userId == null) return false;
+    return product.userId == userId;
   }
 
   Future<void> _handleEditListing(Product product) async {

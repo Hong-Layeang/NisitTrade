@@ -60,9 +60,6 @@ class ProductFeedProvider extends ChangeNotifier {
       throw response.error!;
     }
 
-    // Fetch updated product and notify listeners so all pages stay in sync.
-    // Individual cards (e.g. ProductCard) manage their own optimistic state,
-    // so the rebuild is harmless for them.
     final fetchResponse = await _productRepository.getProduct(productId);
     if (!fetchResponse.isSuccess) {
       throw fetchResponse.error!;
