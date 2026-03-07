@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../utils/constants/colors.dart';
+import '../../screens/chat/chat_screen.dart';
 
 class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int chatBadgeCount;
@@ -65,7 +66,14 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
           Stack(
             children: [
               IconButton(
-                onPressed: onChatTap,
+                onPressed: onChatTap ?? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ChatScreen(),
+                    ),
+                  );
+                },
                 icon: Icon(
                   Icons.chat_bubble_outline,
                   color: onPrimary,

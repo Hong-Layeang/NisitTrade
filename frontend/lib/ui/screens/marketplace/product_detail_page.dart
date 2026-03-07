@@ -13,6 +13,7 @@ import '../../widgets/common/app_action_chip.dart';
 import '../../widgets/common/full_screen_image_viewer.dart';
 import '../../widgets/marketplace/product_card_image_carousel.dart';
 import '../profile/other_profile_page.dart';
+import '../chat/chat_screen.dart';
 
 class ProductDetailArgs {
   final int productId;
@@ -451,8 +452,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         const Spacer(),
         OutlinedButton(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Chat is not implemented yet.')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(
+                  initialProduct: product,
+                ),
+              ),
             );
           },
           child: const Text('Chat'),
