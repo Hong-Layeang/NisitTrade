@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
-import '../../logic/state_managers/user_provider.dart';
+import '../../logic/view_models/user_view_model.dart';
 import 'package:provider/provider.dart';
 import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
 import '../screens/profile/profile_page.dart';
 import '../screens/search/search_page.dart';
 import '../Screens/sell/sell_page.dart';
-import '../widgets/common/app_app_bar.dart';
-import '../widgets/common/app_bottom_nav.dart';
+import '../widgets/app_app_bar.dart';
+import '../widgets/app_bottom_nav.dart';
 import '../../core/navigation/app_routes.dart';
 
 
@@ -34,7 +34,7 @@ class _MainShellState extends State<MainShell> {
     _currentIndex = widget.initialIndex;
     // Ensure user info is loaded when the main shell first mounts
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userProvider = context.read<UserProvider>();
+      final userProvider = context.read<UserViewModel>();
       if (userProvider.profile == null && !userProvider.isLoading) {
         userProvider.load();
       }

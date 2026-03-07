@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../../data/repositories/user_repository.dart';
+import 'package:get_it/get_it.dart';
+import '../../../domain/repository_interfaces/i_user_repository.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/user_profile.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/common/empty_state.dart';
-import '../../widgets/profile/profile_widgets.dart';
+import '../../widgets/empty_state.dart';
+import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
+
+final getIt = GetIt.instance;
 
 class OtherProfileArgs {
   final int userId;
@@ -27,7 +30,7 @@ class OtherProfilePage extends StatefulWidget {
 class _OtherProfilePageState extends State<OtherProfilePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final UserRepository _userRepository = UserRepositoryImpl();
+  late final IUserRepository _userRepository;
 
   UserProfile? _profile;
   List<Product> _products = [];
@@ -45,8 +48,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
 
   @override
   void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    super.initState();    _userRepository = getIt<IUserRepository>();    _tabController = TabController(length: 2, vsync: this);
     _loadProfile();
   }
 
@@ -81,8 +83,10 @@ class _OtherProfilePageState extends State<OtherProfilePage>
 
       if (mounted) {
         setState(() {
-          _profile = profile;
-          _products = productsResponse.data ?? [];
+          _profile = UserProfile.fromEntity(profile);
+          _products = (productsResponse.data ?? [])
+              .map((entity) => Product.fromEntity(entity))
+              .toList();
           _isFollowing = profile.isFollowing;
           _isLoading = false;
         });

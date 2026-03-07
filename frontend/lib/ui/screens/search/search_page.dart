@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:get_it/get_it.dart';
 import '../../../core/constants/colors.dart';
-import '../../../data/repositories/category_repository.dart';
-import '../../../data/repositories/user_repository.dart';
+import '../../../domain/repository_interfaces/i_category_repository.dart';
+import '../../../domain/repository_interfaces/i_user_repository.dart';
 import '../../../data/models/category.dart';
+import '../../../data/models/user_profile.dart';
 import '../../../data/models/like.dart';
 import '../../../data/models/product.dart';
-import '../../../data/models/user_profile.dart';
 import '../../../core/errors/api_exception.dart';
-import '../../../logic/state_managers/product_feed_provider.dart';
-import '../../../logic/state_managers/user_provider.dart';
-import '../../widgets/common/product_grid_card.dart';
-import '../../widgets/common/category_filter_strip.dart';
-import '../../widgets/common/search_bar_widget.dart';
-import '../../widgets/common/user_widgets.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
+import '../../widgets/product_grid_card.dart';
+import '../../widgets/category_filter_strip.dart';
+import '../../widgets/search_bar_widget.dart';
+import '../../widgets/user_widgets.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../marketplace/product_detail_page.dart';
 import '../profile/other_profile_page.dart';
+
+final getIt = GetIt.instance;
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -29,8 +32,8 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage>
     with SingleTickerProviderStateMixin {
   bool _showCategoryFilter = false;
-  final CategoryRepository _categoryRepository = CategoryRepositoryImpl();
-  final UserRepository _userRepository = UserRepositoryImpl();
+  late final ICategoryRepository _categoryRepository;
+  late final IUserRepository _userRepository;
   final TextEditingController _searchController = TextEditingController();
   late final FocusNode _searchFocusNode;
   bool _searchFocused = false;
@@ -57,6 +60,8 @@ class _SearchPageState extends State<SearchPage>
   @override
   void initState() {
     super.initState();
+    _categoryRepository = getIt<ICategoryRepository>();
+    _userRepository = getIt<IUserRepository>();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
     _loadInitialData();
@@ -102,7 +107,7 @@ class _SearchPageState extends State<SearchPage>
 
       // Ensure products are loaded in the shared provider
       if (mounted) {
-        final provider = context.read<ProductFeedProvider>();
+        final provider = context.read<ProductFeedViewModel>();
         if (provider.products.isEmpty && !provider.isLoading) {
           await provider.load();
         }
@@ -110,7 +115,9 @@ class _SearchPageState extends State<SearchPage>
 
       if (mounted) {
         setState(() {
-          _categories = categoriesResponse.data;
+          _categories = (categoriesResponse.data ?? [])
+              .map((entity) => Category.fromEntity(entity))
+              .toList();
           _isLoading = false;
         });
       }
@@ -129,7 +136,9 @@ class _SearchPageState extends State<SearchPage>
       final response = await _userRepository.getAllUsers(limit: 100);
       if (response.isSuccess && mounted) {
         setState(() {
-          _allUsers = response.data ?? [];
+          _allUsers = (response.data ?? [])
+              .map((entity) => UserProfile.fromEntity(entity))
+              .toList();
           _usersLoaded = true;
         });
       }
@@ -139,7 +148,7 @@ class _SearchPageState extends State<SearchPage>
   }
 
   Like? _findUserLike(Product product) {
-    final userId = context.read<UserProvider>().userId;
+    final userId = context.read<UserViewModel>().userId;
     if (userId == null) return null;
 
     for (final like in product.likes) {
@@ -213,7 +222,7 @@ class _SearchPageState extends State<SearchPage>
     HapticFeedback.lightImpact();
 
     try {
-      final provider = context.read<ProductFeedProvider>();
+      final provider = context.read<ProductFeedViewModel>();
 
       if (isCurrentlyLiked) {
         final likeRecord = _findUserLike(product);
@@ -259,8 +268,10 @@ class _SearchPageState extends State<SearchPage>
   @override
   Widget build(BuildContext context) {
     // Watch provider so the search page rebuilds when likes change on any page
-    final provider = context.watch<ProductFeedProvider>();
-    final allProducts = provider.products;
+    final provider = context.watch<ProductFeedViewModel>();
+    final allProducts = provider.products
+        .map((entity) => Product.fromEntity(entity))
+        .toList();
     final filteredProducts = _getFilteredProducts(allProducts);
 
     if (_isLoading || provider.isLoading) {
@@ -426,7 +437,7 @@ class _SearchPageState extends State<SearchPage>
             if (!context.mounted) return;
             // Refresh product data when returning from detail page
             await context
-                .read<ProductFeedProvider>()
+                .read<ProductFeedViewModel>()
                 .refreshProduct(product.id);
           },
           onLikeTap: () => _handleLikeTap(product),
@@ -488,3 +499,4 @@ class _SearchPageState extends State<SearchPage>
     );
   }
 }
+

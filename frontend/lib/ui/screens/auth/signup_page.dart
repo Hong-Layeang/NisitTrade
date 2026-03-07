@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/auth/auth_back_link.dart';
-import '../../widgets/auth/auth_footer_links.dart';
-import '../../widgets/auth/white_blur_gradient.dart';
-import '../../widgets/common/app_buttons.dart';
-import '../../widgets/common/app_form_fields.dart';
+import 'widgets/auth_back_link.dart';
+import 'widgets/auth_footer_links.dart';
+import 'widgets/white_blur_gradient.dart';
+import '../../widgets/app_buttons.dart';
+import '../../widgets/app_form_fields.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});

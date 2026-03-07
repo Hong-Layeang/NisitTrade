@@ -1,3 +1,5 @@
+import '../../domain/entities/category_entity.dart';
+
 class Category {
   final int id;
   final String name;
@@ -50,6 +52,28 @@ class Category {
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  /// Convert to domain entity
+  CategoryEntity toEntity() {
+    return CategoryEntity(
+      id: id,
+      name: name,
+      imageUrl: imageUrl,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
+  /// Create from domain entity
+  factory Category.fromEntity(CategoryEntity entity) {
+    return Category(
+      id: entity.id,
+      name: entity.name,
+      imageUrl: entity.imageUrl,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
     );
   }
 }

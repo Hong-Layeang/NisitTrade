@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/auth/auth_footer_links.dart';
-import '../../widgets/auth/join_waitlist_dialog.dart';
-import '../../widgets/auth/white_blur_gradient.dart';
-import '../../widgets/common/app_buttons.dart';
+import 'widgets/auth_footer_links.dart';
+import 'widgets/join_waitlist_dialog.dart';
+import 'widgets/white_blur_gradient.dart';
+import '../../widgets/app_buttons.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});

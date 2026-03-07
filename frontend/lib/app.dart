@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'logic/state_managers/product_feed_provider.dart';
-import 'logic/state_managers/user_provider.dart';
+import 'core/di/service_locator.dart';
+import 'logic/view_models/product_feed_view_model.dart';
+import 'logic/view_models/user_view_model.dart';
 import 'ui/themes/app_theme.dart';
 import 'core/navigation/app_navigator.dart';
 import 'core/navigation/app_routes.dart';
@@ -15,8 +16,13 @@ class NisitTradeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => UserProvider()),
-        ChangeNotifierProvider(create: (_) => ProductFeedProvider()),
+        // Get ViewModels from dependency injection container
+        ChangeNotifierProvider<UserViewModel>(
+          create: (_) => getIt<UserViewModel>(),
+        ),
+        ChangeNotifierProvider<ProductFeedViewModel>(
+          create: (_) => getIt<ProductFeedViewModel>(),
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -33,3 +39,4 @@ class NisitTradeApp extends StatelessWidget {
     );
   }
 }
+

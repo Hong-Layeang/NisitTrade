@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../widgets/common/app_buttons.dart';
+import '../../widgets/app_buttons.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});

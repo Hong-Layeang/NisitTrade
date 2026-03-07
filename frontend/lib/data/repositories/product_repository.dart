@@ -1,148 +1,87 @@
 import '../models/product.dart';
 import '../../core/errors/api_response.dart';
+import '../../domain/entities/product_entity.dart';
+import '../../domain/repository_interfaces/i_product_repository.dart';
 import '../providers/product_api_service.dart';
 
-/// Repository for managing product data
-/// Provides a clean abstraction over the API service
-abstract class ProductRepository {
-  Future<ApiResponse<List<Product>>> getProducts({
-    int? categoryId,
-    String? status,
-    String? search,
-    int? limit,
-    int? offset,
-  });
-
-  Future<ApiResponse<Product>> getProduct(int id);
-
-  Future<ApiResponse<Product>> createProduct({
-    required String title,
-    String? description,
-    required double price,
-    required int categoryId,
-  });
-
-  Future<ApiResponse<Product>> updateProduct({
-    required int id,
-    String? title,
-    String? description,
-    double? price,
-    int? categoryId,
-  });
-
-  Future<ApiResponse<void>> deleteProduct(int id);
-
-  Future<ApiResponse<Product>> updateProductStatus({
-    required int id,
-    required String status,
-  });
-
-  Future<ApiResponse<Product>> addProductImages({
-    required int id,
-    required List<String> imagePaths,
-  });
-
-  Future<ApiResponse<void>> deleteProductImage({
-    required int productId,
-    required int imageId,
-  });
-
-  // Likes
-  Future<ApiResponse<void>> likeProduct(int productId);
-  Future<ApiResponse<void>> unlikeProduct({
-    required int productId,
-    required int likeId,
-  });
-
-  // Saves
-  Future<ApiResponse<void>> saveListing(int productId);
-  Future<ApiResponse<void>> unsaveListing(int productId);
-
-  // Hide/Unhide
-  Future<ApiResponse<Product>> hideProduct(int productId);
-  Future<ApiResponse<Product>> unhideProduct(int productId);
-
-  // Share
-  Future<ApiResponse<String>> shareProduct(int productId);
-
-  // Report
-  Future<ApiResponse<void>> reportProduct({
-    required int productId,
-    required String reason,
-    String? details,
-  });
-
-  // Comments
-  Future<ApiResponse<void>> addComment({
-    required int productId,
-    required String content,
-    int? rating,
-  });
-  Future<ApiResponse<void>> deleteComment({
-    required int productId,
-    required int commentId,
-  });
-}
-
-/// Implementation of ProductRepository using the API service
-class ProductRepositoryImpl implements ProductRepository {
+/// Implementation of IProductRepository using the API service
+/// Focuses on core product CRUD operations only
+/// Other responsibilities (likes, saves, comments, etc.) are handled by separate repositories
+class ProductRepositoryImpl implements IProductRepository {
   ProductRepositoryImpl({ProductApiService? apiService})
       : _apiService = apiService ?? ProductApiService.instance;
 
   final ProductApiService _apiService;
 
   @override
-  Future<ApiResponse<List<Product>>> getProducts({
+  Future<ApiResponse<List<ProductEntity>>> getProducts({
     int? categoryId,
     String? status,
     String? search,
     int? limit,
     int? offset,
   }) async {
-    return _apiService.getProducts(
+    final response = await _apiService.getProducts(
       categoryId: categoryId,
       status: status,
       search: search,
       limit: limit,
       offset: offset,
     );
+    if (response.isSuccess && response.data != null) {
+      final entities = response.data!.map((model) => model.toEntity()).toList();
+      return ApiResponse.success(entities);
+    }
+    return ApiResponse.error(response.error!);
   }
 
   @override
-  Future<ApiResponse<Product>> getProduct(int id) async {
-    return _apiService.getProduct(id);
+  Future<ApiResponse<ProductEntity>> getProduct(int id) async {
+    final response = await _apiService.getProduct(id);
+    if (response.isSuccess && response.data != null) {
+      return ApiResponse.success(response.data!.toEntity());
+    }
+    return ApiResponse.error(response.error!);
   }
 
   @override
-  Future<ApiResponse<Product>> createProduct({
+  Future<ApiResponse<ProductEntity>> createProduct({
     required String title,
     String? description,
     required double price,
     required int categoryId,
   }) async {
-    return _apiService.createProduct(
+    final response = await _apiService.createProduct(
       title: title,
       description: description,
       price: price,
       categoryId: categoryId,
     );
+    if (response.isSuccess && response.data != null) {
+      return ApiResponse.success(response.data!.toEntity());
+    }
+    return ApiResponse.error(response.error!);
   }
 
   @override
-  Future<ApiResponse<Product>> updateProduct({
+  Future<ApiResponse<ProductEntity>> updateProduct({
     required int id,
     String? title,
     String? description,
     double? price,
     int? categoryId,
   }) async {
-    return _apiService.updateProduct(
+    final response = await _apiService.updateProduct(
       id: id,
       title: title,
       description: description,
       price: price,
       categoryId: categoryId,
     );
+    if (response.isSuccess && response.data != null) {
+      return ApiResponse.success(response.data!.toEntity());
+    }
+    return ApiResponse.error(response.error!);
   }
 
   @override
@@ -151,17 +90,47 @@ class ProductRepositoryImpl implements ProductRepository {
   }
 
   @override
-  Future<ApiResponse<Product>> updateProductStatus({
+  Future<ApiResponse<ProductEntity>> updateProductStatus({
     required int id,
     required String status,
   }) async {
-    return _apiService.updateProductStatus(
+    final response = await _apiService.updateProductStatus(
       id: id,
       status: status,
     );
+    if (response.isSuccess && response.data != null) {
+      return ApiResponse.success(response.data!.toEntity());
+    }
+    return ApiResponse.error(response.error!);
   }
 
   @override
+  Future<ApiResponse<ProductEntity>> hideProduct(int productId) async {
+    final response = await _apiService.hideProduct(productId);
+    if (response.isSuccess && response.data != null) {
+      return ApiResponse.success(response.data!.toEntity());
+    }
+    return ApiResponse.error(response.error!);
+  }
+
+  @override
+  Future<ApiResponse<ProductEntity>> unhideProduct(int productId) async {
+    final response = await _apiService.unhideProduct(productId);
+    if (response.isSuccess && response.data != null) {
+      return ApiResponse.success(response.data!.toEntity());
+    }
+    return ApiResponse.error(response.error!);
+  }
+
+  @override
+  Future<ApiResponse<String>> shareProduct(int productId) async {
+    return _apiService.shareProduct(productId);
+  }
+
+  // Legacy methods maintained for backward compatibility
+  // These delegate to the API service directly and return models
+  // TODO: Remove these once all consumers are updated to use separate repositories
+  @Deprecated('Use ProductImageRepository instead')
   Future<ApiResponse<Product>> addProductImages({
     required int id,
     required List<String> imagePaths,
@@ -172,7 +141,7 @@ class ProductRepositoryImpl implements ProductRepository {
     );
   }
 
-  @override
+  @Deprecated('Use ProductImageRepository instead')
   Future<ApiResponse<void>> deleteProductImage({
     required int productId,
     required int imageId,
@@ -183,12 +152,12 @@ class ProductRepositoryImpl implements ProductRepository {
     );
   }
 
-  @override
+  @Deprecated('Use ProductLikeRepository instead')
   Future<ApiResponse<void>> likeProduct(int productId) async {
     return _apiService.likeProduct(productId);
   }
 
-  @override
+  @Deprecated('Use ProductLikeRepository instead')
   Future<ApiResponse<void>> unlikeProduct({
     required int productId,
     required int likeId,
@@ -199,7 +168,7 @@ class ProductRepositoryImpl implements ProductRepository {
     );
   }
 
-  @override
+  @Deprecated('Use ProductCommentRepository instead')
   Future<ApiResponse<void>> addComment({
     required int productId,
     required String content,
@@ -212,7 +181,7 @@ class ProductRepositoryImpl implements ProductRepository {
     );
   }
 
-  @override
+  @Deprecated('Use ProductCommentRepository instead')
   Future<ApiResponse<void>> deleteComment({
     required int productId,
     required int commentId,
@@ -223,32 +192,17 @@ class ProductRepositoryImpl implements ProductRepository {
     );
   }
 
-  @override
+  @Deprecated('Use ProductSaveRepository instead')
   Future<ApiResponse<void>> saveListing(int productId) async {
     return _apiService.saveListing(productId);
   }
 
-  @override
+  @Deprecated('Use ProductSaveRepository instead')
   Future<ApiResponse<void>> unsaveListing(int productId) async {
     return _apiService.unsaveListing(productId);
   }
 
-  @override
-  Future<ApiResponse<Product>> hideProduct(int productId) async {
-    return _apiService.hideProduct(productId);
-  }
-
-  @override
-  Future<ApiResponse<Product>> unhideProduct(int productId) async {
-    return _apiService.unhideProduct(productId);
-  }
-
-  @override
-  Future<ApiResponse<String>> shareProduct(int productId) async {
-    return _apiService.shareProduct(productId);
-  }
-
-  @override
+  @Deprecated('Use ProductReportRepository instead')
   Future<ApiResponse<void>> reportProduct({
     required int productId,
     required String reason,

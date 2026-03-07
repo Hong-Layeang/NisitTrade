@@ -2,19 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../../../data/repositories/user_repository.dart';
+import 'package:get_it/get_it.dart';
+import '../../../domain/repository_interfaces/i_user_repository.dart';
+import '../../../domain/entities/user_entity.dart';
 import '../../../data/models/product.dart';
-import '../../../data/models/user_profile.dart';
-import '../../../logic/state_managers/product_feed_provider.dart';
-import '../../../logic/state_managers/user_provider.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/common/empty_state.dart';
-import '../../widgets/common/full_screen_image_viewer.dart';
-import '../../widgets/profile/profile_widgets.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/full_screen_image_viewer.dart';
+import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
+
+final getIt = GetIt.instance;
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -26,7 +29,7 @@ class ProfilePage extends StatefulWidget {
 class ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final UserRepository _userRepository = UserRepositoryImpl();
+  late final IUserRepository _userRepository;
 
   List<Product> _products = [];
   bool _isLoading = false;
@@ -35,7 +38,7 @@ class ProfilePageState extends State<ProfilePage>
   String? _error;
   bool _productsLoaded = false;
 
-  // ── Layout constants ──
+  // Layout constants
   static const double _coverHeight = 220;
   static const double _avatarRadius = 65;
   static const double _avatarBorder = 3;
@@ -46,7 +49,7 @@ class ProfilePageState extends State<ProfilePage>
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final userProvider = context.watch<UserProvider>();
+    final userProvider = context.watch<UserViewModel>();
     final profile = userProvider.profile;
 
     if (profile == null && userProvider.isLoading) {
@@ -87,11 +90,6 @@ class ProfilePageState extends State<ProfilePage>
                           const SizedBox(height: 16),
                         ],
                       ),
-                      // Avatar + camera button live here so they are inside
-                      // this Stack's layout bounds and are always hittable.
-                      // (If placed inside _buildCoverAndAvatar with a negative
-                      // bottom offset they fall outside that Stack's 220 px
-                      // layout height and Flutter's hit-test ignores them.)
                       Positioned(
                         top: _coverHeight - _avatarTotalRadius,
                         left: 0,
@@ -125,9 +123,9 @@ class ProfilePageState extends State<ProfilePage>
     await _loadProducts();
   }
 
-  /// Cover image (no avatar – avatar is overlaid at the SliverToBoxAdapter level)
+  /// Cover image (no avatar - avatar is overlaid at the SliverToBoxAdapter level)
   Widget _buildCoverAndAvatar() {
-    final profile = context.read<UserProvider>().profile;
+    final profile = context.read<UserViewModel>().profile;
     final coverUrl = profile?.coverImage;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
 
@@ -249,7 +247,7 @@ class ProfilePageState extends State<ProfilePage>
   /// Rendered as a Positioned overlay at the SliverToBoxAdapter Stack level
   /// so the camera badge is always within hit-test bounds.
   Widget _buildAvatarWithCamera() {
-    final userProvider = context.read<UserProvider>();
+    final userProvider = context.read<UserViewModel>();
     final profile = userProvider.profile;
     final avatarUrl = profile?.profileImage;
     final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
@@ -257,7 +255,7 @@ class ProfilePageState extends State<ProfilePage>
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Tap avatar → full-screen viewer
+        // Tap avatar to open full-screen viewer
         GestureDetector(
           onTap: hasAvatar && !_isUploadingAvatar
               ? () => _viewFullScreen(avatarUrl)
@@ -287,7 +285,7 @@ class ProfilePageState extends State<ProfilePage>
             ),
           )
         else
-          // Camera badge → edit/upload
+          // Camera badge to edit/upload
           Positioned(
             bottom: _avatarGap + 2,
             right: _avatarGap + 2,
@@ -310,7 +308,7 @@ class ProfilePageState extends State<ProfilePage>
 
   /// Stats flanking the avatar overlap area
   Widget _buildStatsRow() {
-    final profile = context.read<UserProvider>().profile;
+    final profile = context.read<UserViewModel>().profile;
     final schoolShort = _getSchoolShortName(profile);
     return SizedBox(
       height: _avatarTotalRadius + 24,
@@ -398,8 +396,8 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   /// Extract a short school abbreviation from the university's name.
-  /// e.g. "Cambodian Academy of Digital Technology" → "CADT"
-  String _getSchoolShortName(UserProfile? profile) {
+  /// e.g. "Cambodian Academy of Digital Technology" -> "CADT"
+  String _getSchoolShortName(UserEntity? profile) {
     final university = profile?.university;
     if (university == null) return 'N/A';
 
@@ -424,7 +422,7 @@ class ProfilePageState extends State<ProfilePage>
 
   /// Profile name and bio text
   Widget _buildNameAndBio(TextTheme textTheme) {
-    final profile = context.read<UserProvider>().profile;
+    final profile = context.read<UserViewModel>().profile;
     final name = profile?.fullName ?? 'User';
     final bio = (profile?.bio != null && profile!.bio!.isNotEmpty)
         ? profile.bio!
@@ -573,15 +571,14 @@ class ProfilePageState extends State<ProfilePage>
 
   @override
   void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    super.initState();    _userRepository = getIt<IUserRepository>();    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_productsLoaded) {
-      final userId = context.read<UserProvider>().userId;
+      final userId = context.read<UserViewModel>().userId;
       if (userId != null) {
         _productsLoaded = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -606,7 +603,7 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _pickAndUploadCover() async {
-    final userProvider = context.read<UserProvider>();
+    final userProvider = context.read<UserViewModel>();
     if (userProvider.profile == null || _isUploadingCover) return;
 
     final picker = ImagePicker();
@@ -637,7 +634,7 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _pickAndUploadAvatar() async {
-    final userProvider = context.read<UserProvider>();
+    final userProvider = context.read<UserViewModel>();
     if (userProvider.profile == null || _isUploadingAvatar) return;
 
     final picker = ImagePicker();
@@ -719,8 +716,8 @@ class ProfilePageState extends State<ProfilePage>
 
   Future<void> _handleLogout() async {
     if (mounted) {
-      context.read<ProductFeedProvider>().clear();
-      context.read<UserProvider>().clear();
+      context.read<ProductFeedViewModel>().clear();
+      context.read<UserViewModel>().clear();
     }
     await AuthService.instance.logout();
     if (mounted) {
@@ -733,7 +730,7 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _loadProfile() async {
-    final userProvider = context.read<UserProvider>();
+    final userProvider = context.read<UserViewModel>();
     // Ensure user profile is loaded in the provider
     if (userProvider.profile == null && !userProvider.isLoading) {
       await userProvider.load();
@@ -742,7 +739,7 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _loadProducts() async {
-    final userId = context.read<UserProvider>().userId;
+    final userId = context.read<UserViewModel>().userId;
     if (userId == null) return;
 
     setState(() {
@@ -763,7 +760,9 @@ class ProfilePageState extends State<ProfilePage>
 
       if (mounted) {
         setState(() {
-          _products = productsResponse.data ?? [];
+          _products = (productsResponse.data ?? [])
+              .map((entity) => Product.fromEntity(entity))
+              .toList();
           _isLoading = false;
         });
       }
@@ -808,3 +807,4 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
     return productCount != oldDelegate.productCount;
   }
 }
+

@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../data/repositories/category_repository.dart';
+import 'package:get_it/get_it.dart';
+import '../../../domain/repository_interfaces/i_category_repository.dart';
 import '../../../data/models/category.dart';
+import '../../../data/models/product.dart';
+
 import '../../../core/errors/api_exception.dart';
-import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../../logic/state_managers/product_feed_provider.dart';
-import '../../widgets/common/app_refresh_indicator.dart';
-import '../../widgets/common/category_filter_strip.dart';
-import '../../widgets/common/category_widgets.dart';
-import '../../widgets/common/empty_state.dart';
-import '../../widgets/marketplace/product_card.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../widgets/app_refresh_indicator.dart';
+import '../../widgets/category_filter_strip.dart';
+import '../../widgets/empty_state.dart';
+import 'widgets/product_card.dart';
 import 'product_detail_page.dart';
+
+final getIt = GetIt.instance;
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
@@ -22,7 +25,7 @@ class MarketplacePage extends StatefulWidget {
 
 class MarketplacePageState extends State<MarketplacePage> {
   final PageController _pageController = PageController();
-  final CategoryRepository _categoryRepository = CategoryRepositoryImpl();
+  late final ICategoryRepository _categoryRepository;
   
   List<Category>? _categories;
   int? _selectedCategoryIndex;
@@ -46,19 +49,20 @@ class MarketplacePageState extends State<MarketplacePage> {
     }
     await _loadData();
     if (mounted) {
-      await context.read<ProductFeedProvider>().refresh();
+      await context.read<ProductFeedViewModel>().refresh();
     }
   }
 
   @override
   void initState() {
     super.initState();
+    _categoryRepository = getIt<ICategoryRepository>();
     _loadDataIfNeeded();
     // Always reload products to ensure fresh data for the current user session.
     // This prevents stale cached data from a previous user being shown after
     // a logout/login cycle.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<ProductFeedProvider>();
+      final provider = context.read<ProductFeedViewModel>();
       if (!provider.isLoading) {
         provider.load();
       }
@@ -94,7 +98,9 @@ class MarketplacePageState extends State<MarketplacePage> {
 
       if (mounted) {
         setState(() {
-          _categories = categoriesResponse.data;
+          _categories = (categoriesResponse.data ?? [])
+              .map((entity) => Category.fromEntity(entity))
+              .toList();
           _isLoading = false;
         });
       }
@@ -116,8 +122,9 @@ class MarketplacePageState extends State<MarketplacePage> {
 
   @override
   Widget build(BuildContext context) {
-    final productProvider = context.watch<ProductFeedProvider>();
-    final products = productProvider.products;
+    final productProvider = context.watch<ProductFeedViewModel>();
+    final productsEntities = productProvider.products;
+    final products = productsEntities.map((e) => Product.fromEntity(e)).toList();
     final filteredProducts = _selectedCategoryIndex == null
         ? products
         : products
@@ -212,7 +219,7 @@ class MarketplacePageState extends State<MarketplacePage> {
                           );
                           if (!context.mounted) return;
                           // Refresh the product data when returning to ensure like status is updated
-                          await context.read<ProductFeedProvider>().refreshProduct(product.id);
+                          await context.read<ProductFeedViewModel>().refreshProduct(product.id);
                         },
                       );
                     },

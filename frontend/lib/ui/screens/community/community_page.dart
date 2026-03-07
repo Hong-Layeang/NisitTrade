@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../data/models/community_post.dart';
 import '../../../data/models/seller.dart';
 import '../../../core/constants/colors.dart';
-import '../../widgets/community/community_post_card.dart';
-import '../../widgets/community/post_composer.dart';
+import 'widgets/community_post_card.dart';
+import 'widgets/post_composer.dart';
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});

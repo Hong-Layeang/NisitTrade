@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../logic/state_managers/product_feed_provider.dart';
-import '../../../logic/state_managers/user_provider.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/microsoft_auth_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/auth/auth_back_link.dart';
-import '../../widgets/auth/auth_footer_links.dart';
-import '../../widgets/auth/microsoft_signin_button.dart';
-import '../../widgets/auth/white_blur_gradient.dart';
-import '../../widgets/common/app_buttons.dart';
-import '../../widgets/common/app_form_fields.dart';
+import 'widgets/auth_back_link.dart';
+import 'widgets/auth_footer_links.dart';
+import 'widgets/microsoft_signin_button.dart';
+import 'widgets/white_blur_gradient.dart';
+import '../../widgets/app_buttons.dart';
+import '../../widgets/app_form_fields.dart';
 import 'set_password_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -69,8 +69,8 @@ class _LoginPageState extends State<LoginPage> {
     if (result.isAuthenticated) {
       // Clear stale product data from any previous user session
       if (mounted) {
-        context.read<ProductFeedProvider>().clear();
-        context.read<UserProvider>().load();
+        context.read<ProductFeedViewModel>().clear();
+        context.read<UserViewModel>().load();
       }
       Navigator.pushNamedAndRemoveUntil(
         context,
@@ -120,8 +120,8 @@ class _LoginPageState extends State<LoginPage> {
     if (result.isAuthenticated) {
       // Clear stale product data from any previous user session
       if (mounted) {
-        context.read<ProductFeedProvider>().clear();
-        context.read<UserProvider>().load();
+        context.read<ProductFeedViewModel>().clear();
+        context.read<UserViewModel>().load();
       }
       Navigator.pushNamedAndRemoveUntil(
         context,
@@ -333,3 +333,4 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
+

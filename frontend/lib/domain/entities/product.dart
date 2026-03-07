@@ -1,4 +1,2 @@
-// Domain entity - exports the data model
-// In a full clean architecture, this would be a pure Dart class
-// For now, we re-export the data model
-export '../../data/models/product.dart';
+// Domain entity - pure business object
+export 'product_entity.dart';

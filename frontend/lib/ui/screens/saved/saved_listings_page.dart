@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 
-import '../../../data/repositories/user_repository.dart';
-import '../../../data/repositories/product_repository.dart';
+import '../../../domain/repository_interfaces/i_user_repository.dart';
+import '../../../domain/repository_interfaces/i_product_repository.dart';
 import '../../../data/models/product.dart';
-import '../../../logic/state_managers/product_feed_provider.dart';
-import '../../../logic/state_managers/user_provider.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
+
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/common/app_refresh_indicator.dart';
-import '../../widgets/common/app_action_sheet.dart';
-import '../../widgets/common/empty_state.dart';
-import '../../widgets/common/product_grid_card.dart';
+import '../../widgets/app_refresh_indicator.dart';
+import '../../widgets/app_action_sheet.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/product_grid_card.dart';
 import '../edit/edit_product_page.dart';
 import '../marketplace/product_detail_page.dart';
+
+final getIt = GetIt.instance;
 
 class SavedListingsPage extends StatefulWidget {
   const SavedListingsPage({super.key});
@@ -24,8 +28,8 @@ class SavedListingsPage extends StatefulWidget {
 }
 
 class _SavedListingsPageState extends State<SavedListingsPage> {
-  final UserRepository _userRepository = UserRepositoryImpl();
-  final ProductRepository _productRepository = ProductRepositoryImpl();
+  late final IUserRepository _userRepository;
+  late final IProductRepository _productRepository;
   List<Product> _savedProducts = [];
   bool _isLoading = false;
   String? _error;
@@ -34,11 +38,13 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
   @override
   void initState() {
     super.initState();
+    _userRepository = getIt<IUserRepository>();
+    _productRepository = getIt<IProductRepository>();
     _loadSavedListings();
   }
 
   Future<void> _loadSavedListings() async {
-    final userId = context.read<UserProvider>().userId;
+    final userId = context.read<UserViewModel>().userId;
     if (userId == null) return;
 
     setState(() {
@@ -59,7 +65,9 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
 
       if (mounted) {
         setState(() {
-          _savedProducts = savedResponse.data ?? [];
+          _savedProducts = (savedResponse.data ?? [])
+              .map((entity) => Product.fromEntity(entity))
+              .toList();
           _isLoading = false;
         });
       }
@@ -75,7 +83,7 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
 
   Future<void> _removeSaved(Product product) async {
     try {
-      await context.read<ProductFeedProvider>().unsaveListing(product.id);
+      await context.read<ProductFeedViewModel>().unsaveListing(product.id);
       if (mounted) {
         setState(() {
           _savedProducts = _savedProducts
@@ -92,7 +100,7 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
   }
 
   bool _isOwner(Product product) {
-    final userId = context.read<UserProvider>().userId;
+    final userId = context.read<UserViewModel>().userId;
     if (userId == null) return false;
     return product.userId == userId;
   }
@@ -150,7 +158,7 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
         });
       }
 
-      context.read<ProductFeedProvider>().refresh();
+      context.read<ProductFeedViewModel>().refresh();
       _showSnack('Listing deleted.');
     } catch (_) {
       _showSnack('Failed to delete listing.');
@@ -268,3 +276,4 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
     );
   }
 }
+

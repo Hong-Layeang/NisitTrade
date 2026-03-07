@@ -2,6 +2,7 @@ import 'category.dart';
 import 'seller.dart';
 import 'like.dart';
 import 'comment.dart';
+import '../../domain/entities/product_entity.dart';
 
 class Product {
   final int id;
@@ -225,6 +226,47 @@ class Product {
       final years = (difference.inDays / 365).floor();
       return '$years ${years == 1 ? 'year' : 'years'} ago';
     }
+  }
+
+  /// Convert to domain entity
+  ProductEntity toEntity() {
+    return ProductEntity(
+      id: id,
+      title: title,
+      description: description,
+      price: price,
+      status: ProductStatus.fromString(status),
+      userId: userId,
+      categoryId: categoryId,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      seller: user?.toEntity(),
+      category: category?.toEntity(),
+      imageUrls: imageUrls,
+      likeCount: likes.length,
+      commentCount: comments.length,
+      isLiked: false,
+    );
+  }
+
+  /// Create from domain entity
+  factory Product.fromEntity(ProductEntity entity) {
+    return Product(
+      id: entity.id,
+      title: entity.title,
+      description: entity.description,
+      price: entity.price,
+      status: entity.status.toValue(),
+      userId: entity.userId,
+      categoryId: entity.categoryId,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      user: entity.seller != null ? Seller.fromEntity(entity.seller!) : null,
+      category: entity.category != null ? Category.fromEntity(entity.category!) : null,
+      // productImages will be reconstructed from imageUrls if needed
+      likes: [],
+      comments: [],
+    );
   }
 }
 

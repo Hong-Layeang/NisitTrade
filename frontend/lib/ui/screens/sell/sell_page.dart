@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../data/repositories/category_repository.dart';
-import '../../../data/repositories/product_repository.dart';
+import 'package:get_it/get_it.dart';
+import '../../../domain/repository_interfaces/i_category_repository.dart';
+import '../../../domain/repository_interfaces/i_product_repository.dart';
+import '../../../domain/repository_interfaces/i_product_image_repository.dart';
+
 import '../../../data/models/category.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
-import '../../../logic/state_managers/product_feed_provider.dart';
-import '../../widgets/common/app_buttons.dart';
-import '../../widgets/sell/sell_form_widgets.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../widgets/app_buttons.dart';
+import 'widgets/sell_form_widgets.dart';
+
+final getIt = GetIt.instance;
 
 class SellPage extends StatefulWidget {
   const SellPage({super.key});
@@ -19,8 +24,9 @@ class SellPage extends StatefulWidget {
 }
 
 class _SellPageState extends State<SellPage> {
-  final CategoryRepository _categoryRepository = CategoryRepositoryImpl();
-  final ProductRepository _productRepository = ProductRepositoryImpl();
+  late final ICategoryRepository _categoryRepository;
+  late final IProductRepository _productRepository;
+  late final IProductImageRepository _productImageRepository;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
@@ -36,6 +42,9 @@ class _SellPageState extends State<SellPage> {
   @override
   void initState() {
     super.initState();
+    _categoryRepository = getIt<ICategoryRepository>();
+    _productRepository = getIt<IProductRepository>();
+    _productImageRepository = getIt<IProductImageRepository>();
     _loadCategories();
   }
 
@@ -61,7 +70,9 @@ class _SellPageState extends State<SellPage> {
 
       if (mounted) {
         setState(() {
-          _categories = response.data ?? [];
+          _categories = (response.data ?? [])
+              .map((entity) => Category.fromEntity(entity))
+              .toList();
           _isLoading = false;
         });
       }
@@ -143,8 +154,8 @@ class _SellPageState extends State<SellPage> {
       final productId = createResponse.data!.id;
       final imagePaths = _selectedImages.map((image) => image.path).toList();
 
-      final imageResponse = await _productRepository.addProductImages(
-        id: productId,
+      final imageResponse = await _productImageRepository.addProductImages(
+        productId: productId,
         imagePaths: imagePaths,
       );
 
@@ -152,7 +163,7 @@ class _SellPageState extends State<SellPage> {
         throw imageResponse.error!;
       }
 
-      context.read<ProductFeedProvider>().refresh();
+      context.read<ProductFeedViewModel>().refresh();
       _showSnack('Product created successfully.');
       _clearForm();
     } on ApiException catch (e) {

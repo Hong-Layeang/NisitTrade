@@ -1,2 +1,2 @@
-// Domain entity - exports the data model
-export '../../data/models/user_profile.dart';
+// Domain entity - pure business object
+export 'user_entity.dart';

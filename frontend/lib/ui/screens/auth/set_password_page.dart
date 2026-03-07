@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../logic/state_managers/user_provider.dart';
+import '../../../logic/view_models/user_view_model.dart';
 import '../../../core/auth/microsoft_auth_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/common/app_buttons.dart';
-import '../../widgets/common/app_form_fields.dart';
+import '../../widgets/app_buttons.dart';
+import '../../widgets/app_form_fields.dart';
 
 class SetPasswordArgs {
   final String accessToken;
@@ -120,7 +120,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     });
 
     if (result.isSuccess) {
-      if (mounted) context.read<UserProvider>().load();
+      if (mounted) context.read<UserViewModel>().load();
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRoutes.marketplace,
@@ -225,3 +225,4 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     );
   }
 }
+

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
-import '../widgets/common/app_bottom_nav.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class MainLayout extends StatelessWidget {
   final Widget child;

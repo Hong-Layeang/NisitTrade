@@ -1,4 +1,5 @@
 import 'university.dart';
+import '../../domain/entities/user_entity.dart';
 
 class UserProfile {
   final int id;
@@ -88,6 +89,52 @@ class UserProfile {
       followerCount: followerCount ?? this.followerCount,
       followingCount: followingCount ?? this.followingCount,
       isFollowing: isFollowing ?? this.isFollowing,
+    );
+  }
+
+  /// Convert to domain entity
+  UserEntity toEntity() {
+    return UserEntity(
+      id: id,
+      fullName: fullName,
+      email: email,
+      profileImage: profileImage,
+      coverImage: coverImage,
+      bio: bio,
+      major: major,
+      provider: provider,
+      role: UserRole.fromString(role),
+      universityId: universityId,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      university: university?.toEntity(),
+      followerCount: followerCount,
+      followingCount: followingCount,
+      isFollowing: isFollowing,
+    );
+  }
+
+  /// Create from domain entity
+  factory UserProfile.fromEntity(UserEntity entity) {
+    return UserProfile(
+      id: entity.id,
+      fullName: entity.fullName,
+      email: entity.email,
+      profileImage: entity.profileImage,
+      coverImage: entity.coverImage,
+      bio: entity.bio,
+      major: entity.major,
+      provider: entity.provider,
+      role: entity.role.toValue(),
+      universityId: entity.universityId,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      university: entity.university != null 
+          ? University.fromEntity(entity.university!) 
+          : null,
+      followerCount: entity.followerCount,
+      followingCount: entity.followingCount,
+      isFollowing: entity.isFollowing,
     );
   }
 }

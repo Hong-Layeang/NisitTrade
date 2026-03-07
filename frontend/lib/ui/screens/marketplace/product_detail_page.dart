@@ -4,14 +4,14 @@ import 'package:provider/provider.dart';
 import '../../../data/models/comment.dart';
 import '../../../data/models/like.dart';
 import '../../../data/models/product.dart';
-import '../../../logic/state_managers/product_feed_provider.dart';
-import '../../../logic/state_managers/user_provider.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../widgets/common/app_action_chip.dart';
-import '../../widgets/common/full_screen_image_viewer.dart';
-import '../../widgets/marketplace/product_card_image_carousel.dart';
+import '../../widgets/app_action_chip.dart';
+import '../../widgets/full_screen_image_viewer.dart';
+import 'widgets/product_card_image_carousel.dart';
 import '../profile/other_profile_page.dart';
 
 class ProductDetailArgs {
@@ -93,7 +93,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
     try {
       final product = await context
-          .read<ProductFeedProvider>()
+          .read<ProductFeedViewModel>()
           .refreshProduct(widget.productId);
       if (product == null) {
         throw ApiException(message: 'Product not found');
@@ -101,7 +101,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
       if (mounted) {
         setState(() {
-          _product = product;
+          _product = Product.fromEntity(product);
           _isLoading = false;
         });
         if (widget.focusComments) {
@@ -121,10 +121,10 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   Future<void> _refreshProduct() async {
     try {
       final product = await context
-          .read<ProductFeedProvider>()
+          .read<ProductFeedViewModel>()
           .refreshProduct(widget.productId);
       if (mounted && product != null) {
-        setState(() => _product = product);
+        setState(() => _product = Product.fromEntity(product));
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -136,7 +136,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Like? _findUserLike() {
-    final userId = context.read<UserProvider>().userId;
+    final userId = context.read<UserViewModel>().userId;
     if (userId == null) return null;
     final likes = _product?.likes ?? [];
     for (final like in likes) {
@@ -149,13 +149,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
   Future<void> _toggleLike() async {
     if (_isTogglingLike) return;
-    if (context.read<UserProvider>().userId == null) return;
+    if (context.read<UserViewModel>().userId == null) return;
     final like = _findUserLike();
 
     _likeAnimationController.forward(from: 0.0);
     setState(() => _isTogglingLike = true);
     try {
-      final provider = context.read<ProductFeedProvider>();
+      final provider = context.read<ProductFeedViewModel>();
       final updatedProduct = like == null
           ? await provider.likeProduct(widget.productId)
           : await provider.unlikeProduct(
@@ -163,7 +163,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
               likeId: like.id,
             );
       if (mounted && updatedProduct != null) {
-        setState(() => _product = updatedProduct);
+        setState(() => _product = Product.fromEntity(updatedProduct));
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -185,13 +185,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     setState(() => _isSubmittingComment = true);
 
     try {
-      final updatedProduct = await context.read<ProductFeedProvider>().addComment(
+      final updatedProduct = await context.read<ProductFeedViewModel>().addComment(
             productId: widget.productId,
             content: content,
           );
       _commentController.clear();
       if (mounted && updatedProduct != null) {
-        setState(() => _product = updatedProduct);
+        setState(() => _product = Product.fromEntity(updatedProduct));
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -279,7 +279,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                 child: _buildCommentsHeader(product),
               ),
-              _buildComments(product.comments ?? []),
+              _buildComments(product.comments),
               const SizedBox(height: 12),
               _buildCommentComposer(),
               const SizedBox(height: 24),
@@ -402,7 +402,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Widget _buildSellerRow(Product product) {
-    final userProvider = context.watch<UserProvider>();
+    final userProvider = context.watch<UserViewModel>();
     final isCurrentUser =
         userProvider.userId != null && product.userId == userProvider.userId;
     final avatarUrl = isCurrentUser
@@ -561,10 +561,10 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       itemCount: comments.length,
-      separatorBuilder: (_, __) => const Divider(height: 16, color: AppColors.border),
+      separatorBuilder: (_, _) => const Divider(height: 16, color: AppColors.border),
       itemBuilder: (context, index) {
         final comment = comments[index];
-        final userProvider = context.watch<UserProvider>();
+        final userProvider = context.watch<UserViewModel>();
         final isCurrentUser = userProvider.userId != null &&
             comment.userId == userProvider.userId;
         final commentAvatarUrl = isCurrentUser
@@ -691,3 +691,4 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     return '${dateTime.month}/${dateTime.day}/${dateTime.year}';
   }
 }
+

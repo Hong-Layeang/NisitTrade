@@ -1,3 +1,5 @@
+import '../../domain/entities/seller_entity.dart';
+
 class Seller {
   final int id;
   final String fullName;
@@ -6,6 +8,7 @@ class Seller {
   final String? provider;
   final String role;
   final int? universityId;
+  final String? major;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,6 +20,7 @@ class Seller {
     this.provider,
     required this.role,
     this.universityId,
+    this.major,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -30,6 +34,7 @@ class Seller {
       provider: json['provider'] as String?,
       role: (json['role'] ?? 'user') as String,
       universityId: json['university_id'] as int?,
+      major: json['major'] as String?,
       createdAt: (json['createdAt'] ?? json['created_at']) != null
           ? DateTime.parse((json['createdAt'] ?? json['created_at']) as String)
           : DateTime.now(),
@@ -48,6 +53,7 @@ class Seller {
       'provider': provider,
       'role': role,
       'university_id': universityId,
+      'major': major,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -61,6 +67,7 @@ class Seller {
     String? provider,
     String? role,
     int? universityId,
+    String? major,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -72,8 +79,33 @@ class Seller {
       provider: provider ?? this.provider,
       role: role ?? this.role,
       universityId: universityId ?? this.universityId,
+      major: major ?? this.major,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  /// Convert to domain entity
+  SellerEntity toEntity() {
+    return SellerEntity(
+      id: id,
+      fullName: fullName,
+      profileImage: profileImage,
+      major: major,
+    );
+  }
+
+  /// Create from domain entity
+  factory Seller.fromEntity(SellerEntity entity) {
+    return Seller(
+      id: entity.id,
+      fullName: entity.fullName,
+      email: '', // Not in entity
+      profileImage: entity.profileImage,
+      role: 'user', // Default
+      major: entity.major,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
   }
 }
