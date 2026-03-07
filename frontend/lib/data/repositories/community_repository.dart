@@ -1,4 +1,4 @@
-import '../../models/community_post.dart';
+import '../models/community_post.dart';
 
 abstract class CommunityRepository {
   Future<List<CommunityPost>> getPosts();

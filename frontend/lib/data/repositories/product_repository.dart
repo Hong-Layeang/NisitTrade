@@ -1,6 +1,6 @@
-import '../../models/product.dart';
-import '../../services/api/api_response.dart';
-import '../../services/api/product_api_service.dart';
+import '../models/product.dart';
+import '../../core/errors/api_response.dart';
+import '../providers/product_api_service.dart';
 
 /// Repository for managing product data
 /// Provides a clean abstraction over the API service

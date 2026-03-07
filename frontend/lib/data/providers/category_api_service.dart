@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 
-import '../../models/category.dart';
+import '../models/category.dart';
 import 'api_client.dart';
-import 'api_exception.dart';
-import 'api_response.dart';
+import '../../core/errors/api_exception.dart';
+import '../../core/errors/api_response.dart';
 
 /// Service for category-related API calls
 class CategoryApiService {

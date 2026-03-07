@@ -1,7 +1,7 @@
-import '../../models/product.dart';
-import '../../models/user_profile.dart';
-import '../../services/api/api_response.dart';
-import '../../services/api/user_api_service.dart';
+import '../models/product.dart';
+import '../models/user_profile.dart';
+import '../../core/errors/api_response.dart';
+import '../providers/user_api_service.dart';
 
 abstract class UserRepository {
   Future<ApiResponse<UserProfile>> getCurrentUser();

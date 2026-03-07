@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
-import '../api/api_client.dart';
+import '../../data/providers/api_client.dart';
 import 'auth_token_store.dart';
 
 class AuthSession {

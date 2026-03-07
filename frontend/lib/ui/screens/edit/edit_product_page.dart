@@ -6,11 +6,11 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
-import '../../../models/category.dart';
-import '../../../models/product.dart';
-import '../../../services/api/api_exception.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../providers/product_feed_provider.dart';
+import '../../../data/models/category.dart';
+import '../../../data/models/product.dart';
+import '../../../core/errors/api_exception.dart';
+import '../../../core/constants/colors.dart';
+import '../../../logic/state_managers/product_feed_provider.dart';
 import '../../widgets/common/app_buttons.dart';
 import '../../widgets/sell/sell_form_widgets.dart';
 

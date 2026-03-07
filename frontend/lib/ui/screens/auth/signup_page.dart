@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../utils/routes/app_routes.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../widgets/auth/auth_back_link.dart';
 import '../../widgets/auth/auth_footer_links.dart';
 import '../../widgets/auth/white_blur_gradient.dart';

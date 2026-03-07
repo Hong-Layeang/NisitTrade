@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../providers/product_feed_provider.dart';
-import '../../../providers/user_provider.dart';
-import '../../../services/auth/auth_service.dart';
-import '../../../services/auth/microsoft_auth_service.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../utils/routes/app_routes.dart';
+import '../../../logic/state_managers/product_feed_provider.dart';
+import '../../../logic/state_managers/user_provider.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/microsoft_auth_service.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../widgets/auth/auth_back_link.dart';
 import '../../widgets/auth/auth_footer_links.dart';
 import '../../widgets/auth/microsoft_signin_button.dart';

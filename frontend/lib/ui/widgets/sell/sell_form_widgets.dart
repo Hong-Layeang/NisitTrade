@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import '../../../utils/constants/colors.dart';
+import '../../../core/constants/colors.dart';
 
 class SellHeaderRow extends StatelessWidget {
   const SellHeaderRow({super.key});

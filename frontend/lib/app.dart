@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'providers/product_feed_provider.dart';
-import 'providers/user_provider.dart';
-import 'ui/theme/app_theme.dart';
-import 'utils/navigation/app_navigator.dart';
-import 'utils/routes/app_routes.dart';
-import 'utils/routes/route_controller.dart';
+import 'logic/state_managers/product_feed_provider.dart';
+import 'logic/state_managers/user_provider.dart';
+import 'ui/themes/app_theme.dart';
+import 'core/navigation/app_navigator.dart';
+import 'core/navigation/app_routes.dart';
+import 'core/navigation/route_controller.dart';
 
 class NisitTradeApp extends StatelessWidget {
   const NisitTradeApp({super.key});

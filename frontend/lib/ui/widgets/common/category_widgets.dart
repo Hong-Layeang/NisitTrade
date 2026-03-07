@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../models/category.dart';
+import '../../../core/constants/colors.dart';
+import '../../../data/models/category.dart';
 
 class CategoryCircle extends StatelessWidget {
   final Category category;

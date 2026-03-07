@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
-import 'package:frontend/data/providers/api_client.dart';
 import 'dart:io';
 
-import '../../data/models/product.dart';
-import '../../data/models/user_profile.dart';
+import '../models/product.dart';
+import '../models/user_profile.dart';
+import 'api_client.dart';
 import '../../core/errors/api_exception.dart';
 import '../../core/errors/api_response.dart';
 

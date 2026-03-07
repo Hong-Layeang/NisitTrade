@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../utils/constants/colors.dart';
-import '../../providers/user_provider.dart';
+import '../../core/constants/colors.dart';
+import '../../logic/state_managers/user_provider.dart';
 import 'package:provider/provider.dart';
 import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
@@ -9,7 +9,7 @@ import '../screens/search/search_page.dart';
 import '../Screens/sell/sell_page.dart';
 import '../widgets/common/app_app_bar.dart';
 import '../widgets/common/app_bottom_nav.dart';
-import '../../utils/routes/app_routes.dart';
+import '../../core/navigation/app_routes.dart';
 
 
 class MainShell extends StatefulWidget {

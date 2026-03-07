@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../utils/constants/colors.dart';
+import '../../../core/constants/colors.dart';
 
 /// Reusable empty state widget
 class EmptyState extends StatelessWidget {

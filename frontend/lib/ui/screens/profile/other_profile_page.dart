@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/user_repository.dart';
-import '../../../models/product.dart';
-import '../../../models/user_profile.dart';
-import '../../../services/api/api_exception.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../utils/routes/app_routes.dart';
+import '../../../data/models/product.dart';
+import '../../../data/models/user_profile.dart';
+import '../../../core/errors/api_exception.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/profile/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';

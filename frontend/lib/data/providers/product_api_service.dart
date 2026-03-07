@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 
-import '../../models/product.dart';
+import '../models/product.dart';
 import 'api_client.dart';
-import 'api_exception.dart';
-import 'api_response.dart';
+import '../../core/errors/api_exception.dart';
+import '../../core/errors/api_response.dart';
 
 /// Service for product-related API calls
 class ProductApiService {

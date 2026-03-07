@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/product.dart';
-import '../../../providers/user_provider.dart';
-import '../../../utils/constants/colors.dart';
+import '../../../data/models/product.dart';
+import '../../../logic/state_managers/user_provider.dart';
+import '../../../core/constants/colors.dart';
 import '../common/user_widgets.dart';
 
 class ProductCardSellerHeader extends StatelessWidget {

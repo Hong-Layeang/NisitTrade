@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
-import '../../config/app_config.dart';
-import '../../utils/navigation/app_navigator.dart';
-import '../../utils/routes/app_routes.dart';
-import '../auth/auth_token_store.dart';
+import '../../core/config/app_config.dart';
+import '../../core/navigation/app_navigator.dart';
+import '../../core/navigation/app_routes.dart';
+import '../../core/auth/auth_token_store.dart';
 
 class ApiClient {
   ApiClient._() {

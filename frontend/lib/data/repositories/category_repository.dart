@@ -1,6 +1,6 @@
-import '../../models/category.dart';
-import '../../services/api/api_response.dart';
-import '../../services/api/category_api_service.dart';
+import '../models/category.dart';
+import '../../core/errors/api_response.dart';
+import '../providers/category_api_service.dart';
 
 /// Repository for managing category data
 /// Provides a clean abstraction over the API service

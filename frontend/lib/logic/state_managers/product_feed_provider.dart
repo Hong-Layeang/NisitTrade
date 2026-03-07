@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../data/repositories/product_repository.dart';
-import '../models/product.dart';
-import '../services/api/api_exception.dart';
+import '../../data/repositories/product_repository.dart';
+import '../../data/models/product.dart';
+import '../../core/errors/api_exception.dart';
 
 class ProductFeedProvider extends ChangeNotifier {
   final ProductRepository _productRepository = ProductRepositoryImpl();

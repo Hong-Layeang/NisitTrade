@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../utils/routes/app_routes.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../widgets/auth/auth_footer_links.dart';
 import '../../widgets/auth/join_waitlist_dialog.dart';
 import '../../widgets/auth/white_blur_gradient.dart';

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:aad_oauth/aad_oauth.dart';
 import 'package:aad_oauth/model/config.dart';
 
-import '../../utils/navigation/app_navigator.dart';
+import '../navigation/app_navigator.dart';
 import 'auth_token_store.dart';
 import 'microsoft_auth_api.dart';
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../services/auth/auth_session.dart';
+import '../auth/auth_session.dart';
 import 'app_routes.dart';
 
 class AuthGate extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../models/student.dart';
-import '../../../models/user_profile.dart';
+import '../../../core/constants/colors.dart';
+import '../../../data/models/student.dart';
+import '../../../data/models/user_profile.dart';
 
 class StudentListTile extends StatelessWidget {
   final Student student;

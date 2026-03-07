@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../models/comment.dart';
-import '../../../models/like.dart';
-import '../../../models/product.dart';
-import '../../../providers/product_feed_provider.dart';
-import '../../../providers/user_provider.dart';
-import '../../../services/api/api_exception.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../utils/routes/app_routes.dart';
+import '../../../data/models/comment.dart';
+import '../../../data/models/like.dart';
+import '../../../data/models/product.dart';
+import '../../../logic/state_managers/product_feed_provider.dart';
+import '../../../logic/state_managers/user_provider.dart';
+import '../../../core/errors/api_exception.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../widgets/common/app_action_chip.dart';
 import '../../widgets/common/full_screen_image_viewer.dart';
 import '../../widgets/marketplace/product_card_image_carousel.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../models/product.dart';
-import '../../../utils/constants/colors.dart';
+import '../../../data/models/product.dart';
+import '../../../core/constants/colors.dart';
 import '../common/app_action_chip.dart';
 
 class ProductCardActionRow extends StatelessWidget {

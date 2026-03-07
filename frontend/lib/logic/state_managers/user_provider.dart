@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../data/repositories/user_repository.dart';
-import '../data/models/user_profile.dart';
-import '../core/errors/api_exception.dart';
+import '../../data/repositories/user_repository.dart';
+import '../../data/models/user_profile.dart';
+import '../../core/errors/api_exception.dart';
 
 class UserProvider extends ChangeNotifier {
   final UserRepository _userRepository;

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../providers/user_provider.dart';
-import '../../../services/auth/microsoft_auth_service.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../utils/routes/app_routes.dart';
+import '../../../logic/state_managers/user_provider.dart';
+import '../../../core/auth/microsoft_auth_service.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../widgets/common/app_buttons.dart';
 import '../../widgets/common/app_form_fields.dart';
 

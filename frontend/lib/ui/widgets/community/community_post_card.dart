@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../models/community_post.dart';
-import '../../../utils/constants/colors.dart';
+import '../../../data/models/community_post.dart';
+import '../../../core/constants/colors.dart';
 import '../common/user_widgets.dart';
 
 class CommunityPostCard extends StatelessWidget {

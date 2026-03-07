@@ -3,12 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../../../data/repositories/user_repository.dart';
 import '../../../data/repositories/product_repository.dart';
-import '../../../models/product.dart';
-import '../../../providers/product_feed_provider.dart';
-import '../../../providers/user_provider.dart';
-import '../../../services/api/api_exception.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../utils/routes/app_routes.dart';
+import '../../../data/models/product.dart';
+import '../../../logic/state_managers/product_feed_provider.dart';
+import '../../../logic/state_managers/user_provider.dart';
+import '../../../core/errors/api_exception.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../widgets/common/app_refresh_indicator.dart';
 import '../../widgets/common/app_action_sheet.dart';
 import '../../widgets/common/empty_state.dart';

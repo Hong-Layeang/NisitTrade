@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../utils/constants/colors.dart';
+import '../../../core/constants/colors.dart';
 
 class AppActionChip extends StatelessWidget {
   final Widget icon;

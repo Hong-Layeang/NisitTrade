@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../models/category.dart';
-import '../../../utils/constants/colors.dart';
+import '../../../data/models/category.dart';
+import '../../../core/constants/colors.dart';
 import 'category_widgets.dart';
 
 class CategoryFilterStrip extends StatelessWidget {

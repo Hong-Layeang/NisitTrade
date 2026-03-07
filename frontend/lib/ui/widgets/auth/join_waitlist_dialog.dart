@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../utils/constants/colors.dart';
+import '../../../core/constants/colors.dart';
 import '../../widgets/common/app_buttons.dart';
 import '../../widgets/common/app_form_fields.dart';
 

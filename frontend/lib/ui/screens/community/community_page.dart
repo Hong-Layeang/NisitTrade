@@ -1,7 +1,7 @@
-﻿import 'package:flutter/material.dart';
-import '../../../models/community_post.dart';
-import '../../../models/seller.dart';
-import '../../../utils/constants/colors.dart';
+import 'package:flutter/material.dart';
+import '../../../data/models/community_post.dart';
+import '../../../data/models/seller.dart';
+import '../../../core/constants/colors.dart';
 import '../../widgets/community/community_post_card.dart';
 import '../../widgets/community/post_composer.dart';
 

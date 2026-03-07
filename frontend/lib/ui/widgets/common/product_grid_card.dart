@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../utils/constants/colors.dart';
-import '../../../models/product.dart';
+import '../../../core/constants/colors.dart';
+import '../../../data/models/product.dart';
 
 class ProductGridCard extends StatelessWidget {
   final Product product;
