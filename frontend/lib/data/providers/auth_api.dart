@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
 
@@ -75,7 +76,8 @@ class AuthApi {
         user: null,
         message: _extractMessage(error),
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('AuthApi.login unexpected error: $e\n$st');
       return const AuthApiResponse(
         isValid: false,
         token: null,

@@ -7,6 +7,7 @@ import '../../domain/repository_interfaces/i_product_like_repository.dart';
 import '../../domain/repository_interfaces/i_product_save_repository.dart';
 import '../../domain/repository_interfaces/i_product_comment_repository.dart';
 import '../../domain/repository_interfaces/i_product_report_repository.dart';
+import '../services/product_interaction_service.dart';
 
 /// ViewModel for managing product feed state
 /// Uses domain entities and repository interfaces
@@ -18,39 +19,74 @@ class ProductFeedViewModel extends ChangeNotifier {
     required IProductCommentRepository commentRepository,
     required IProductReportRepository reportRepository,
   })  : _productRepository = productRepository,
-        _likeRepository = likeRepository,
-        _saveRepository = saveRepository,
-        _commentRepository = commentRepository,
-        _reportRepository = reportRepository;
+        _interactionService = ProductInteractionService(
+          productRepository: productRepository,
+          likeRepository: likeRepository,
+          saveRepository: saveRepository,
+          commentRepository: commentRepository,
+          reportRepository: reportRepository,
+        );
 
   final IProductRepository _productRepository;
-  final IProductLikeRepository _likeRepository;
-  final IProductSaveRepository _saveRepository;
-  final IProductCommentRepository _commentRepository;
-  final IProductReportRepository _reportRepository;
+  final ProductInteractionService _interactionService;
 
   List<ProductEntity> _products = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String? _error;
+  
+  // Pagination state
+  int _currentPage = 0;
+  static const int _pageSize = 20;
+  bool _hasMore = true;
+
+  // Product cache for optimized navigation
+  final Map<int, ProductEntity> _productCache = {};
 
   List<ProductEntity> get products => _products;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   String? get error => _error;
+  bool get hasMore => _hasMore;
+
+  /// Get a cached product by ID, returns null if not cached
+  ProductEntity? getCachedProduct(int productId) {
+    return _productCache[productId];
+  }
 
   Future<void> load() async {
+    await loadFirstPage();
+  }
+
+  /// Load the first page of products
+  Future<void> loadFirstPage() async {
     if (_isLoading) return;
 
     _isLoading = true;
+    _isLoadingMore = false;
     _error = null;
+    _currentPage = 0;
+    _hasMore = true;
+    _products = [];
     notifyListeners();
 
     try {
-      final response = await _productRepository.getProducts();
+      final response = await _productRepository.getProducts(
+        limit: _pageSize,
+        offset: 0,
+      );
       if (!response.isSuccess) {
         throw response.error!;
       }
 
-      _products = response.data ?? [];
+      final loadedProducts = response.data ?? [];
+      _products = loadedProducts;
+      _hasMore = loadedProducts.length >= _pageSize;
+      
+      // Cache all loaded products
+      for (final product in loadedProducts) {
+        _productCache[product.id] = product;
+      }
     } on ApiException catch (e) {
       _error = e.message;
     } finally {
@@ -59,17 +95,48 @@ class ProductFeedViewModel extends ChangeNotifier {
     }
   }
 
+  /// Load the next page of products (for infinite scroll)
+  Future<void> loadNextPage() async {
+    if (_isLoadingMore || _isLoading || !_hasMore) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      _currentPage++;
+      final offset = _currentPage * _pageSize;
+
+      final response = await _productRepository.getProducts(
+        limit: _pageSize,
+        offset: offset,
+      );
+      if (!response.isSuccess) {
+        throw response.error!;
+      }
+
+      final loadedProducts = response.data ?? [];
+      _products = [..._products, ...loadedProducts];
+      _hasMore = loadedProducts.length >= _pageSize;
+      
+      // Cache all loaded products
+      for (final product in loadedProducts) {
+        _productCache[product.id] = product;
+      }
+    } on ApiException catch (e) {
+      _error = e.message;
+      _currentPage--; // Revert page increment on error
+    } finally {
+      _isLoadingMore = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> refresh() async {
-    await load();
+    await loadFirstPage();
   }
 
   Future<ProductEntity?> refreshProduct(int productId) async {
-    final response = await _productRepository.getProduct(productId);
-    if (!response.isSuccess) {
-      throw response.error!;
-    }
-
-    final product = response.data;
+    final product = await _interactionService.refreshProduct(productId);
     if (product != null) {
       _upsertProduct(product);
     }
@@ -77,51 +144,73 @@ class ProductFeedViewModel extends ChangeNotifier {
   }
 
   Future<ProductEntity?> likeProduct(int productId) async {
-    final response = await _likeRepository.likeProduct(productId);
-    if (!response.isSuccess) {
-      throw response.error!;
+    final product = await _interactionService.likeProduct(productId);
+    if (product != null) {
+      _upsertProduct(product);
     }
-
-    return refreshProduct(productId);
+    return product;
   }
 
   Future<ProductEntity?> unlikeProduct({
     required int productId,
     required int likeId,
   }) async {
-    final response = await _likeRepository.unlikeProduct(
+    final product = await _interactionService.unlikeProduct(
       productId: productId,
       likeId: likeId,
     );
-    if (!response.isSuccess) {
-      throw response.error!;
+    if (product != null) {
+      _upsertProduct(product);
     }
-
-    return refreshProduct(productId);
+    return product;
   }
 
   Future<ProductEntity?> addComment({
     required int productId,
     required String content,
   }) async {
-    final response = await _commentRepository.addComment(
+    final product = await _interactionService.addComment(
       productId: productId,
       content: content,
     );
-    if (!response.isSuccess) {
-      throw response.error!;
+    if (product != null) {
+      _upsertProduct(product);
     }
+    return product;
+  }
 
-    return refreshProduct(productId);
+  Future<ProductEntity?> updateComment({
+    required int productId,
+    required int commentId,
+    required String content,
+  }) async {
+    final product = await _interactionService.updateComment(
+      productId: productId,
+      commentId: commentId,
+      content: content,
+    );
+    if (product != null) {
+      _upsertProduct(product);
+    }
+    return product;
+  }
+
+  Future<ProductEntity?> deleteComment({
+    required int productId,
+    required int commentId,
+  }) async {
+    final product = await _interactionService.deleteComment(
+      productId: productId,
+      commentId: commentId,
+    );
+    if (product != null) {
+      _upsertProduct(product);
+    }
+    return product;
   }
 
   Future<ProductEntity?> hideProduct(int productId) async {
-    final response = await _productRepository.hideProduct(productId);
-    if (!response.isSuccess) {
-      throw response.error!;
-    }
-
-    final product = response.data;
+    final product = await _interactionService.hideProduct(productId);
     if (product != null) {
       _upsertProduct(product);
     }
@@ -129,12 +218,7 @@ class ProductFeedViewModel extends ChangeNotifier {
   }
 
   Future<ProductEntity?> unhideProduct(int productId) async {
-    final response = await _productRepository.unhideProduct(productId);
-    if (!response.isSuccess) {
-      throw response.error!;
-    }
-
-    final product = response.data;
+    final product = await _interactionService.unhideProduct(productId);
     if (product != null) {
       _upsertProduct(product);
     }
@@ -142,25 +226,15 @@ class ProductFeedViewModel extends ChangeNotifier {
   }
 
   Future<void> saveListing(int productId) async {
-    final response = await _saveRepository.saveListing(productId);
-    if (!response.isSuccess) {
-      throw response.error!;
-    }
+    await _interactionService.saveListing(productId);
   }
 
   Future<void> unsaveListing(int productId) async {
-    final response = await _saveRepository.unsaveListing(productId);
-    if (!response.isSuccess) {
-      throw response.error!;
-    }
+    await _interactionService.unsaveListing(productId);
   }
 
   Future<String?> shareProduct(int productId) async {
-    final response = await _productRepository.shareProduct(productId);
-    if (!response.isSuccess) {
-      throw response.error!;
-    }
-    return response.data;
+    return _interactionService.shareProduct(productId);
   }
 
   Future<void> reportProduct({
@@ -168,25 +242,29 @@ class ProductFeedViewModel extends ChangeNotifier {
     required String reason,
     String? details,
   }) async {
-    final response = await _reportRepository.reportProduct(
+    await _interactionService.reportProduct(
       productId: productId,
       reason: reason,
       details: details,
     );
-    if (!response.isSuccess) {
-      throw response.error!;
-    }
   }
 
   /// Clears cached product state for auth/session transitions.
   void clear() {
     _products = [];
+    _productCache.clear();
     _isLoading = false;
+    _isLoadingMore = false;
     _error = null;
+    _currentPage = 0;
+    _hasMore = true;
     notifyListeners();
   }
 
   void _upsertProduct(ProductEntity product) {
+    // Update cache
+    _productCache[product.id] = product;
+    
     final index = _products.indexWhere((item) => item.id == product.id);
     if (index == -1) {
       _products = [..._products, product];

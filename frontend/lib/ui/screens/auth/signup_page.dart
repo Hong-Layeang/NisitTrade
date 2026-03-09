@@ -148,7 +148,7 @@ class _SignupPageState extends State<SignupPage> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              side: BorderSide(
+                              side: const BorderSide(
                                 color: AppColors.textSecondary,
                                 width: 1.5,
                               ),

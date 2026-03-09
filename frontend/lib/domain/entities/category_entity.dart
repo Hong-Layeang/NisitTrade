@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
 
 /// Domain entity representing a product category
-/// This is a pure business object with no framework dependencies
 class CategoryEntity extends Equatable {
   final int id;
   final String name;

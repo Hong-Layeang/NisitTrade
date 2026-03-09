@@ -1,14 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import '../../../../data/models/category.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../widgets/app_buttons.dart';
 
 class SellHeaderRow extends StatelessWidget {
   const SellHeaderRow({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Text(
         'Add Your Product',
         textAlign: TextAlign.center,
@@ -138,7 +140,7 @@ class CategoryDropdownField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -185,6 +187,148 @@ class CategoryDropdownField<T> extends StatelessWidget {
       onChanged: onChanged,
       menuMaxHeight: 300,
       dropdownColor: Colors.white,
+    );
+  }
+}
+
+/// Shared form section used by both sell and edit product screens.
+class ProductFormFieldsSection extends StatelessWidget {
+  final TextEditingController titleController;
+  final TextEditingController descriptionController;
+  final TextEditingController priceController;
+  final List<Category> categories;
+  final int? selectedCategoryId;
+  final ValueChanged<int?> onCategoryChanged;
+  final Widget photoGrid;
+  final String submitLabel;
+  final bool isSubmitting;
+  final VoidCallback? onSubmit;
+
+  const ProductFormFieldsSection({
+    super.key,
+    required this.titleController,
+    required this.descriptionController,
+    required this.priceController,
+    required this.categories,
+    required this.selectedCategoryId,
+    required this.onCategoryChanged,
+    required this.photoGrid,
+    required this.submitLabel,
+    required this.isSubmitting,
+    required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionLabel(text: 'Title'),
+        const SizedBox(height: 6),
+        OutlinedField(
+          hintText: 'Name',
+          controller: titleController,
+          textInputAction: TextInputAction.next,
+          isDense: true,
+        ),
+        const SizedBox(height: 12),
+        const SectionLabel(text: 'Description'),
+        const SizedBox(height: 6),
+        OutlinedField(
+          hintText: 'Detailed description of your product',
+          maxLines: 3,
+          controller: descriptionController,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionLabel(text: 'Category'),
+                  const SizedBox(height: 6),
+                  CategoryDropdownField<int>(
+                    value: selectedCategoryId,
+                    hint: 'Select category',
+                    items: categories
+                        .map(
+                          (category) => DropdownMenuItem<int>(
+                            value: category.id,
+                            child: Text(
+                              category.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onCategoryChanged,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionLabel(text: 'Price (in \$)'),
+                  const SizedBox(height: 6),
+                  OutlinedField(
+                    hintText: '0.0',
+                    controller: priceController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    isDense: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const SectionLabel(text: 'Photos'),
+        const SizedBox(height: 4),
+        const Text.rich(
+          TextSpan(
+            text:
+                'Capture all the angles and details. Your first square is the key image. ',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.2,
+            ),
+            children: [
+              TextSpan(
+                text: 'At least 1 photo required.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.primary,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        photoGrid,
+        const SizedBox(height: 14),
+        AppPrimaryButton(
+          label: submitLabel,
+          isLoading: isSubmitting,
+          onPressed: onSubmit,
+        ),
+      ],
     );
   }
 }
@@ -282,7 +426,7 @@ class PhotoTile extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(

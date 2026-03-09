@@ -96,7 +96,7 @@ class _CommunityPageState extends State<CommunityPage>
   Widget _buildTabBar(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.background,
       ),
       child: TabBar(

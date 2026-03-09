@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../../data/models/product.dart';
+import '../../../../domain/entities/product_entity.dart';
 import '../../../../core/constants/colors.dart';
 
+/// Displays product information in the product card
 class ProductCardInfo extends StatelessWidget {
-  final Product product;
+  final ProductEntity product;
 
   const ProductCardInfo({super.key, required this.product});
 

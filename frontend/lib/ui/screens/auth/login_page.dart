@@ -12,6 +12,7 @@ import 'widgets/microsoft_signin_button.dart';
 import 'widgets/white_blur_gradient.dart';
 import '../../widgets/app_buttons.dart';
 import '../../widgets/app_form_fields.dart';
+import '../../widgets/app_snack_bar.dart';
 import 'set_password_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -80,9 +81,7 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.message)),
-    );
+    AppSnackBar.error(context, result.message);
   }
 
   Future<void> _handleEmailLogin() async {
@@ -94,9 +93,7 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email and password are required.')),
-      );
+      AppSnackBar.error(context, 'Email and password are required.');
       return;
     }
 
@@ -131,9 +128,7 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.message)),
-    );
+    AppSnackBar.error(context, result.message);
   }
 
   @override
@@ -250,12 +245,12 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 16),
 
-                      Row(
+                      const Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Divider(color: AppColors.border),
                           ),
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
                               'OR',
@@ -267,7 +262,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                           ),
-                          const Expanded(
+                          Expanded(
                             child: Divider(color: AppColors.border),
                           ),
                         ],

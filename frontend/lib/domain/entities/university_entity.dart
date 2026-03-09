@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
 
 /// Domain entity representing a university
-/// This is a pure business object with no framework dependencies
 class UniversityEntity extends Equatable {
   final int id;
   final String name;

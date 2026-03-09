@@ -6,7 +6,7 @@ import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
 import '../screens/profile/profile_page.dart';
 import '../screens/search/search_page.dart';
-import '../Screens/sell/sell_page.dart';
+import '../screens/sell/sell_page.dart';
 import '../widgets/app_app_bar.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../../core/navigation/app_routes.dart';
@@ -27,11 +27,19 @@ class _MainShellState extends State<MainShell> {
       GlobalKey<MarketplacePageState>();
   final GlobalKey<ProfilePageState> _profileKey =
       GlobalKey<ProfilePageState>();
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _screens = [
+      MarketplacePage(key: _marketplaceKey),
+      const SearchPage(),
+      const SellPage(),
+      const CommunityPage(),
+      ProfilePage(key: _profileKey),
+    ];
     // Ensure user info is loaded when the main shell first mounts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<UserViewModel>();
@@ -67,13 +75,7 @@ class _MainShellState extends State<MainShell> {
       appBar: _buildAppBar(),
       body: IndexedStack(
         index: _currentIndex,
-        children: [
-          MarketplacePage(key: _marketplaceKey),
-          const SearchPage(),
-          const SellPage(),
-          const CommunityPage(),
-          ProfilePage(key: _profileKey),
-        ],
+        children: _screens,
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex,

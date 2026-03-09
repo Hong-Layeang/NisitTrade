@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../data/models/community_post.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../widgets/user_widgets.dart';
 
 class CommunityPostCard extends StatelessWidget {
@@ -104,17 +106,32 @@ class CommunityPostCard extends StatelessWidget {
           ClipRRect(
             child: AspectRatio(
               aspectRatio: 4 / 3,
-              child: Image.network(
-                post.imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
+              child: RepaintBoundary(
+                child: CachedNetworkImage(
+                  key: ValueKey('post_image_${post.id}_${post.imageUrl}'),
+                  imageUrl: post.imageUrl!,
+                  fit: BoxFit.cover,
+                  useOldImageOnUrlChange: true,
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  placeholder: (context, url) => Container(
                     color: AppColors.surface,
                     child: const Center(
-                      child: Icon(Icons.image_not_supported_outlined),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
                     ),
-                  );
-                },
+                  ),
+                  errorWidget: (context, url, error) {
+                    return Container(
+                      color: AppColors.surface,
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported_outlined),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -126,14 +143,14 @@ class CommunityPostCard extends StatelessWidget {
             children: [
               _ActionButton(
                 icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                label: _formatCount(post.likes),
+                label: NumberFormatters.formatCount(post.likes),
                 color: isLiked ? Colors.redAccent : AppColors.textSecondary,
                 onTap: onLikeTap,
               ),
               const SizedBox(width: 18),
               _ActionButton(
                 icon: Icons.mode_comment_outlined,
-                label: _formatCount(post.comments),
+                label: NumberFormatters.formatCount(post.comments),
                 color: AppColors.textSecondary,
                 onTap: onCommentTap,
               ),
@@ -152,16 +169,6 @@ class CommunityPostCard extends StatelessWidget {
         const SizedBox(height: 12),
       ],
     );
-  }
-
-  String _formatCount(int count) {
-    if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(1)}m';
-    }
-    if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}k';
-    }
-    return count.toString();
   }
 }
 

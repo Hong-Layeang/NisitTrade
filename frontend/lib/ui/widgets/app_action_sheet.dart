@@ -64,7 +64,7 @@ class AppActionSheet extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.14),
+                color: Colors.black.withValues(alpha: 0.14),
                 blurRadius: 18,
                 offset: const Offset(0, -2),
               ),
@@ -98,7 +98,7 @@ class AppActionSheet extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: items.length,
-                separatorBuilder: (_, __) => const Divider(
+                separatorBuilder: (_, _) => const Divider(
                   height: 1,
                   color: AppColors.border,
                 ),

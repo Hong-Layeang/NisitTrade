@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../../../data/models/product.dart';
+import '../../../../domain/entities/product_entity.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../widgets/app_action_chip.dart';
 
+/// Displays action row with like, comment, chat buttons
 class ProductCardActionRow extends StatelessWidget {
-  final Product product;
+  final ProductEntity product;
   final bool isLiked;
   final bool isLoading;
   final AnimationController likeAnimationController;
@@ -22,18 +24,6 @@ class ProductCardActionRow extends StatelessWidget {
     required this.onCommentTap,
     required this.onChatTap,
   });
-
-  String _formatNumber(int number) {
-    if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(number % 1000 == 0 ? 0 : 1)}k';
-    }
-    return number.toString();
-  }
-
-  String _formatPrice(double price) {
-    // Always show price with 2 decimal places (e.g., 65.00, 89.99)
-    return '\$${price.toStringAsFixed(2)}';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +45,7 @@ class ProductCardActionRow extends StatelessWidget {
                 size: 18,
               ),
             ),
-            label: _formatNumber(product.likesCount),
+            label: NumberFormatters.formatCount(product.likesCount),
             labelColor: isLiked ? Colors.red : AppColors.textPrimary,
             onTap: onLikeTap,
           ),
@@ -66,7 +56,7 @@ class ProductCardActionRow extends StatelessWidget {
               color: AppColors.textPrimary,
               size: 18,
             ),
-            label: _formatNumber(product.commentsCount),
+            label: NumberFormatters.formatCount(product.commentsCount),
             labelColor: AppColors.textPrimary,
             onTap: onCommentTap,
           ),
@@ -87,7 +77,7 @@ class ProductCardActionRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 3),
                 Text(
-                  _formatPrice(product.price),
+                  NumberFormatters.formatPrice(product.price),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,

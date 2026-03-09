@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class FullScreenImageViewer {
   FullScreenImageViewer._();
@@ -46,7 +47,6 @@ class FullScreenImageViewer {
 }
 
 // Internal implementation
-
 class _FullScreenImagePage extends StatefulWidget {
   const _FullScreenImagePage({
     required this.imageUrl,
@@ -163,7 +163,7 @@ class _FullScreenImagePageState extends State<_FullScreenImagePage>
                 icon: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.45),
+                    color: Colors.black.withValues(alpha: 0.45),
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white24, width: 0.5),
                   ),
@@ -183,19 +183,20 @@ class _FullScreenImagePageState extends State<_FullScreenImagePage>
                   : null,
               centerTitle: true,
             ),
-            body: Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.identity()
-                ..translate(_drag.dx * 0.35, _drag.dy)
-                ..scale(1.0 - _progress * 0.08),
-              child: isMulti
-                  ? PageView.builder(
-                      controller: _pageCtrl,
-                      itemCount: images.length,
-                      onPageChanged: (i) => setState(() => _pageIndex = i),
-                      itemBuilder: (_, i) => _buildZoomableImage(images[i]),
-                    )
-                  : _buildZoomableImage(widget.imageUrl),
+            body: Transform.translate(
+              offset: Offset(_drag.dx * 0.35, _drag.dy),
+              child: Transform.scale(
+                alignment: Alignment.center,
+                scale: 1.0 - _progress * 0.08,
+                child: isMulti
+                    ? PageView.builder(
+                        controller: _pageCtrl,
+                        itemCount: images.length,
+                        onPageChanged: (i) => setState(() => _pageIndex = i),
+                        itemBuilder: (_, i) => _buildZoomableImage(images[i]),
+                      )
+                    : _buildZoomableImage(widget.imageUrl),
+              ),
             ),
           ),
         ],
@@ -208,25 +209,24 @@ class _FullScreenImagePageState extends State<_FullScreenImagePage>
       minScale: 0.5,
       maxScale: 5.0,
       child: Center(
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          key: ValueKey('fullscreen_$url'),
+          imageUrl: url,
           fit: BoxFit.contain,
-          loadingBuilder: (_, child, progress) => progress == null
-              ? child
-              : SizedBox(
-                  height: 240,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      value: progress.expectedTotalBytes != null
-                          ? progress.cumulativeBytesLoaded /
-                              progress.expectedTotalBytes!
-                          : null,
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                ),
-          errorBuilder: (_, _, _) => const Center(
+          useOldImageOnUrlChange: true,
+          fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
+          progressIndicatorBuilder: (context, url, progress) => SizedBox(
+            height: 240,
+            child: Center(
+              child: CircularProgressIndicator(
+                value: progress.progress,
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) => const Center(
             child: Icon(Icons.broken_image, color: Colors.white38, size: 72),
           ),
         ),

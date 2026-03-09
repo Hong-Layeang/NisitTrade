@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../data/providers/api_client.dart';
 
@@ -79,7 +80,8 @@ class MicrosoftAuthApi {
         user: null,
         message: _extractMessage(error),
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('MicrosoftAuthApi.signInWithMicrosoft unexpected error: $e\n$st');
       return const MicrosoftAuthApiResponse(
         isValid: false,
         token: null,
@@ -116,7 +118,8 @@ class MicrosoftAuthApi {
         user: null,
         message: _extractMessage(error),
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('MicrosoftAuthApi.setPassword unexpected error: $e\n$st');
       return const MicrosoftAuthApiResponse(
         isValid: false,
         token: null,

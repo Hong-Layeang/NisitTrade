@@ -78,18 +78,21 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           focusNode: widget.focusNode,
           onChanged: widget.onChanged,
           onTap: widget.onTap,
+          onTapOutside: (_) {
+            FocusScope.of(context).unfocus();
+          },
           decoration: InputDecoration(
             hintText: widget.hintText,
             hintStyle: textTheme.bodyLarge?.copyWith(
               color: AppColors.textSecondary,
             ),
-            prefixIcon: Icon(
+            prefixIcon: const Icon(
               Icons.search,
               color: AppColors.textSecondary,
             ),
             suffixIcon: _hasText
                 ? IconButton(
-                    icon: Icon(
+                    icon: const Icon(
                       Icons.clear,
                       color: AppColors.textSecondary,
                     ),

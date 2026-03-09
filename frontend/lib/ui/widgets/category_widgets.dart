@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/colors.dart';
-import '../../../data/models/category.dart';
+import '../../../domain/entities/category_entity.dart';
 
 class CategoryCircle extends StatelessWidget {
-  final Category category;
+  final CategoryEntity category;
   final bool isSelected;
   final VoidCallback? onTap;
   final double size;
@@ -39,13 +40,27 @@ class CategoryCircle extends StatelessWidget {
               ),
               child: ClipOval(
                 child: category.imageUrl != null && category.imageUrl!.isNotEmpty
-                    ? Image.network(
-                        category.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.category,
-                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                          size: size * 0.4,
+                    ? RepaintBoundary(
+                        child: CachedNetworkImage(
+                          key: ValueKey('category_${category.id}_${category.imageUrl}'),
+                          imageUrl: category.imageUrl!,
+                          fit: BoxFit.cover,
+                          useOldImageOnUrlChange: true,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          placeholder: (context, url) => Container(
+                            color: AppColors.surface,
+                            child: Icon(
+                              Icons.category,
+                              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                              size: size * 0.4,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Icon(
+                            Icons.category,
+                            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                            size: size * 0.4,
+                          ),
                         ),
                       )
                     : Icon(
@@ -182,7 +197,7 @@ class SeeLessCircle extends StatelessWidget {
 
 /// A horizontal scrollable list of category circles with optional "See All" / "See Less" button
 class CategoryList extends StatelessWidget {
-  final List<Category> categories;
+  final List<CategoryEntity> categories;
   final int? selectedIndex;
   final ValueChanged<int?>? onCategorySelected;
   final VoidCallback? onSeeAllTap;

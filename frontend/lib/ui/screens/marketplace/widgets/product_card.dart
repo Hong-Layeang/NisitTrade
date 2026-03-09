@@ -1,31 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/core/constants/colors.dart';
+import 'package:frontend/core/constants/app_durations.dart';
 import 'package:provider/provider.dart';
-import '../../../../data/models/like.dart';
 import '../../../../data/models/product.dart';
 import '../../../../domain/entities/product_entity.dart';
 import 'package:get_it/get_it.dart';
+import '../../../../logic/helpers/product_like_helpers.dart';
 import '../../../../logic/view_models/product_feed_view_model.dart';
 
 import '../../../../logic/view_models/user_view_model.dart';
 import '../../../../domain/repository_interfaces/i_product_repository.dart';
-import '../../../widgets/app_action_sheet.dart';
 import '../../edit/edit_product_page.dart';
 import '../product_detail_page.dart';
 import '../../profile/other_profile_page.dart';
 import '../../../../core/navigation/app_routes.dart';
+import '../../../widgets/app_snack_bar.dart';
 import 'product_card_action_row.dart';
 import 'product_card_image_carousel.dart';
 import 'product_card_info.dart';
 import 'product_card_seller_header.dart';
+import 'product_card_action_handler.dart';
 
 final getIt = GetIt.instance;
 
+/// ProductCard displays a product in the marketplace feed.
 class ProductCard extends StatefulWidget {
-  final Product product;
+  final ProductEntity product;
   final VoidCallback? onTap;
-  final Function(Product)? onProductUpdated;
+  final Function(ProductEntity)? onProductUpdated;
 
   const ProductCard({
     super.key,
@@ -38,14 +41,18 @@ class ProductCard extends StatefulWidget {
   State<ProductCard> createState() => _ProductCardState();
 }
 
-class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin {
+class _ProductCardState extends State<ProductCard>
+  with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   int _currentImageIndex = 0;
   late PageController _pageController;
   late AnimationController _likeAnimationController;
-  late Product _product;
+  late ProductEntity _product;
   bool _isLoading = false;
   bool _isActionLoading = false;
   late IProductRepository _productRepository;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -53,7 +60,7 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
     _productRepository = getIt<IProductRepository>();
     _pageController = PageController();
     _likeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: AppDurations.slow,
       vsync: this,
     );
     _product = widget.product;
@@ -62,10 +69,26 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   @override
   void didUpdateWidget(ProductCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Always sync with the parent's product if it's a different instance
-    // This ensures we get the latest state from the parent, including any like changes
     if (oldWidget.product != widget.product) {
-      _product = widget.product;
+      // Reset carousel only if it's a different product
+      if (oldWidget.product.id != widget.product.id) {
+        if (mounted) {
+          setState(() {
+            _currentImageIndex = 0;
+            _product = widget.product;
+          });
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(0);
+          }
+        }
+      } else {
+        final imagesChanged = oldWidget.product.imageUrls != widget.product.imageUrls;
+        if (imagesChanged && mounted) {
+          setState(() => _product = widget.product);
+        } else {
+          _product = widget.product;
+        }
+      }
     }
   }
 
@@ -76,55 +99,16 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
       arguments: ProductDetailArgs(
         productId: _product.id,
         focusComments: true,
+        initialProduct: _product,
       ),
     );
-    if (!mounted) return;
-    await context.read<ProductFeedViewModel>().refreshProduct(_product.id);
-  }
-
-  int? _findCurrentUserLikeId() {
-    final userId = context.read<UserViewModel>().userId;
-    if (userId == null) return null;
-
-    for (final like in _product.likes) {
-      if (like.userId == userId) {
-        return like.id;
-      }
-    }
-    return null;
-  }
-
-  Product _buildOptimisticLikeProduct({required bool willBeLiked}) {
-    final now = DateTime.now();
-    final userId = context.read<UserViewModel>().userId;
-
-    if (willBeLiked) {
-      if (userId == null) return _product;
-
-      final likes = List<Like>.from(_product.likes)
-        ..add(
-          Like(
-            id: -now.microsecondsSinceEpoch,
-            userId: userId,
-            productId: _product.id,
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-
-      return _product.copyWith(likes: likes, updatedAt: now);
-    }
-
-    if (userId == null) return _product;
-
-    final likes = _product.likes.where((like) => like.userId != userId).toList();
-    return _product.copyWith(likes: likes, updatedAt: now);
   }
 
   bool _isProductLikedByCurrentUser() {
-    final userId = context.read<UserViewModel>().userId;
-    if (userId == null) return false;
-    return _product.likes.any((like) => like.userId == userId);
+    return ProductLikeHelpers.isLikedByUser(
+      product: _product,
+      userId: context.read<UserViewModel>().userId,
+    );
   }
 
   bool _isOwner() {
@@ -134,32 +118,23 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppSnackBar.show(context, message);
   }
 
   Future<void> _handleSaveListing() async {
-    if (_isActionLoading) return;
-    setState(() => _isActionLoading = true);
-
-    try {
-      await context.read<ProductFeedViewModel>().saveListing(_product.id);
-      _showSnack('Saved to your list.');
-    } catch (e) {
-      _showSnack('Failed to save listing.');
-    } finally {
-      if (mounted) {
-        setState(() => _isActionLoading = false);
-      }
-    }
+    await executeAction(
+      () => context.read<ProductFeedViewModel>().saveListing(_product.id),
+      onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
+      successMessage: 'Saved to your list.',
+      errorMessage: 'Failed to save listing.',
+    );
   }
 
   Future<void> _handleEditListing() async {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProductPage(product: _product),
+        builder: (context) => EditProductPage(product: Product.fromEntity(_product)),
       ),
     );
 
@@ -205,7 +180,8 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
       }
 
       _showSnack('Listing deleted.');
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ProductCard._handleDeleteListing failed: $e\n$st');
       _showSnack('Failed to delete listing.');
     } finally {
       if (mounted) {
@@ -226,9 +202,8 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
           : await provider.hideProduct(_product.id);
 
       if (updated != null && mounted) {
-        final updatedModel = Product.fromEntity(updated);
-        setState(() => _product = updatedModel);
-        widget.onProductUpdated?.call(updatedModel);
+        setState(() => _product = updated);
+        widget.onProductUpdated?.call(updated);
       }
 
       _showSnack(wasHidden ? 'Listing unhidden.' : 'Listing hidden.');
@@ -242,24 +217,18 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   }
 
   Future<void> _handleShareListing() async {
-    if (_isActionLoading) return;
-    setState(() => _isActionLoading = true);
-
-    try {
-      final shareUrl = await context.read<ProductFeedViewModel>().shareProduct(_product.id);
-      if (shareUrl != null && shareUrl.isNotEmpty) {
+    await executeAction(
+      () async {
+        final shareUrl = await context.read<ProductFeedViewModel>().shareProduct(_product.id);
+        if (shareUrl == null || shareUrl.isEmpty) {
+          throw Exception('Failed to get share link');
+        }
         await Clipboard.setData(ClipboardData(text: shareUrl));
-        _showSnack('Share link copied to clipboard.');
-      } else {
-        _showSnack('Failed to get share link.');
-      }
-    } catch (e) {
-      _showSnack('Failed to get share link.');
-    } finally {
-      if (mounted) {
-        setState(() => _isActionLoading = false);
-      }
-    }
+      },
+      onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
+      successMessage: 'Share link copied to clipboard.',
+      errorMessage: 'Failed to get share link.',
+    );
   }
 
   Future<void> _handleReportListing() async {
@@ -329,59 +298,28 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
   }
 
   void _showProductActions() {
-    final isOwner = _isOwner();
-    final items = <AppActionSheetItem>[
-      if (isOwner)
-        AppActionSheetItem(
-          label: 'Edit listing',
-          icon: Icons.edit_outlined,
-          onTap: _handleEditListing,
-        ),
-      if (isOwner)
-        AppActionSheetItem(
-          label: 'Delete listing',
-          icon: Icons.delete_outline,
-          isDestructive: true,
-          onTap: _handleDeleteListing,
-        ),
-      AppActionSheetItem(
-        label: 'Save listing',
-        icon: Icons.bookmark_border,
-        onTap: _handleSaveListing,
-      ),
-      if (isOwner)
-        AppActionSheetItem(
-          label: _product.isHidden ? 'Unhide listing' : 'Hide listing',
-          icon: Icons.visibility_off_outlined,
-          onTap: _handleHideToggle,
-        ),
-      AppActionSheetItem(
-        label: 'Share',
-        icon: Icons.share_outlined,
-        onTap: _handleShareListing,
-      ),
-      AppActionSheetItem(
-        label: 'Report',
-        icon: Icons.flag_outlined,
-        isDestructive: true,
-        onTap: _handleReportListing,
-      ),
-    ];
-
-    AppActionSheet.show(
-      context,
-      title: 'Listing options',
-      items: items,
+    final handler = ProductCardActionHandler(
+      context: context,
+      product: _product,
+      isOwner: _isOwner(),
+      onEditListing: _handleEditListing,
+      onDeleteListing: _handleDeleteListing,
+      onSaveListing: _handleSaveListing,
+      onHideToggle: _handleHideToggle,
+      onShareListing: _handleShareListing,
+      onReportListing: _handleReportListing,
     );
+    handler.showActionSheet();
   }
 
   Future<void> _handleLikeTap() async {
     if (_isLoading) return;
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    if (context.read<UserViewModel>().userId == null) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('Unable to load your account. Please try again.')),
+    final userId = context.read<UserViewModel>().userId;
+    if (userId == null) {
+      AppSnackBar.error(
+        context,
+        'Unable to load your account. Please try again.',
       );
       return;
     }
@@ -398,15 +336,9 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
     try {
       final provider = context.read<ProductFeedViewModel>();
       final isCurrentlyLiked = _isProductLikedByCurrentUser();
-      final unlikeLikeId = isCurrentlyLiked ? _findCurrentUserLikeId() : null;
-
-      final optimisticProduct = _buildOptimisticLikeProduct(
-        willBeLiked: !isCurrentlyLiked,
-      );
-      if (mounted) {
-        setState(() => _product = optimisticProduct);
-        widget.onProductUpdated?.call(_product);
-      }
+      final unlikeLikeId = isCurrentlyLiked
+          ? ProductLikeHelpers.findUserLikeId(product: _product, userId: userId)
+          : null;
 
       ProductEntity? updatedProduct;
 
@@ -416,15 +348,19 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
         if (likeId == null) {
           final refreshed = await provider.refreshProduct(_product.id);
           if (refreshed != null && mounted) {
-            setState(() => _product = Product.fromEntity(refreshed));
+            setState(() => _product = refreshed);
           }
-          likeId = _findCurrentUserLikeId();
+          likeId = ProductLikeHelpers.findUserLikeId(
+            product: _product,
+            userId: userId,
+          );
         }
 
         if (likeId == null) {
           if (mounted) {
-            scaffoldMessenger.showSnackBar(
-              const SnackBar(content: Text('Unable to find your like. Please try again.')),
+            AppSnackBar.error(
+              context,
+              'Unable to find your like. Please try again.',
             );
           }
         } else {
@@ -438,12 +374,13 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
       }
 
       if (updatedProduct != null && mounted) {
-        setState(() => _product = Product.fromEntity(updatedProduct!));
+        final nextProduct = updatedProduct;
+        setState(() => _product = nextProduct);
         widget.onProductUpdated?.call(_product);
       } else {
         final refreshed = await provider.refreshProduct(_product.id);
         if (refreshed != null && mounted) {
-          setState(() => _product = Product.fromEntity(refreshed));
+          setState(() => _product = refreshed);
           widget.onProductUpdated?.call(_product);
         }
       }
@@ -454,8 +391,9 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
       if (mounted) {
         setState(() => _product = previousProduct);
         widget.onProductUpdated?.call(_product);
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Failed to update like. Please try again.')),
+        AppSnackBar.error(
+          context,
+          'Failed to update like. Please try again.',
         );
       }
     } finally {
@@ -474,6 +412,8 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     return Material(
       color: AppColors.background,
       child: InkWell(
@@ -493,10 +433,10 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
             Expanded(
               child: RepaintBoundary(
                 child: ProductCardImageCarousel(
-                  key: ValueKey(_product.id),
                   images: _product.imageUrls,
                   currentIndex: _currentImageIndex,
                   pageController: _pageController,
+                  pageViewKey: PageStorageKey('product-card-carousel-${_product.id}'),
                   onPageChanged: (index) {
                     setState(() {
                       _currentImageIndex = index;
@@ -526,12 +466,12 @@ class _ProductCardState extends State<ProductCard> with TickerProviderStateMixin
 
 /// Separate widget for action row to prevent image carousel rebuilds
 class _ProductCardActionSection extends StatelessWidget {
-  final Product product;
+  final ProductEntity product;
   final bool isLiked;
   final AnimationController likeAnimationController;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
-  final Function(Product) onProductUpdated;
+  final Function(ProductEntity) onProductUpdated;
 
   const _ProductCardActionSection({
     required this.product,

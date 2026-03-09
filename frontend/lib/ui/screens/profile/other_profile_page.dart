@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get_it/get_it.dart';
 import '../../../domain/repository_interfaces/i_user_repository.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/user_profile.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/constants/app_dimensions.dart';
 import '../../../core/navigation/app_routes.dart';
+import '../../../core/utils/extensions/state_extensions.dart';
 import '../../widgets/empty_state.dart';
 import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
@@ -38,13 +41,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
   String? _error;
   bool _isFollowing = false;
 
-  // ── Layout constants ──
-  static const double _coverHeight = 220;
-  static const double _avatarRadius = 65;
-  static const double _avatarBorder = 3;
-  static const double _avatarGap = 3;
-  static const double _avatarTotalRadius =
-      _avatarRadius + _avatarGap + _avatarBorder;
+  // Using AppDimensions for layout constants
 
   @override
   void initState() {
@@ -81,23 +78,17 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         throw productsResponse.error!;
       }
 
-      if (mounted) {
-        setState(() {
-          _profile = UserProfile.fromEntity(profile);
-          _products = (productsResponse.data ?? [])
-              .map((entity) => Product.fromEntity(entity))
-              .toList();
-          _isFollowing = profile.isFollowing;
-          _isLoading = false;
-        });
-      }
+      setStateIfMounted(() {
+        _profile = UserProfile.fromEntity(profile);
+        _products = (productsResponse.data ?? []).toModels();
+        _isFollowing = profile.isFollowing;
+        _isLoading = false;
+      });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message;
-          _isLoading = false;
-        });
-      }
+      setStateIfMounted(() {
+        _error = e.message;
+        _isLoading = false;
+      });
     }
   }
 
@@ -185,13 +176,23 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                     expandedHeight: 0,
                   ),
                   SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        _buildCoverAndAvatar(profile),
-                        _buildStatsRow(profile),
-                        _buildNameAndBio(textTheme, profile),
-                        const SizedBox(height: 16),
-                      ],
+                    child: ProfileHeaderSection(
+                      data: ProfileHeaderData(
+                        coverImage: profile.coverImage,
+                        profileImage: profile.profileImage,
+                        fullName: profile.fullName,
+                        bio: profile.bio,
+                        followerCount: profile.followerCount,
+                        followingCount: profile.followingCount,
+                        major: profile.major,
+                        schoolShortName: ProfileUtils.getSchoolShortName(profile.university?.toEntity()),
+                      ),
+                      coverHeight: AppDimensions.profileCoverHeight,
+                      avatarRadius: AppDimensions.profileAvatarRadius,
+                      avatarBorder: AppDimensions.profileAvatarBorder,
+                      avatarGap: AppDimensions.profileAvatarGap,
+                      statsDetailGap: 20,
+                      actionsBelow: _buildActionButtons(profile),
                     ),
                   ),
                   SliverPersistentHeader(
@@ -213,239 +214,62 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     );
   }
 
-  Widget _buildCoverPlaceholder() {
-    return const ColoredBox(color: Colors.black);
-  }
-
-  Widget _buildCoverAndAvatar(UserProfile profile) {
-    final coverUrl = profile.coverImage;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // Cover image (server data) or gradient placeholder
-        SizedBox(
-          height: _coverHeight,
-          width: double.infinity,
-          child: coverUrl != null && coverUrl.isNotEmpty
-              ? Image.network(
-                  coverUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _buildCoverPlaceholder(),
-                )
-              : _buildCoverPlaceholder(),
-        ),
-        // Profile avatar overlapping bottom of cover
-        Positioned(
-          bottom: -_avatarTotalRadius,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: ProfileAvatar(
-              imageUrl: profile.profileImage,
-              displayName: profile.fullName,
-              radius: _avatarRadius,
-              borderWidth: _avatarBorder,
-              gapWidth: _avatarGap,
+  Widget _buildActionButtons(UserProfile profile) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _toggleFollow,
+              icon: Icon(
+                _isFollowing ? Icons.person_remove_outlined : Icons.person_add_outlined,
+                size: 18,
+              ),
+              label: Text(_isFollowing ? 'Unfollow' : 'Follow'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.surface,
+                foregroundColor: AppColors.textPrimary,
+                side: const BorderSide(color: AppColors.border, width: 1.5),
+                elevation: 0,
+                minimumSize: const Size.fromHeight(44),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatsRow(UserProfile profile) {
-    final schoolShort = _getSchoolShortName(profile);
-    return SizedBox(
-      height: _avatarTotalRadius + 24,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _buildCountStat(
-                    Icons.person_add_outlined,
-                    '${profile.followerCount}',
-                    'Followers',
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCountStat(
-                    Icons.people_outline,
-                    '${profile.followingCount}',
-                    'Following',
-                  ),
-                ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: () => Navigator.pushNamed(
+                context,
+                AppRoutes.chatRoom,
+                arguments: {'userId': profile.id},
+              ),
+              icon: const Icon(Icons.chat_bubble_outline, size: 18),
+              label: const Text('Message'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                minimumSize: const Size.fromHeight(44),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
               ),
             ),
-            // Center gap for avatar
-            SizedBox(width: _avatarTotalRadius * 2 + 16),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ProfileStatItem(
-                    icon: Icons.school_outlined,
-                    value: profile.major ?? 'N/A',
-                  ),
-                  const SizedBox(height: 20),
-                  ProfileStatItem(
-                    icon: Icons.verified_outlined,
-                    value: schoolShort,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-
-  Widget _buildCountStat(IconData icon, String count, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18, color: AppColors.textSecondary),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              count,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Extract a short school abbreviation from the university's name.
-  /// e.g. "Cambodian Academy of Digital Technology" → "CADT"
-  String _getSchoolShortName(UserProfile profile) {
-    final university = profile.university;
-    if (university == null) return 'N/A';
-
-    // Try abbreviation from name first
-    const skipWords = {'of', 'the', 'and', 'in', 'at', 'for', 'a', 'an', 'to'};
-    final nameParts = university.name.trim().split(RegExp(r'\s+'));
-    final initials = nameParts
-        .where((w) => w.isNotEmpty && !skipWords.contains(w.toLowerCase()))
-        .map((w) => w[0].toUpperCase())
-        .join();
-    if (initials.isNotEmpty) return initials;
-
-    // Fallback: parse domain
-    const excluded = {'student', 'mail', 'www', 'edu', 'ac', 'com', 'org', 'net', 'kh'};
-    final domainParts = university.domain.split('.');
-    final meaningful = domainParts.where(
-      (p) => p.length > 2 && !excluded.contains(p.toLowerCase()),
-    );
-    if (meaningful.isNotEmpty) return meaningful.first.toUpperCase();
-    return domainParts.isNotEmpty ? domainParts.first.toUpperCase() : 'N/A';
-  }
-
-  Widget _buildNameAndBio(TextTheme textTheme, UserProfile profile) {
-    final name = profile.fullName;
-    final bio = (profile.bio != null && profile.bio!.isNotEmpty)
-        ? profile.bio!
-        : 'No bio yet.';
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        Text(
-          name,
-          style: textTheme.titleLarge?.copyWith(color: AppColors.primary),
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            bio,
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.4,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _toggleFollow,
-                  icon: Icon(
-                    _isFollowing ? Icons.person_remove_outlined : Icons.person_add_outlined,
-                    size: 18,
-                  ),
-                  label: Text(_isFollowing ? 'Unfollow' : 'Follow'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.border, width: 1.5),
-                    elevation: 0,
-                    minimumSize: const Size.fromHeight(44),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: const StadiumBorder(),
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => Navigator.pushNamed(
-                    context,
-                    AppRoutes.chatRoom,
-                    arguments: {'userId': profile.id},
-                  ),
-                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: const Text('Message'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    minimumSize: const Size.fromHeight(44),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: const StadiumBorder(),
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildTabBar(BuildContext context) {
     final productCount = _products.length;
     return Container(
@@ -480,8 +304,8 @@ class _OtherProfilePageState extends State<OtherProfilePage>
   }
 
   Widget _buildPostsTab() {
-    return CustomScrollView(
-      slivers: const [
+    return const CustomScrollView(
+      slivers: [
         SliverFillRemaining(
           hasScrollBody: false,
           child: Padding(
@@ -499,8 +323,8 @@ class _OtherProfilePageState extends State<OtherProfilePage>
 
   Widget _buildProductGrid(UserProfile profile) {
     if (_products.isEmpty) {
-      return CustomScrollView(
-        slivers: const [
+      return const CustomScrollView(
+        slivers: [
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
@@ -539,12 +363,27 @@ class _OtherProfilePageState extends State<OtherProfilePage>
 
         return GestureDetector(
           onTap: () => _openProduct(product),
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: AppColors.surface,
-              child: const Icon(Icons.image, color: AppColors.textSecondary),
+          child: RepaintBoundary(
+            child: CachedNetworkImage(
+              key: ValueKey('other_profile_product_${product.id}_$imageUrl'),
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              useOldImageOnUrlChange: true,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+              placeholder: (context, url) => Container(
+                color: AppColors.surface,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: AppColors.surface,
+                child: const Icon(Icons.image, color: AppColors.textSecondary),
+              ),
             ),
           ),
         );
@@ -556,7 +395,10 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     Navigator.pushNamed(
       context,
       AppRoutes.productDetail,
-      arguments: ProductDetailArgs(productId: product.id),
+      arguments: ProductDetailArgs(
+        productId: product.id,
+        initialProduct: product.toEntity(),
+      ),
     );
   }
 }

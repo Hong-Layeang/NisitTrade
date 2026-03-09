@@ -1,37 +1,46 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../data/models/comment.dart';
-import '../../../data/models/like.dart';
 import '../../../data/models/product.dart';
+import '../../../domain/entities/product_entity.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/constants/app_durations.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../widgets/app_action_chip.dart';
+import '../../widgets/app_snack_bar.dart';
 import '../../widgets/full_screen_image_viewer.dart';
 import 'widgets/product_card_image_carousel.dart';
+import 'widgets/comment_item.dart';
+import 'widgets/edit_comment_dialog.dart';
 import '../profile/other_profile_page.dart';
 
 class ProductDetailArgs {
   final int productId;
   final bool focusComments;
+  final ProductEntity? initialProduct;
 
   const ProductDetailArgs({
     required this.productId,
     this.focusComments = false,
+    this.initialProduct,
   });
 }
 
 class ProductDetailPage extends StatefulWidget {
   final int productId;
   final bool focusComments;
+  final ProductEntity? initialProduct;
 
   const ProductDetailPage({
     super.key,
     required this.productId,
     this.focusComments = false,
+    this.initialProduct,
   });
 
   @override
@@ -57,10 +66,23 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   void initState() {
     super.initState();
     _likeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: AppDurations.slow,
       vsync: this,
     );
-    _loadData();
+    
+    // Use initial product if provided, or check cache
+    if (widget.initialProduct != null) {
+      _product = Product.fromEntity(widget.initialProduct!);
+      _loadData(silent: true);
+    } else {
+      final cachedProduct = context.read<ProductFeedViewModel>().getCachedProduct(widget.productId);
+      if (cachedProduct != null) {
+        _product = Product.fromEntity(cachedProduct);
+        _loadData(silent: true);
+      } else {
+        _loadData();
+      }
+    }
   }
 
   void _scrollToComments() {
@@ -68,7 +90,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 400),
+          duration: AppDurations.medium,
           curve: Curves.easeOut,
         );
       }
@@ -85,11 +107,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final product = await context
@@ -102,17 +126,21 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       if (mounted) {
         setState(() {
           _product = Product.fromEntity(product);
-          _isLoading = false;
+          if (!silent) {
+            _isLoading = false;
+          }
         });
-        if (widget.focusComments) {
+        if (widget.focusComments && !silent) {
           _scrollToComments();
         }
       }
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message;
-          _isLoading = false;
+          if (!silent) {
+            _error = e.message;
+            _isLoading = false;
+          }
         });
       }
     }
@@ -128,48 +156,39 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        AppSnackBar.error(context, e.message);
       }
     }
-  }
-
-  Like? _findUserLike() {
-    final userId = context.read<UserViewModel>().userId;
-    if (userId == null) return null;
-    final likes = _product?.likes ?? [];
-    for (final like in likes) {
-      if (like.userId == userId) {
-        return like;
-      }
-    }
-    return null;
   }
 
   Future<void> _toggleLike() async {
     if (_isTogglingLike) return;
-    if (context.read<UserViewModel>().userId == null) return;
-    final like = _findUserLike();
+    final userId = context.read<UserViewModel>().userId;
+    final product = _product;
+    if (userId == null || product == null) return;
+
+    final likeId = product.likes
+        .where((like) => like.userId == userId)
+        .map((like) => like.id)
+        .cast<int?>()
+        .firstWhere((id) => id != null, orElse: () => null);
 
     _likeAnimationController.forward(from: 0.0);
     setState(() => _isTogglingLike = true);
     try {
       final provider = context.read<ProductFeedViewModel>();
-      final updatedProduct = like == null
+      final updatedProduct = likeId == null
           ? await provider.likeProduct(widget.productId)
           : await provider.unlikeProduct(
               productId: widget.productId,
-              likeId: like.id,
+              likeId: likeId,
             );
       if (mounted && updatedProduct != null) {
         setState(() => _product = Product.fromEntity(updatedProduct));
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        AppSnackBar.error(context, e.message);
       }
     } finally {
       if (mounted) {
@@ -192,16 +211,82 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       _commentController.clear();
       if (mounted && updatedProduct != null) {
         setState(() => _product = Product.fromEntity(updatedProduct));
+        AppSnackBar.success(context, 'Comment added successfully');
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        AppSnackBar.error(context, e.message);
       }
     } finally {
       if (mounted) {
         setState(() => _isSubmittingComment = false);
+      }
+    }
+  }
+
+  Future<void> _editComment(Comment comment) async {
+    final newContent = await EditCommentDialog.show(
+      context,
+      initialContent: comment.content,
+    );
+
+    if (!mounted) return;
+
+    if (newContent == null || newContent == comment.content) return;
+
+    try {
+      final updatedProduct = await context.read<ProductFeedViewModel>().updateComment(
+            productId: widget.productId,
+            commentId: comment.id,
+            content: newContent,
+          );
+      if (mounted && updatedProduct != null) {
+        setState(() => _product = Product.fromEntity(updatedProduct));
+        AppSnackBar.success(context, 'Comment updated successfully');
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        AppSnackBar.error(context, e.message);
+      }
+    }
+  }
+
+  Future<void> _deleteComment(Comment comment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (confirmed != true) return;
+
+    try {
+      final updatedProduct = await context.read<ProductFeedViewModel>().deleteComment(
+            productId: widget.productId,
+            commentId: comment.id,
+          );
+      if (mounted && updatedProduct != null) {
+        setState(() => _product = Product.fromEntity(updatedProduct));
+        AppSnackBar.success(context, 'Comment deleted successfully');
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        AppSnackBar.error(context, e.message);
       }
     }
   }
@@ -320,6 +405,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           images: images,
           currentIndex: _currentImageIndex,
           pageController: _pageController,
+          pageViewKey: PageStorageKey('product-detail-carousel-${widget.productId}'),
           onPageChanged: (index) {
             setState(() => _currentImageIndex = index);
           },
@@ -394,35 +480,64 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   void _navigateToUserProfile(int userId) {
-    Navigator.pushNamed(
-      context,
-      AppRoutes.userProfile,
-      arguments: OtherProfileArgs(userId: userId),
-    );
+    final currentUserId = context.read<UserViewModel>().userId;
+    if (currentUserId == userId) {
+      // Navigate to own profile tab
+      Navigator.pushNamed(context, AppRoutes.profile);
+    } else {
+      // Navigate to other user's profile
+      Navigator.pushNamed(
+        context,
+        AppRoutes.userProfile,
+        arguments: OtherProfileArgs(userId: userId),
+      );
+    }
   }
 
   Widget _buildSellerRow(Product product) {
-    final userProvider = context.watch<UserViewModel>();
-    final isCurrentUser =
-        userProvider.userId != null && product.userId == userProvider.userId;
-    final avatarUrl = isCurrentUser
-        ? userProvider.profile?.profileImage
-        : product.sellerProfileImage;
+    return Selector<UserViewModel,
+        ({
+          int? userId,
+          String? profileImage,
+        })>(
+      selector: (_, vm) => (
+        userId: vm.userId,
+        profileImage: vm.profile?.profileImage,
+      ),
+      builder: (context, userData, _) {
+        final isCurrentUser =
+            userData.userId != null && product.userId == userData.userId;
+        final avatarUrl = isCurrentUser
+            ? userData.profileImage
+            : product.sellerProfileImage;
 
+        return _buildSellerRowContent(product, isCurrentUser, avatarUrl);
+      },
+    );
+  }
+
+  Widget _buildSellerRowContent(
+    Product product,
+    bool isCurrentUser,
+    String? avatarUrl,
+  ) {
     return Row(
       children: [
         GestureDetector(
           onTap: () => _navigateToUserProfile(product.userId),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppColors.surface,
-                backgroundImage:
-                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                child: avatarUrl == null
-                    ? const Icon(Icons.person, color: AppColors.textSecondary)
-                    : null,
+              RepaintBoundary(
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppColors.surface,
+                  backgroundImage: avatarUrl != null
+                      ? CachedNetworkImageProvider(avatarUrl) as ImageProvider
+                      : null,
+                  child: avatarUrl == null
+                      ? const Icon(Icons.person, color: AppColors.textSecondary)
+                      : null,
+                ),
               ),
               const SizedBox(width: 10),
               Column(
@@ -450,9 +565,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         const Spacer(),
         OutlinedButton(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Chat is not implemented yet.')),
-            );
+            AppSnackBar.show(context, 'Chat is not implemented yet.');
           },
           child: const Text('Chat'),
         ),
@@ -461,7 +574,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Widget _buildActions(Product product) {
-    final isLiked = _findUserLike() != null;
+    final userId = context.read<UserViewModel>().userId;
+    final isLiked = userId != null &&
+        product.likes.any((like) => like.userId == userId);
     return Row(
       children: [
         AppActionChip(
@@ -564,60 +679,12 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       separatorBuilder: (_, _) => const Divider(height: 16, color: AppColors.border),
       itemBuilder: (context, index) {
         final comment = comments[index];
-        final userProvider = context.watch<UserViewModel>();
-        final isCurrentUser = userProvider.userId != null &&
-            comment.userId == userProvider.userId;
-        final commentAvatarUrl = isCurrentUser
-            ? userProvider.profile?.profileImage
-            : comment.user?.profileImage;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTap: () => _navigateToUserProfile(comment.userId),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.surface,
-                backgroundImage: commentAvatarUrl != null
-                    ? NetworkImage(commentAvatarUrl)
-                    : null,
-                child: commentAvatarUrl == null
-                    ? const Icon(Icons.person, color: AppColors.textSecondary)
-                    : null,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () => _navigateToUserProfile(comment.userId),
-                    child: Text(
-                      comment.user?.fullName ?? 'User',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    comment.content,
-                    style: const TextStyle(height: 1.4),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTimeAgo(comment.createdAt),
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        return CommentItem(
+          key: ValueKey(comment.id),
+          comment: comment,
+          onUserTap: () => _navigateToUserProfile(comment.userId),
+          onEdit: () => _editComment(comment),
+          onDelete: () => _deleteComment(comment),
         );
       },
     );
@@ -670,25 +737,6 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       return '@${domainParts[1]}';
     }
     return email;
-  }
-
-  String _formatTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
-
-    if (diff.inSeconds < 60) {
-      return 'just now';
-    }
-    if (diff.inMinutes < 60) {
-      return '${diff.inMinutes}m ago';
-    }
-    if (diff.inHours < 24) {
-      return '${diff.inHours}h ago';
-    }
-    if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
-    }
-    return '${dateTime.month}/${dateTime.day}/${dateTime.year}';
   }
 }
 

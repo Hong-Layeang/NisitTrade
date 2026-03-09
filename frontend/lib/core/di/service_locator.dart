@@ -4,14 +4,14 @@ import 'package:get_it/get_it.dart';
 import '../../data/providers/category_api_service.dart';
 import '../../data/providers/product_api_service.dart';
 import '../../data/providers/user_api_service.dart';
-import '../../data/repositories/category_repository.dart';
-import '../../data/repositories/product_repository.dart';
+import '../../data/repositories/category_repository_impl.dart';
+import '../../data/repositories/product_repository_impl.dart';
 import '../../data/repositories/product_image_repository_impl.dart';
 import '../../data/repositories/product_like_repository_impl.dart';
 import '../../data/repositories/product_save_repository_impl.dart';
 import '../../data/repositories/product_report_repository_impl.dart';
 import '../../data/repositories/product_comment_repository_impl.dart';
-import '../../data/repositories/user_repository.dart';
+import '../../data/repositories/user_repository_impl.dart';
 
 // Domain layer
 import '../../domain/repository_interfaces/i_category_repository.dart';
@@ -25,6 +25,9 @@ import '../../domain/repository_interfaces/i_user_repository.dart';
 
 // Logic layer (ViewModels)
 import '../../logic/view_models/product_feed_view_model.dart';
+import '../../logic/view_models/saved_listings_view_model.dart';
+import '../../logic/view_models/search_view_model.dart';
+import '../../logic/view_models/marketplace_view_model.dart';
 import '../../logic/view_models/user_view_model.dart';
 
 /// Global service locator instance
@@ -107,11 +110,10 @@ Future<void> setupServiceLocator() async {
   );
 
   // ============================================================================
-  // VIEW MODELS (Singletons)
-  // Centralized in logic/view_models/
+  // VIEW MODELS (Factories)
   // ============================================================================
   
-  getIt.registerLazySingleton<ProductFeedViewModel>(
+  getIt.registerFactory<ProductFeedViewModel>(
     () => ProductFeedViewModel(
       productRepository: getIt<IProductRepository>(),
       likeRepository: getIt<IProductLikeRepository>(),
@@ -121,9 +123,30 @@ Future<void> setupServiceLocator() async {
     ),
   );
   
-  getIt.registerLazySingleton<UserViewModel>(
+  getIt.registerFactory<UserViewModel>(
     () => UserViewModel(
       userRepository: getIt<IUserRepository>(),
+    ),
+  );
+
+  getIt.registerFactory<SavedListingsViewModel>(
+    () => SavedListingsViewModel(
+      userRepository: getIt<IUserRepository>(),
+      productRepository: getIt<IProductRepository>(),
+      productSaveRepository: getIt<IProductSaveRepository>(),
+    ),
+  );
+
+  getIt.registerFactory<SearchViewModel>(
+    () => SearchViewModel(
+      categoryRepository: getIt<ICategoryRepository>(),
+      userRepository: getIt<IUserRepository>(),
+    ),
+  );
+
+  getIt.registerFactory<MarketplaceViewModel>(
+    () => MarketplaceViewModel(
+      categoryRepository: getIt<ICategoryRepository>(),
     ),
   );
 }

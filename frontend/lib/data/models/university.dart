@@ -29,6 +29,16 @@ class University {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'domain': domain,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
   /// Convert to domain entity
   UniversityEntity toEntity() {
     return UniversityEntity(

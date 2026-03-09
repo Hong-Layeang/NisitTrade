@@ -4,7 +4,7 @@ import '../../ui/screens/auth/login_page.dart';
 import '../../ui/screens/auth/set_password_page.dart';
 import '../../ui/screens/auth/signup_page.dart';
 import '../../ui/screens/auth/welcome_page.dart';
-import '../../ui/Screens/splash/splash_page.dart';
+import '../../ui/screens/splash/splash_page.dart';
 import '../../ui/screens/marketplace/product_detail_page.dart';
 import '../../ui/layouts/main_shell.dart';
 import '../../ui/screens/profile/other_profile_page.dart';
@@ -78,6 +78,7 @@ Route<dynamic> controlRoute(RouteSettings settings) {
           builder: (_) => ProductDetailPage(
             productId: args.productId,
             focusComments: args.focusComments,
+            initialProduct: args.initialProduct,
           ),
         );
       }

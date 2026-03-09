@@ -2,7 +2,6 @@ import '../entities/product_entity.dart';
 import '../../core/errors/api_response.dart';
 
 /// Repository interface for managing product data
-/// This belongs in the domain layer and defines the contract
 abstract class IProductRepository {
   Future<ApiResponse<List<ProductEntity>>> getProducts({
     int? categoryId,

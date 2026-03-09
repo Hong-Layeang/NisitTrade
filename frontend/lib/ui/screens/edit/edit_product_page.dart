@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get_it/get_it.dart';
 import 'package:frontend/domain/repository_interfaces/i_category_repository.dart';
 import 'package:frontend/domain/repository_interfaces/i_product_repository.dart';
@@ -12,9 +13,13 @@ import 'package:image_picker/image_picker.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/category.dart';
 import '../../../core/errors/api_exception.dart';
+import '../../../core/constants/app_limits.dart';
 import '../../../core/constants/colors.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
-import '../../widgets/app_buttons.dart';
+import '../../widgets/app_snack_bar.dart';
+import '../sell/product_form_image_picker.dart';
+import '../sell/product_form_orchestrator.dart';
+import '../sell/product_form_shared.dart';
 import '../sell/widgets/sell_form_widgets.dart';
 
 final getIt = GetIt.instance;
@@ -30,8 +35,7 @@ class EditProductPage extends StatefulWidget {
 
 class _EditProductPageState extends State<EditProductPage> {
   late final ICategoryRepository _categoryRepository;
-  late final IProductRepository _productRepository;
-  late final IProductImageRepository _productImageRepository;
+  late final ProductFormOrchestrator _orchestrator;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
@@ -56,8 +60,10 @@ class _EditProductPageState extends State<EditProductPage> {
   void initState() {
     super.initState();
     _categoryRepository = getIt<ICategoryRepository>();
-    _productRepository = getIt<IProductRepository>();
-    _productImageRepository = getIt<IProductImageRepository>();
+    _orchestrator = ProductFormOrchestrator(
+      productRepository: getIt<IProductRepository>(),
+      productImageRepository: getIt<IProductImageRepository>(),
+    );
     _initializeForm();
     _loadCategories();
   }
@@ -91,16 +97,13 @@ class _EditProductPageState extends State<EditProductPage> {
     });
 
     try {
-      final response = await _categoryRepository.getCategories();
-      if (!response.isSuccess) {
-        throw response.error!;
-      }
+      final categories = await ProductFormShared.loadCategories(
+        _categoryRepository,
+      );
 
       if (mounted) {
         setState(() {
-          _categories = (response.data ?? [])
-              .map((entity) => Category.fromEntity(entity))
-              .toList();
+          _categories = categories;
           _isLoading = false;
         });
       }
@@ -116,17 +119,21 @@ class _EditProductPageState extends State<EditProductPage> {
 
   Future<void> _pickImages() async {
     final totalImages = _existingImages.length - _imagesToDelete.length + _newImages.length;
-    if (totalImages >= 8) {
-      _showSnack('You can upload up to 8 images.');
+
+    final pickResult = await ProductFormImagePicker.pickWithinLimit(
+      imagePicker: _imagePicker,
+      currentCount: totalImages,
+    );
+
+    if (pickResult.reachedLimit) {
+      _showSnack('You can upload up to $maxProductImages images.');
       return;
     }
 
-    final images = await _imagePicker.pickMultiImage();
-    if (images.isEmpty) return;
+    if (pickResult.images.isEmpty) return;
 
     setState(() {
-      final remaining = 8 - totalImages;
-      _newImages.addAll(images.take(remaining));
+      _newImages.addAll(pickResult.images);
     });
   }
 
@@ -186,32 +193,26 @@ class _EditProductPageState extends State<EditProductPage> {
   Future<void> _submit() async {
     if (_isLoading) return;
 
-    final title = _titleController.text.trim();
-    final description = _descriptionController.text.trim();
-    final price = double.tryParse(_priceController.text.trim());
-
-    if (title.isEmpty) {
-      _showSnack('Title is required.');
-      return;
-    }
-
-    if (price == null || price <= 0) {
-      _showSnack('Please enter a valid price.');
-      return;
-    }
-
-    if (_selectedCategoryId == null) {
-      _showSnack('Please select a category.');
-      return;
-    }
-
     final remainingExistingCount = _existingImages.length - _imagesToDelete.length;
     final totalImageCount = remainingExistingCount + _newImages.length;
-    
-    if (totalImageCount < 1) {
-      _showSnack('Please have at least 1 photo.');
+
+    final validation = ProductFormShared.validateSubmission(
+      titleInput: _titleController.text,
+      descriptionInput: _descriptionController.text,
+      priceInput: _priceController.text,
+      selectedCategoryId: _selectedCategoryId,
+      imageCount: totalImageCount,
+      imageRequiredMessage: 'Please have at least 1 photo.',
+    );
+
+    if (!validation.isValid) {
+      _showSnack(validation.error!);
       return;
     }
+
+    final title = validation.title;
+    final description = validation.description;
+    final price = validation.price!;
 
     setState(() {
       _isLoading = true;
@@ -219,53 +220,25 @@ class _EditProductPageState extends State<EditProductPage> {
     });
 
     try {
-      // 1. Update product basic info
-      final updateResponse = await _productRepository.updateProduct(
-        id: widget.product.id,
+      final result = await _orchestrator.updateProduct(
+        productId: widget.product.id,
         title: title,
         description: description.isEmpty ? null : description,
         price: price,
         categoryId: _selectedCategoryId!,
+        imageIdsToDelete: _imagesToDelete,
+        newImages: _newImages,
       );
 
-      if (!updateResponse.isSuccess) {
-        throw updateResponse.error!;
-      }
+      if (!mounted) return;
 
-      // 2. Delete marked images
-      for (final imageId in _imagesToDelete) {
-        final deleteResponse = await _productImageRepository.deleteProductImage(
-          productId: widget.product.id,
-          imageId: imageId,
-        );
-        if (!deleteResponse.isSuccess) {
-          throw deleteResponse.error!;
-        }
-      }
-
-      // 3. Add new images
-      if (_newImages.isNotEmpty) {
-        final imagePaths = _newImages.map((image) => image.path).toList();
-        final imageResponse = await _productImageRepository.addProductImages(
-          productId: widget.product.id,
-          imagePaths: imagePaths,
-        );
-
-        if (!imageResponse.isSuccess) {
-          throw imageResponse.error!;
-        }
-      }
-
-      // Refresh product feed
-      if (mounted) {
+      if (result.success) {
         context.read<ProductFeedViewModel>().refresh();
-        _showSnack('Listing updated successfully.');
-        Navigator.of(context).pop(true); // Return true to indicate success
-      }
-    } on ApiException catch (e) {
-      if (mounted) {
-        setState(() => _error = e.message);
-        _showSnack(e.message);
+        _showSnack(result.message);
+        Navigator.of(context).pop(true);
+      } else {
+        setState(() => _error = result.message);
+        _showSnack(result.message);
       }
     } finally {
       if (mounted) {
@@ -275,9 +248,7 @@ class _EditProductPageState extends State<EditProductPage> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppSnackBar.show(context, message);
   }
 
   @override
@@ -339,122 +310,29 @@ class _EditProductPageState extends State<EditProductPage> {
             children: [
               EditHeaderRow(onBack: () => Navigator.of(context).pop()),
               const SizedBox(height: 12),
-              const SectionLabel(text: 'Title'),
-              const SizedBox(height: 6),
-              OutlinedField(
-                hintText: 'Name',
-                controller: _titleController,
-                textInputAction: TextInputAction.next,
-                isDense: true,
-              ),
-              const SizedBox(height: 12),
-              const SectionLabel(text: 'Description'),
-              const SizedBox(height: 6),
-              OutlinedField(
-                hintText: 'Detailed description of your product',
-                maxLines: 3,
-                controller: _descriptionController,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
+              ProductFormFieldsSection(
+                titleController: _titleController,
+                descriptionController: _descriptionController,
+                priceController: _priceController,
+                categories: _categories,
+                selectedCategoryId: _selectedCategoryId,
+                onCategoryChanged: (value) {
+                  setState(() => _selectedCategoryId = value);
+                },
+                photoGrid: EditPhotoGrid(
+                  existingImages: _existingImages,
+                  newImages: _newImages,
+                  imagesToDelete: _imagesToDelete,
+                  onAddTap: _pickImages,
+                  onRemoveExisting: _removeExistingImage,
+                  onUndoRemoveExisting: _undoRemoveExistingImage,
+                  onConfirmDeleteExisting: _confirmDeleteExistingImage,
+                  onRemoveNew: _removeNewImage,
+                  onReorder: _reorderImages,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SectionLabel(text: 'Category'),
-                        const SizedBox(height: 6),
-                        CategoryDropdownField<int>(
-                          value: _selectedCategoryId,
-                          hint: 'Select category',
-                          items: _categories
-                              .map(
-                                (category) => DropdownMenuItem<int>(
-                                  value: category.id,
-                                  child: Text(
-                                    category.name,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            setState(() => _selectedCategoryId = value);
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SectionLabel(text: 'Price (in \$)'),
-                        const SizedBox(height: 6),
-                        OutlinedField(
-                          hintText: '0.0',
-                          controller: _priceController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          isDense: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const SectionLabel(text: 'Photos'),
-              const SizedBox(height: 4),
-              Text.rich(
-                TextSpan(
-                  text:
-                      'Capture all the angles and details. Your first square is the key image. ',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.2,
-                  ),
-                  children: const [
-                    TextSpan(
-                      text: 'At least 1 photo required.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              EditPhotoGrid(
-                existingImages: _existingImages,
-                newImages: _newImages,
-                imagesToDelete: _imagesToDelete,
-                onAddTap: _pickImages,
-                onRemoveExisting: _removeExistingImage,
-                onUndoRemoveExisting: _undoRemoveExistingImage,
-                onConfirmDeleteExisting: _confirmDeleteExistingImage,
-                onRemoveNew: _removeNewImage,
-                onReorder: _reorderImages,
-              ),
-              const SizedBox(height: 14),
-              AppPrimaryButton(
-                label: _isLoading ? 'Saving...' : 'Save Changes',
-                isLoading: _isLoading,
-                onPressed: _isLoading ? null : _submit,
+                submitLabel: _isLoading ? 'Saving...' : 'Save Changes',
+                isSubmitting: _isLoading,
+                onSubmit: _isLoading ? null : _submit,
               ),
             ],
           ),
@@ -581,9 +459,9 @@ class _EditPhotoGridState extends State<EditPhotoGrid> {
         final isHovering = _hoveringIndex == index;
 
         return DragTarget<int>(
-          onWillAccept: (dragIndex) => dragIndex != index,
-          onAccept: (dragIndex) {
-            widget.onReorder(dragIndex, index);
+          onWillAcceptWithDetails: (details) => details.data != index,
+          onAcceptWithDetails: (details) {
+            widget.onReorder(details.data, index);
             setState(() {
               _hoveringIndex = null;
             });
@@ -612,7 +490,14 @@ class _EditPhotoGridState extends State<EditPhotoGrid> {
                       decoration: BoxDecoration(
                         border: Border.all(color: AppColors.primary, width: 2),
                       ),
-                      child: Image.network(item.imageUrl!, fit: BoxFit.cover),
+                      child: CachedNetworkImage(
+                        key: ValueKey('edit_product_thumb_${item.imageUrl}'),
+                        imageUrl: item.imageUrl!,
+                        fit: BoxFit.cover,
+                        useOldImageOnUrlChange: true,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                      ),
                     ),
                   ),
                 ),
@@ -780,7 +665,7 @@ class EditPhotoTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: isHovering ? AppColors.primary.withOpacity(0.1) : AppColors.surface,
+        color: isHovering ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surface,
         border: Border.all(
           color: isHovering ? AppColors.primary : AppColors.border,
           width: isHovering ? 2 : 1.2,
@@ -791,10 +676,23 @@ class EditPhotoTile extends StatelessWidget {
         children: [
           // Image display (from URL or local file)
           if (imageUrl != null)
-            Image.network(
-              imageUrl!,
+            CachedNetworkImage(
+              key: ValueKey('edit_tile_$imageUrl'),
+              imageUrl: imageUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              useOldImageOnUrlChange: true,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+              placeholder: (context, url) => Container(
+                color: AppColors.surface,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
                 color: AppColors.surface,
                 child: const Icon(
                   Icons.image,
@@ -806,7 +704,7 @@ class EditPhotoTile extends StatelessWidget {
             Image.file(
               File(imagePath!),
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_, _, _) => Container(
                 color: AppColors.surface,
                 child: const Icon(
                   Icons.image,
@@ -820,14 +718,14 @@ class EditPhotoTile extends StatelessWidget {
             GestureDetector(
               onTap: onUndo,
               child: Container(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 child: Center(
                   child: GestureDetector(
                     onTap: onConfirmDelete,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.8),
+                        color: Colors.red.withValues(alpha: 0.8),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -851,7 +749,7 @@ class EditPhotoTile extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(

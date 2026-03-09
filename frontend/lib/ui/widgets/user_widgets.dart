@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/colors.dart';
 import '../../../data/models/student.dart';
-import '../../../data/models/user_profile.dart';
+import '../../../domain/entities/user_entity.dart';
 
 class StudentListTile extends StatelessWidget {
   final Student student;
@@ -87,43 +88,49 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: AppColors.surface,
-      child: ClipOval(
-        child: Image.network(
-          imageUrl,
-          width: radius * 2,
-          height: radius * 2,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: radius * 2,
-              height: radius * 2,
-              color: AppColors.surface,
-              child: Icon(
-                fallbackIcon,
-                color: AppColors.textSecondary,
-                size: radius,
-              ),
-            );
-          },
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              width: radius * 2,
-              height: radius * 2,
-              color: AppColors.surface,
-              child: Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppColors.textSecondary,
+    return RepaintBoundary(
+      child: CircleAvatar(
+        key: ValueKey('avatar_$imageUrl'),
+        radius: radius,
+        backgroundColor: AppColors.surface,
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            useOldImageOnUrlChange: true,
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
+            errorWidget: (context, url, error) {
+              return Container(
+                width: radius * 2,
+                height: radius * 2,
+                color: AppColors.surface,
+                child: Icon(
+                  fallbackIcon,
+                  color: AppColors.textSecondary,
+                  size: radius,
+                ),
+              );
+            },
+            progressIndicatorBuilder: (context, url, progress) {
+              return Container(
+                width: radius * 2,
+                height: radius * 2,
+                color: AppColors.surface,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: progress.progress,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.textSecondary,
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -149,7 +156,7 @@ class FollowButton extends StatelessWidget {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: isFollowing
-              ? AppColors.primary.withOpacity(0.1)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
@@ -163,9 +170,8 @@ class FollowButton extends StatelessWidget {
   }
 }
 
-/// List tile for a [UserProfile] — used on the Students search tab.
 class UserProfileListTile extends StatelessWidget {
-  final UserProfile user;
+  final UserEntity user;
   final VoidCallback? onTap;
 
   const UserProfileListTile({

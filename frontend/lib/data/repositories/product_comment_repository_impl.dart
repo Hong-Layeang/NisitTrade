@@ -24,6 +24,21 @@ class ProductCommentRepositoryImpl implements IProductCommentRepository {
   }
 
   @override
+  Future<ApiResponse<void>> updateComment({
+    required int productId,
+    required int commentId,
+    required String content,
+    int? rating,
+  }) async {
+    return _apiService.updateComment(
+      productId: productId,
+      commentId: commentId,
+      content: content,
+      rating: rating,
+    );
+  }
+
+  @override
   Future<ApiResponse<void>> deleteComment({
     required int productId,
     required int commentId,

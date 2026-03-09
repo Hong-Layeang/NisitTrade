@@ -21,9 +21,9 @@ class WhiteBlurGradient extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.white.withOpacity(0.0),
-              Colors.white.withOpacity(0.3),
-              Colors.white.withOpacity(0.7),
+              Colors.white.withValues(alpha: 0.0),
+              Colors.white.withValues(alpha: 0.3),
+              Colors.white.withValues(alpha: 0.7),
               Colors.white,
             ],
             stops: const [0.0, 0.3, 0.7, 1.0],

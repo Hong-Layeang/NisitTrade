@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 
-import '../../../domain/repository_interfaces/i_user_repository.dart';
-import '../../../domain/repository_interfaces/i_product_repository.dart';
 import '../../../data/models/product.dart';
+import '../../../domain/entities/product_entity.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 
-import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../widgets/app_refresh_indicator.dart';
 import '../../widgets/app_action_sheet.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/loading_error_builder.dart';
 import '../../widgets/product_grid_card.dart';
+import '../../widgets/app_snack_bar.dart';
 import '../edit/edit_product_page.dart';
 import '../marketplace/product_detail_page.dart';
-
-final getIt = GetIt.instance;
 
 class SavedListingsPage extends StatefulWidget {
   const SavedListingsPage({super.key});
@@ -28,88 +26,45 @@ class SavedListingsPage extends StatefulWidget {
 }
 
 class _SavedListingsPageState extends State<SavedListingsPage> {
-  late final IUserRepository _userRepository;
-  late final IProductRepository _productRepository;
-  List<Product> _savedProducts = [];
-  bool _isLoading = false;
-  String? _error;
-  bool _isActionLoading = false;
+  bool _didInitialLoad = false;
 
   @override
   void initState() {
     super.initState();
-    _userRepository = getIt<IUserRepository>();
-    _productRepository = getIt<IProductRepository>();
-    _loadSavedListings();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSavedListings();
+    });
   }
 
   Future<void> _loadSavedListings() async {
     final userId = context.read<UserViewModel>().userId;
     if (userId == null) return;
+    await context.read<SavedListingsViewModel>().loadSavedListings(userId: userId);
+    _didInitialLoad = true;
+  }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _removeSaved(ProductEntity product) async {
+    final ok = await context
+        .read<SavedListingsViewModel>()
+        .removeSavedListing(productId: product.id);
 
-    try {
-      final savedResponse = await _userRepository.getUserSavedListings(
-        userId: userId,
-        limit: 50,
-        offset: 0,
-      );
-
-      if (!savedResponse.isSuccess) {
-        throw savedResponse.error!;
-      }
-
-      if (mounted) {
-        setState(() {
-          _savedProducts = (savedResponse.data ?? [])
-              .map((entity) => Product.fromEntity(entity))
-              .toList();
-          _isLoading = false;
-        });
-      }
-    } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message;
-          _isLoading = false;
-        });
-      }
+    if (!mounted) return;
+    if (!ok) {
+      _showSnack('Failed to remove saved listing.');
     }
   }
 
-  Future<void> _removeSaved(Product product) async {
-    try {
-      await context.read<ProductFeedViewModel>().unsaveListing(product.id);
-      if (mounted) {
-        setState(() {
-          _savedProducts = _savedProducts
-              .where((item) => item.id != product.id)
-              .toList();
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to remove saved listing.')),
-      );
-    }
-  }
-
-  bool _isOwner(Product product) {
+  bool _isOwner(ProductEntity product) {
     final userId = context.read<UserViewModel>().userId;
     if (userId == null) return false;
     return product.userId == userId;
   }
 
-  Future<void> _handleEditListing(Product product) async {
+  Future<void> _handleEditListing(ProductEntity product) async {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProductPage(product: product),
+        builder: (context) => EditProductPage(product: Product.fromEntity(product)),
       ),
     );
 
@@ -119,7 +74,10 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
     }
   }
 
-  Future<void> _handleDeleteListing(Product product) async {
+  Future<void> _handleDeleteListing(ProductEntity product) async {
+    final savedListingsVm = context.read<SavedListingsViewModel>();
+    final productFeedVm = context.read<ProductFeedViewModel>();
+
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -141,35 +99,18 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
 
     if (shouldDelete != true) return;
 
-    if (_isActionLoading) return;
-    setState(() => _isActionLoading = true);
+    final ok = await savedListingsVm.deleteListing(productId: product.id);
 
-    try {
-      final response = await _productRepository.deleteProduct(product.id);
-      if (!response.isSuccess) {
-        throw response.error!;
-      }
-
-      if (mounted) {
-        setState(() {
-          _savedProducts = _savedProducts
-              .where((item) => item.id != product.id)
-              .toList();
-        });
-      }
-
-      context.read<ProductFeedViewModel>().refresh();
+    if (!mounted) return;
+    if (ok) {
+      productFeedVm.refresh();
       _showSnack('Listing deleted.');
-    } catch (_) {
+    } else {
       _showSnack('Failed to delete listing.');
-    } finally {
-      if (mounted) {
-        setState(() => _isActionLoading = false);
-      }
     }
   }
 
-  void _showOwnerActions(Product product) {
+  void _showOwnerActions(ProductEntity product) {
     if (!_isOwner(product)) return;
 
     AppActionSheet.show(
@@ -192,7 +133,8 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
   }
 
   Widget _buildGrid() {
-    if (_savedProducts.isEmpty) {
+    final savedProducts = context.watch<SavedListingsViewModel>().savedProducts;
+    if (savedProducts.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
@@ -214,17 +156,21 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: _savedProducts.length,
+      itemCount: savedProducts.length,
       itemBuilder: (context, index) {
-        final product = _savedProducts[index];
+        final product = savedProducts[index];
         return ProductGridCard(
+          key: ValueKey(product.id),
           product: product,
           isLiked: false,
           onTap: () async {
             await Navigator.pushNamed(
               context,
               AppRoutes.productDetail,
-              arguments: ProductDetailArgs(productId: product.id),
+              arguments: ProductDetailArgs(
+                productId: product.id,
+                initialProduct: product,
+              ),
             );
             // Refresh saved products list when returning from detail page
             if (mounted) {
@@ -239,13 +185,19 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppSnackBar.show(context, message);
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<SavedListingsViewModel>();
+
+    if (!_didInitialLoad && !vm.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadSavedListings();
+      });
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -253,26 +205,16 @@ class _SavedListingsPageState extends State<SavedListingsPage> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Error: ${_error ?? 'Unknown error'}'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadSavedListings,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : AppRefreshIndicator(
-                  onRefresh: _loadSavedListings,
-                  child: _buildGrid(),
-                ),
+          body: LoadingErrorBuilder(
+            isLoading: vm.isLoading,
+            error: vm.error,
+            onRetry: _loadSavedListings,
+            isInitialLoad: !_didInitialLoad,
+            child: AppRefreshIndicator(
+              onRefresh: _loadSavedListings,
+              child: _buildGrid(),
+            ),
+          ),
     );
   }
 }

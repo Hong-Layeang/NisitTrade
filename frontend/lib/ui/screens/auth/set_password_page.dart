@@ -7,6 +7,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../widgets/app_buttons.dart';
 import '../../widgets/app_form_fields.dart';
+import '../../widgets/app_snack_bar.dart';
 
 class SetPasswordArgs {
   final String accessToken;
@@ -129,9 +130,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.message)),
-    );
+    AppSnackBar.error(context, result.message);
   }
 
   @override

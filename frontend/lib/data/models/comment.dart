@@ -23,20 +23,38 @@ class Comment {
     this.user,
   });
 
+  static int _toInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      return int.tryParse(value) ?? fallback;
+    }
+    return fallback;
+  }
+
   factory Comment.fromJson(Map<String, dynamic> json) {
+    final createdRaw = json['createdAt'] ?? json['created_at'];
+    final updatedRaw = json['updatedAt'] ?? json['updated_at'];
+    final userJson = json['User'] ?? json['user'];
+    final parsedUserId = _toInt(
+      json['user_id'] ?? json['userId'] ?? (userJson is Map<String, dynamic> ? userJson['id'] : null),
+    );
+
     return Comment(
-      id: json['id'] as int? ?? 0,
+      id: _toInt(json['id']),
       content: (json['content'] ?? '') as String,
-      rating: json['rating'] as int?,
-      userId: json['user_id'] as int? ?? 0,
-      productId: json['product_id'] as int? ?? 0,
-      createdAt: (json['createdAt'] ?? json['created_at']) != null 
-          ? DateTime.parse((json['createdAt'] ?? json['created_at']) as String)
+      rating: json['rating'] is int
+        ? json['rating'] as int
+        : (json['rating'] is String ? int.tryParse(json['rating'] as String) : null),
+      userId: parsedUserId,
+      productId: _toInt(json['product_id'] ?? json['productId']),
+      createdAt: createdRaw != null
+        ? DateTime.parse(createdRaw as String)
           : DateTime.now(),
-      updatedAt: (json['updatedAt'] ?? json['updated_at']) != null 
-          ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
+      updatedAt: updatedRaw != null
+        ? DateTime.parse(updatedRaw as String)
           : DateTime.now(),
-      user: json['User'] != null ? Seller.fromJson(json['User'] as Map<String, dynamic>) : null,
+      user: userJson is Map<String, dynamic> ? Seller.fromJson(userJson) : null,
     );
   }
 

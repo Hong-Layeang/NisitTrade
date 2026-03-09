@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../data/models/category.dart';
+import '../../../domain/entities/category_entity.dart';
 import '../../../core/constants/colors.dart';
 import 'category_widgets.dart';
 
+/// Filter strip for selecting categories with animation
 class CategoryFilterStrip extends StatelessWidget {
-  final List<Category> categories;
+  final List<CategoryEntity> categories;
   final int? selectedIndex;
   final ValueChanged<int?> onCategorySelected;
   final bool isOpen;
@@ -81,8 +82,8 @@ class CategoryFilterStrip extends StatelessWidget {
                     GestureDetector(
                       onTap: () => onCategorySelected(null),
                       behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 4, right: 4),
+                      child: const Padding(
+                        padding: EdgeInsets.only(left: 4, right: 4),
                         child: Icon(
                           Icons.close_rounded,
                           size: 15,
@@ -125,7 +126,7 @@ class CategoryFilterStrip extends StatelessWidget {
             ),
           ),
         ),
-        Divider(height: 1, thickness: 1, color: AppColors.border),
+        const Divider(height: 1, thickness: 1, color: AppColors.border),
       ],
     );
   }

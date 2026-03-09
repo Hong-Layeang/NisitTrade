@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../data/providers/api_client.dart';
 import 'auth_token_store.dart';
@@ -64,7 +65,8 @@ class AuthSession {
       final normalized = base64Url.normalize(payload);
       final decoded = utf8.decode(base64Url.decode(normalized));
       return json.decode(decoded) as Map<String, dynamic>;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('AuthSession._decodePayload failed: $e\n$st');
       return <String, dynamic>{};
     }
   }

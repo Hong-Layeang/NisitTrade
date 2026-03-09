@@ -35,7 +35,7 @@ class _MicrosoftSignInButtonState extends State<MicrosoftSignInButton> {
           boxShadow: [
             if (_isPressed && !widget.isLoading)
               BoxShadow(
-                color: Colors.grey.withOpacity(0.3),
+                color: Colors.grey.withValues(alpha: 0.3),
                 blurRadius: 2,
                 offset: const Offset(0, 1),
               ),

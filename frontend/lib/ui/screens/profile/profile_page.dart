@@ -11,11 +11,16 @@ import '../../../logic/view_models/user_view_model.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/constants/app_dimensions.dart';
 import '../../../core/navigation/app_routes.dart';
+import '../../../core/utils/extensions/state_extensions.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/full_screen_image_viewer.dart';
+import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_refresh_indicator.dart';
 import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 final getIt = GetIt.instance;
 
@@ -38,17 +43,10 @@ class ProfilePageState extends State<ProfilePage>
   String? _error;
   bool _productsLoaded = false;
 
-  // Layout constants
-  static const double _coverHeight = 220;
-  static const double _avatarRadius = 65;
-  static const double _avatarBorder = 3;
-  static const double _avatarGap = 3;
-  static const double _avatarTotalRadius =
-      _avatarRadius + _avatarGap + _avatarBorder;
+  // Using AppDimensions for layout constants
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final userProvider = context.watch<UserViewModel>();
     final profile = userProvider.profile;
 
@@ -76,27 +74,39 @@ class ProfilePageState extends State<ProfilePage>
     return Column(
       children: [
         Expanded(
-          child: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
+          child: AppRefreshIndicator(
+            onRefresh: () async {
+              await context.read<UserViewModel>().refresh();
+              await refresh();
+            },
+            child: NestedScrollView(
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                return [
                 SliverToBoxAdapter(
-                  child: Stack(
-                    children: [
-                      Column(
-                        children: [
-                          _buildCoverAndAvatar(),
-                          _buildStatsRow(),
-                          _buildNameAndBio(textTheme),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                      Positioned(
-                        top: _coverHeight - _avatarTotalRadius,
-                        left: 0,
-                        right: 0,
-                        child: Center(child: _buildAvatarWithCamera()),
-                      ),
-                    ],
+                  child: ProfileHeaderSection(
+                    data: ProfileHeaderData(
+                      coverImage: profile.coverImage,
+                      profileImage: profile.profileImage,
+                      fullName: profile.fullName,
+                      bio: profile.bio,
+                      followerCount: profile.followerCount,
+                      followingCount: profile.followingCount,
+                      major: profile.major,
+                      schoolShortName: ProfileUtils.getSchoolShortName(profile.university),
+                    ),
+                    coverHeight: AppDimensions.profileCoverHeight,
+                    avatarRadius: AppDimensions.profileAvatarRadius,
+                    avatarBorder: AppDimensions.profileAvatarBorder,
+                    avatarGap: AppDimensions.profileAvatarGap,
+                    statsDetailGap: 10,
+                    onCoverTap: profile.coverImage != null && profile.coverImage!.isNotEmpty && !_isUploadingCover
+                        ? () => _viewFullScreen(profile.coverImage!)
+                        : null,
+                    onAvatarTap: profile.profileImage != null && profile.profileImage!.isNotEmpty && !_isUploadingAvatar
+                        ? () => _viewFullScreen(profile.profileImage!)
+                        : null,
+                    coverOverlay: _buildCoverOverlay(profile),
+                    avatarOverlay: _buildAvatarOverlay(),
                   ),
                 ),
                 SliverPersistentHeader(
@@ -113,6 +123,7 @@ class ProfilePageState extends State<ProfilePage>
               children: [_buildProductGrid(), _buildPostsTab()],
             ),
           ),
+          ),
         ),
       ],
     );
@@ -123,90 +134,65 @@ class ProfilePageState extends State<ProfilePage>
     await _loadProducts();
   }
 
-  /// Cover image (no avatar - avatar is overlaid at the SliverToBoxAdapter level)
-  Widget _buildCoverAndAvatar() {
-    final profile = context.read<UserViewModel>().profile;
-    final coverUrl = profile?.coverImage;
+  /// Build overlay for cover image (edit button, upload spinner, menu)
+  Widget _buildCoverOverlay(UserEntity profile) {
+    final coverUrl = profile.coverImage;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
 
     return Stack(
+      fit: StackFit.expand,
       children: [
-        // Cover
-        GestureDetector(
-          onTap: hasCover && !_isUploadingCover
-              ? () => _viewFullScreen(coverUrl)
-              : null,
-          child: SizedBox(
-            height: _coverHeight,
-            width: double.infinity,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Background
-                hasCover
-                    ? Image.network(
-                        coverUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildCoverPlaceholder(),
-                      )
-                    : _buildCoverPlaceholder(),
-
-                // Dim + spinner while uploading
-                if (_isUploadingCover)
-                  const ColoredBox(
-                    color: Colors.black54,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    ),
-                  ),
-
-                // Add / Edit cover button
-                if (!_isUploadingCover)
-                  Positioned(
-                    bottom: _avatarTotalRadius + 10,
-                    right: 14,
-                    child: GestureDetector(
-                      onTap: _pickAndUploadCover,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(20),
-                          border:
-                              Border.all(color: Colors.white24, width: 0.5),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              hasCover
-                                  ? Icons.camera_alt_outlined
-                                  : Icons.add_photo_alternate_outlined,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              hasCover ? 'Edit' : 'Add cover',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+        // Dim + spinner while uploading
+        if (_isUploadingCover)
+          const ColoredBox(
+            color: Colors.black54,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2.5,
+              ),
             ),
           ),
-        ),
+
+        // Add / Edit cover button
+        if (!_isUploadingCover)
+          Positioned(
+            bottom: AppDimensions.profileAvatarTotalRadius + 10,
+            right: 14,
+            child: GestureDetector(
+              onTap: _pickAndUploadCover,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24, width: 0.5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      hasCover
+                          ? Icons.camera_alt_outlined
+                          : Icons.add_photo_alternate_outlined,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      hasCover ? 'Edit' : 'Add cover',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
         // Three-dot menu
         Positioned(
@@ -214,7 +200,7 @@ class ProfilePageState extends State<ProfilePage>
           right: 12,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.35),
+              color: Colors.black.withValues(alpha: 0.35),
               shape: BoxShape.circle,
             ),
             child: PopupMenuButton<String>(
@@ -243,52 +229,30 @@ class ProfilePageState extends State<ProfilePage>
     );
   }
 
-  /// Avatar circle + camera-badge button.
-  /// Rendered as a Positioned overlay at the SliverToBoxAdapter Stack level
-  /// so the camera badge is always within hit-test bounds.
-  Widget _buildAvatarWithCamera() {
-    final userProvider = context.read<UserViewModel>();
-    final profile = userProvider.profile;
-    final avatarUrl = profile?.profileImage;
-    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
-
+  /// Build overlay for avatar (camera button, upload spinner)
+  Widget _buildAvatarOverlay() {
     return Stack(
-      clipBehavior: Clip.none,
+      fit: StackFit.expand,
       children: [
-        // Tap avatar to open full-screen viewer
-        GestureDetector(
-          onTap: hasAvatar && !_isUploadingAvatar
-              ? () => _viewFullScreen(avatarUrl)
-              : null,
-          child: ProfileAvatar(
-            imageUrl: profile?.profileImage,
-            displayName: profile?.fullName,
-            radius: _avatarRadius,
-            borderWidth: _avatarBorder,
-            gapWidth: _avatarGap,
-          ),
-        ),
         // Upload spinner over avatar
         if (_isUploadingAvatar)
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.black38,
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
+          Container(
+            decoration: const BoxDecoration(
+              color: Colors.black38,
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2.5,
               ),
             ),
           )
         else
           // Camera badge to edit/upload
           Positioned(
-            bottom: _avatarGap + 2,
-            right: _avatarGap + 2,
+            bottom: AppDimensions.profileAvatarGap + 2,
+            right: AppDimensions.profileAvatarGap + 2,
             child: GestureDetector(
               onTap: _pickAndUploadAvatar,
               child: Container(
@@ -306,150 +270,6 @@ class ProfilePageState extends State<ProfilePage>
     );
   }
 
-  /// Stats flanking the avatar overlap area
-  Widget _buildStatsRow() {
-    final profile = context.read<UserViewModel>().profile;
-    final schoolShort = _getSchoolShortName(profile);
-    return SizedBox(
-      height: _avatarTotalRadius + 24,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Left: followers + following, right-aligned towards avatar
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _buildCountStat(
-                    Icons.person_add_outlined,
-                    '${profile?.followerCount ?? 0}',
-                    'Followers',
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCountStat(
-                    Icons.people_outline,
-                    '${profile?.followingCount ?? 0}',
-                    'Following',
-                  ),
-                ],
-              ),
-            ),
-            // Center gap for avatar
-            SizedBox(width: _avatarTotalRadius * 2 + 16),
-            // Right: major + school, left-aligned towards avatar
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ProfileStatItem(
-                    icon: Icons.school_outlined,
-                    value: profile?.major ?? 'N/A',
-                  ),
-                  const SizedBox(height: 10),
-                  ProfileStatItem(
-                    icon: Icons.verified_outlined,
-                    value: schoolShort,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Count stat with icon: [icon] bold-number / small-label
-  Widget _buildCountStat(IconData icon, String count, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18, color: AppColors.textSecondary),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              count,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Extract a short school abbreviation from the university's name.
-  /// e.g. "Cambodian Academy of Digital Technology" -> "CADT"
-  String _getSchoolShortName(UserEntity? profile) {
-    final university = profile?.university;
-    if (university == null) return 'N/A';
-
-    // Try abbreviation from name first (first letter of each significant word)
-    const skipWords = {'of', 'the', 'and', 'in', 'at', 'for', 'a', 'an', 'to'};
-    final nameParts = university.name.trim().split(RegExp(r'\s+'));
-    final initials = nameParts
-        .where((w) => w.isNotEmpty && !skipWords.contains(w.toLowerCase()))
-        .map((w) => w[0].toUpperCase())
-        .join();
-    if (initials.isNotEmpty) return initials;
-
-    // Fallback: parse domain
-    const excluded = {'student', 'mail', 'www', 'edu', 'ac', 'com', 'org', 'net', 'kh'};
-    final domainParts = university.domain.split('.');
-    final meaningful = domainParts.where(
-      (p) => p.length > 2 && !excluded.contains(p.toLowerCase()),
-    );
-    if (meaningful.isNotEmpty) return meaningful.first.toUpperCase();
-    return domainParts.isNotEmpty ? domainParts.first.toUpperCase() : 'N/A';
-  }
-
-  /// Profile name and bio text
-  Widget _buildNameAndBio(TextTheme textTheme) {
-    final profile = context.read<UserViewModel>().profile;
-    final name = profile?.fullName ?? 'User';
-    final bio = (profile?.bio != null && profile!.bio!.isNotEmpty)
-        ? profile.bio!
-        : 'No bio yet.';
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        Text(
-          name,
-          style: textTheme.titleLarge?.copyWith(color: AppColors.primary),
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            bio,
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.4,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildTabBar(BuildContext context) {
     final productCount = _products.length;
@@ -485,8 +305,8 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildPostsTab() {
-    return CustomScrollView(
-      slivers: const [
+    return const CustomScrollView(
+      slivers: [
         SliverFillRemaining(
           hasScrollBody: false,
           child: Padding(
@@ -508,8 +328,8 @@ class ProfilePageState extends State<ProfilePage>
     }
 
     if (_products.isEmpty) {
-      return CustomScrollView(
-        slivers: const [
+      return const CustomScrollView(
+        slivers: [
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
@@ -548,12 +368,27 @@ class ProfilePageState extends State<ProfilePage>
 
         return GestureDetector(
           onTap: () => _openProduct(product),
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: AppColors.surface,
-              child: const Icon(Icons.image, color: AppColors.textSecondary),
+          child: RepaintBoundary(
+            child: CachedNetworkImage(
+              key: ValueKey('profile_product_${product.id}_$imageUrl'),
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              useOldImageOnUrlChange: true,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+                        placeholder: (context, url) => Container(
+                          color: AppColors.surface,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+              errorWidget: (context, url, error) => Container(
+                color: AppColors.surface,
+                child: const Icon(Icons.image, color: AppColors.textSecondary),
+              ),
             ),
           ),
         );
@@ -565,7 +400,10 @@ class ProfilePageState extends State<ProfilePage>
     Navigator.pushNamed(
       context,
       AppRoutes.productDetail,
-      arguments: ProductDetailArgs(productId: product.id),
+      arguments: ProductDetailArgs(
+        productId: product.id,
+        initialProduct: product.toEntity(),
+      ),
     );
   }
 
@@ -594,10 +432,6 @@ class ProfilePageState extends State<ProfilePage>
     super.dispose();
   }
 
-  Widget _buildCoverPlaceholder() {
-    return const ColoredBox(color: Colors.black);
-  }
-
   void _viewFullScreen(String imageUrl) {
     FullScreenImageViewer.show(context, imageUrl);
   }
@@ -624,12 +458,10 @@ class ProfilePageState extends State<ProfilePage>
       if (!mounted) return;
 
       if (newUrl == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update cover')),
-        );
+        AppSnackBar.error(context, 'Failed to update cover');
       }
     } finally {
-      if (mounted) setState(() => _isUploadingCover = false);
+      setStateIfMounted(() => _isUploadingCover = false);
     }
   }
 
@@ -655,15 +487,15 @@ class ProfilePageState extends State<ProfilePage>
           toolbarTitle: 'Crop Avatar',
           toolbarColor: AppColors.primary,
           toolbarWidgetColor: Colors.white,
-          statusBarColor: AppColors.primary,
+          statusBarLight: false,
           initAspectRatio: CropAspectRatioPreset.square,
           lockAspectRatio: true,
           hideBottomControls: false,
           showCropGrid: true,
           cropFrameColor: AppColors.primary,
-          cropGridColor: AppColors.primary.withOpacity(0.5),
+          cropGridColor: AppColors.primary.withValues(alpha: 0.5),
           activeControlsWidgetColor: AppColors.primary,
-          dimmedLayerColor: Colors.black.withOpacity(0.5),
+          dimmedLayerColor: Colors.black.withValues(alpha: 0.5),
           cropGridRowCount: 3,
           cropGridColumnCount: 3,
           cropStyle: CropStyle.rectangle,
@@ -692,25 +524,15 @@ class ProfilePageState extends State<ProfilePage>
       if (!mounted) return;
 
       if (newUrl == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update photo. Please try again.')),
-        );
+        AppSnackBar.error(context, 'Failed to update photo. Please try again.');
       } else {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo updated successfully!'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.success(context, 'Photo updated successfully!');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading photo: $e')),
-      );
+      AppSnackBar.error(context, 'Error uploading photo: $e');
     } finally {
-      if (mounted) setState(() => _isUploadingAvatar = false);
+      setStateIfMounted(() => _isUploadingAvatar = false);
     }
   }
 
@@ -758,21 +580,15 @@ class ProfilePageState extends State<ProfilePage>
         throw productsResponse.error!;
       }
 
-      if (mounted) {
-        setState(() {
-          _products = (productsResponse.data ?? [])
-              .map((entity) => Product.fromEntity(entity))
-              .toList();
-          _isLoading = false;
-        });
-      }
+      setStateIfMounted(() {
+        _products = (productsResponse.data ?? []).toModels();
+        _isLoading = false;
+      });
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message;
-          _isLoading = false;
-        });
-      }
+      setStateIfMounted(() {
+        _error = e.message;
+        _isLoading = false;
+      });
     }
   }
 }

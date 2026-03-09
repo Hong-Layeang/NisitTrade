@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/constants/app_durations.dart';
 import '../../../core/navigation/app_routes.dart';
 
 class SplashPage extends StatefulWidget {
@@ -28,7 +29,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   void _setupAnimations() {
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: AppDurations.splash,
     );
 
     // Logo slide up animation
@@ -78,7 +79,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   }
 
   Future<void> _navigateNext() async {
-    await Future.delayed(const Duration(milliseconds: 1800));
+    await Future.delayed(AppDurations.splashDelay);
     final isAuthenticated = await AuthSession.instance.hasValidSession();
     if (mounted) {
       final nextRoute =

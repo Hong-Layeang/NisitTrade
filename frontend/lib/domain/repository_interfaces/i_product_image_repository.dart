@@ -1,7 +1,6 @@
 import '../../core/errors/api_response.dart';
 
 /// Repository interface for managing product images
-/// Separated from ProductRepository to follow Single Responsibility Principle
 abstract class IProductImageRepository {
   Future<ApiResponse<void>> addProductImages({
     required int productId,

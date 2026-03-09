@@ -1,4 +1,5 @@
 import '../../domain/entities/seller_entity.dart';
+import 'university.dart';
 
 class Seller {
   final int id;
@@ -11,6 +12,7 @@ class Seller {
   final String? major;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final University? university;
 
   const Seller({
     required this.id,
@@ -23,9 +25,12 @@ class Seller {
     this.major,
     required this.createdAt,
     required this.updatedAt,
+    this.university,
   });
 
   factory Seller.fromJson(Map<String, dynamic> json) {
+    final universityJson = json['University'] ?? json['university'];
+    
     return Seller(
       id: json['id'] as int? ?? 0,
       fullName: (json['full_name'] ?? '') as String,
@@ -41,6 +46,9 @@ class Seller {
       updatedAt: (json['updatedAt'] ?? json['updated_at']) != null
           ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
           : DateTime.now(),
+      university: universityJson is Map<String, dynamic>
+          ? University.fromJson(universityJson)
+          : null,
     );
   }
 
@@ -51,6 +59,7 @@ class Seller {
       'email': email,
       'profile_image': profileImage,
       'provider': provider,
+      if (university != null) 'University': university!.toJson(),
       'role': role,
       'university_id': universityId,
       'major': major,
@@ -69,7 +78,7 @@ class Seller {
     int? universityId,
     String? major,
     DateTime? createdAt,
-    DateTime? updatedAt,
+    University? university,
   }) {
     return Seller(
       id: id ?? this.id,
@@ -81,7 +90,8 @@ class Seller {
       universityId: universityId ?? this.universityId,
       major: major ?? this.major,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      updatedAt: updatedAt,
+      university: university ?? this.university,
     );
   }
 
@@ -90,6 +100,7 @@ class Seller {
     return SellerEntity(
       id: id,
       fullName: fullName,
+      email: email,
       profileImage: profileImage,
       major: major,
     );
@@ -100,9 +111,10 @@ class Seller {
     return Seller(
       id: entity.id,
       fullName: entity.fullName,
-      email: '', // Not in entity
+      email: entity.email,
       profileImage: entity.profileImage,
       role: 'user', // Default
+      university: null,
       major: entity.major,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),

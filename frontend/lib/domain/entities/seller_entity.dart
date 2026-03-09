@@ -1,16 +1,17 @@
 import 'package:equatable/equatable.dart';
 
 /// Domain entity representing a seller/user
-/// This is a pure business object with no framework dependencies
 class SellerEntity extends Equatable {
   final int id;
   final String fullName;
+  final String email;
   final String? profileImage;
   final String? major;
 
   const SellerEntity({
     required this.id,
     required this.fullName,
+    required this.email,
     this.profileImage,
     this.major,
   });
@@ -22,5 +23,5 @@ class SellerEntity extends Equatable {
   String get displayName => fullName;
 
   @override
-  List<Object?> get props => [id, fullName, profileImage, major];
+  List<Object?> get props => [id, fullName, email, profileImage, major];
 }

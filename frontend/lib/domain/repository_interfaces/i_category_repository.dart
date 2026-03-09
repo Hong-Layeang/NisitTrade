@@ -2,7 +2,6 @@ import '../entities/category_entity.dart';
 import '../../core/errors/api_response.dart';
 
 /// Repository interface for managing category data
-/// This belongs in the domain layer and defines the contract
 abstract class ICategoryRepository {
   Future<ApiResponse<List<CategoryEntity>>> getCategories();
   

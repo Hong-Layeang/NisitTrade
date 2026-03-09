@@ -24,16 +24,18 @@ class AppActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const borderRadius = BorderRadius.all(Radius.circular(20));
+    
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: isDisabled ? null : onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: borderRadius,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: backgroundColor,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: borderRadius,
             border: Border.all(color: borderColor),
           ),
           child: Row(

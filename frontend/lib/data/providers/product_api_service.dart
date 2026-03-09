@@ -2,16 +2,14 @@ import 'package:dio/dio.dart';
 
 import '../models/product.dart';
 import 'api_client.dart';
-import '../../core/errors/api_exception.dart';
+import 'base_api_service.dart';
 import '../../core/errors/api_response.dart';
 
 /// Service for product-related API calls
-class ProductApiService {
-  ProductApiService._();
+class ProductApiService extends BaseApiService {
+  ProductApiService._() : super(ApiClient.instance.dio);
 
   static final ProductApiService instance = ProductApiService._();
-
-  final Dio _dio = ApiClient.instance.dio;
 
   /// Get all products with optional filtering
   ///
@@ -26,46 +24,30 @@ class ProductApiService {
     int? limit,
     int? offset,
   }) async {
-    try {
-      final queryParams = <String, dynamic>{};
-      if (categoryId != null) queryParams['category_id'] = categoryId;
-      if (status != null) queryParams['status'] = status;
-      if (search != null) queryParams['search'] = search;
-      if (limit != null) queryParams['limit'] = limit;
-      if (offset != null) queryParams['offset'] = offset;
+    final queryParams = <String, dynamic>{};
+    if (categoryId != null) queryParams['category_id'] = categoryId;
+    if (status != null) queryParams['status'] = status;
+    if (search != null) queryParams['search'] = search;
+    if (limit != null) queryParams['limit'] = limit;
+    if (offset != null) queryParams['offset'] = offset;
 
-      final response = await _dio.get(
+    return executeListApiCall<Product>(
+      call: () => dio.get(
         '/products',
         queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      );
-
-      final products = (response.data as List)
-          .map((json) => Product.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      return ApiResponse.success(products);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to fetch products: $e'),
-      );
-    }
+      ),
+      itemParser: (json) => Product.fromJson(json as Map<String, dynamic>),
+      errorMessage: 'Failed to fetch products',
+    );
   }
 
   /// Get a single product by ID
   Future<ApiResponse<Product>> getProduct(int id) async {
-    try {
-      final response = await _dio.get('/products/$id');
-      final product = Product.fromJson(response.data as Map<String, dynamic>);
-      return ApiResponse.success(product);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to fetch product: $e'),
-      );
-    }
+    return executeApiCall<Product>(
+      call: () => dio.get('/products/$id'),
+      parser: (data) => Product.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to fetch product',
+    );
   }
 
   /// Create a new product
@@ -75,8 +57,8 @@ class ProductApiService {
     required double price,
     required int categoryId,
   }) async {
-    try {
-      final response = await _dio.post(
+    return executeApiCall<Product>(
+      call: () => dio.post(
         '/products',
         data: {
           'title': title,
@@ -84,17 +66,10 @@ class ProductApiService {
           'price': price,
           'category_id': categoryId,
         },
-      );
-
-      final product = Product.fromJson(response.data as Map<String, dynamic>);
-      return ApiResponse.success(product);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to create product: $e'),
-      );
-    }
+      ),
+      parser: (data) => Product.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to create product',
+    );
   }
 
   /// Update an existing product
@@ -105,38 +80,25 @@ class ProductApiService {
     double? price,
     int? categoryId,
   }) async {
-    try {
-      final data = <String, dynamic>{};
-      if (title != null) data['title'] = title;
-      if (description != null) data['description'] = description;
-      if (price != null) data['price'] = price;
-      if (categoryId != null) data['category_id'] = categoryId;
+    final data = <String, dynamic>{};
+    if (title != null) data['title'] = title;
+    if (description != null) data['description'] = description;
+    if (price != null) data['price'] = price;
+    if (categoryId != null) data['category_id'] = categoryId;
 
-      final response = await _dio.put('/products/$id', data: data);
-
-      final product = Product.fromJson(response.data as Map<String, dynamic>);
-      return ApiResponse.success(product);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to update product: $e'),
-      );
-    }
+    return executeApiCall<Product>(
+      call: () => dio.put('/products/$id', data: data),
+      parser: (data) => Product.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to update product',
+    );
   }
 
   /// Delete a product
   Future<ApiResponse<void>> deleteProduct(int id) async {
-    try {
-      await _dio.delete('/products/$id');
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to delete product: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.delete('/products/$id'),
+      errorMessage: 'Failed to delete product',
+    );
   }
 
   /// Update product status
@@ -144,21 +106,14 @@ class ProductApiService {
     required int id,
     required String status,
   }) async {
-    try {
-      final response = await _dio.patch(
+    return executeApiCall<Product>(
+      call: () => dio.patch(
         '/products/$id/status',
         data: {'status': status},
-      );
-
-      final product = Product.fromJson(response.data as Map<String, dynamic>);
-      return ApiResponse.success(product);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to update product status: $e'),
-      );
-    }
+      ),
+      parser: (data) => Product.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to update product status',
+    );
   }
 
   /// Add images to a product
@@ -166,30 +121,23 @@ class ProductApiService {
     required int id,
     required List<String> imagePaths,
   }) async {
-    try {
-      final formData = FormData();
+    final formData = FormData();
 
-      for (final imagePath in imagePaths) {
-        formData.files.add(
-          MapEntry('images', await MultipartFile.fromFile(imagePath)),
-        );
-      }
+    for (final imagePath in imagePaths) {
+      formData.files.add(
+        MapEntry('images', await MultipartFile.fromFile(imagePath)),
+      );
+    }
 
-      final response = await _dio.post(
+    return executeApiCall<Product>(
+      call: () => dio.post(
         '/products/$id/images',
         data: formData,
         options: Options(contentType: 'multipart/form-data'),
-      );
-
-      final product = Product.fromJson(response.data as Map<String, dynamic>);
-      return ApiResponse.success(product);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to add product images: $e'),
-      );
-    }
+      ),
+      parser: (data) => Product.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to add product images',
+    );
   }
 
   /// Delete a product image
@@ -197,30 +145,18 @@ class ProductApiService {
     required int productId,
     required int imageId,
   }) async {
-    try {
-      await _dio.delete('/products/$productId/images/$imageId');
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to delete product image: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.delete('/products/$productId/images/$imageId'),
+      errorMessage: 'Failed to delete product image',
+    );
   }
 
   /// Like a product
   Future<ApiResponse<void>> likeProduct(int productId) async {
-    try {
-      await _dio.post('/products/$productId/likes');
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to like product: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.post('/products/$productId/likes'),
+      errorMessage: 'Failed to like product',
+    );
   }
 
   /// Unlike a product
@@ -228,16 +164,10 @@ class ProductApiService {
     required int productId,
     required int likeId,
   }) async {
-    try {
-      await _dio.delete('/products/$productId/likes/$likeId');
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to unlike product: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.delete('/products/$productId/likes/$likeId'),
+      errorMessage: 'Failed to unlike product',
+    );
   }
 
   /// Add a comment to a product
@@ -246,93 +176,75 @@ class ProductApiService {
     required String content,
     int? rating,
   }) async {
-    try {
-      final Map<String, dynamic> data = {'content': content};
-      if (rating != null) data['rating'] = rating;
+    final Map<String, dynamic> data = {'content': content};
+    if (rating != null) data['rating'] = rating;
 
-      await _dio.post('/products/$productId/comments', data: data);
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to add comment: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.post('/products/$productId/comments', data: data),
+      errorMessage: 'Failed to add comment',
+    );
+  }
+
+  /// Update a comment
+  Future<ApiResponse<void>> updateComment({
+    required int productId,
+    required int commentId,
+    required String content,
+    int? rating,
+  }) async {
+    final Map<String, dynamic> data = {'content': content};
+    if (rating != null) data['rating'] = rating;
+
+    return executeVoidApiCall(
+      call: () => dio.put('/products/$productId/comments/$commentId', data: data),
+      errorMessage: 'Failed to update comment',
+    );
   }
 
   /// Save (bookmark) a listing
   Future<ApiResponse<void>> saveListing(int productId) async {
-    try {
-      await _dio.post('/products/$productId/saves');
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to save listing: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.post('/products/$productId/saves'),
+      errorMessage: 'Failed to save listing',
+    );
   }
 
   /// Remove a saved listing
   Future<ApiResponse<void>> unsaveListing(int productId) async {
-    try {
-      await _dio.delete('/products/$productId/saves');
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to remove saved listing: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.delete('/products/$productId/saves'),
+      errorMessage: 'Failed to remove saved listing',
+    );
   }
 
   /// Hide a product
   Future<ApiResponse<Product>> hideProduct(int productId) async {
-    try {
-      final response = await _dio.patch('/products/$productId/hide');
-      final product = Product.fromJson(response.data as Map<String, dynamic>);
-      return ApiResponse.success(product);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to hide product: $e'),
-      );
-    }
+    return executeApiCall<Product>(
+      call: () => dio.patch('/products/$productId/hide'),
+      parser: (data) => Product.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to hide product',
+    );
   }
 
   /// Unhide a product
   Future<ApiResponse<Product>> unhideProduct(int productId) async {
-    try {
-      final response = await _dio.patch('/products/$productId/unhide');
-      final product = Product.fromJson(response.data as Map<String, dynamic>);
-      return ApiResponse.success(product);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to unhide product: $e'),
-      );
-    }
+    return executeApiCall<Product>(
+      call: () => dio.patch('/products/$productId/unhide'),
+      parser: (data) => Product.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to unhide product',
+    );
   }
 
   /// Share product
   Future<ApiResponse<String>> shareProduct(int productId) async {
-    try {
-      final response = await _dio.get('/products/$productId/share');
-      final data = response.data as Map<String, dynamic>;
-      final shareUrl = data['share_url']?.toString() ?? '';
-      return ApiResponse.success(shareUrl);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to get share link: $e'),
-      );
-    }
+    return executeApiCall<String>(
+      call: () => dio.get('/products/$productId/share'),
+      parser: (data) {
+        final map = data as Map<String, dynamic>;
+        return map['share_url']?.toString() ?? '';
+      },
+      errorMessage: 'Failed to get share link',
+    );
   }
 
   /// Report product
@@ -341,22 +253,16 @@ class ProductApiService {
     required String reason,
     String? details,
   }) async {
-    try {
-      await _dio.post(
+    return executeVoidApiCall(
+      call: () => dio.post(
         '/products/$productId/reports',
         data: {
           'reason': reason,
           'details': details,
         },
-      );
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to report product: $e'),
-      );
-    }
+      ),
+      errorMessage: 'Failed to report product',
+    );
   }
 
   /// Delete a comment
@@ -364,15 +270,9 @@ class ProductApiService {
     required int productId,
     required int commentId,
   }) async {
-    try {
-      await _dio.delete('/products/$productId/comments/$commentId');
-      return ApiResponse.success(null);
-    } on DioException catch (e) {
-      return ApiResponse.error(ApiException.fromDioException(e));
-    } catch (e) {
-      return ApiResponse.error(
-        ApiException(message: 'Failed to delete comment: $e'),
-      );
-    }
+    return executeVoidApiCall(
+      call: () => dio.delete('/products/$productId/comments/$commentId'),
+      errorMessage: 'Failed to delete comment',
+    );
   }
 }

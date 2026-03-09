@@ -21,6 +21,7 @@ class Product {
   final List<ProductImage>? productImages;
   final List<Like> likes; // Never null, initialized as empty list
   final List<Comment> comments; // Never null, initialized as empty list
+  final int commentCount;
 
   const Product({
     required this.id,
@@ -37,9 +38,34 @@ class Product {
     this.productImages,
     List<Like>? likes,
     List<Comment>? comments,
-  }) : likes = likes ?? const [], comments = comments ?? const [];
+    int? commentCount,
+  })  : likes = likes ?? const [],
+        comments = comments ?? const [],
+        commentCount = commentCount ?? (comments?.length ?? 0);
+
+  static int _toInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      return int.tryParse(value) ?? fallback;
+    }
+    return fallback;
+  }
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final parsedComments = json['Comments'] != null
+        ? (json['Comments'] as List)
+            .map((comment) => Comment.fromJson(comment as Map<String, dynamic>))
+            .toList()
+        : <Comment>[];
+    final parsedCommentCount = _toInt(
+      json['comment_count'] ??
+          json['comments_count'] ??
+          json['commentCount'] ??
+          json['commentsCount'],
+      fallback: parsedComments.length,
+    );
+
     return Product(
       id: json['id'] as int? ?? 0,
       title: (json['title'] ?? '') as String,
@@ -62,9 +88,8 @@ class Product {
       likes: json['Likes'] != null
           ? (json['Likes'] as List).map((like) => Like.fromJson(like as Map<String, dynamic>)).toList()
           : [], // Initialize as empty list instead of null
-      comments: json['Comments'] != null
-          ? (json['Comments'] as List).map((comment) => Comment.fromJson(comment as Map<String, dynamic>)).toList()
-          : [], // Initialize as empty list instead of null
+        comments: parsedComments,
+        commentCount: parsedCommentCount,
     );
   }
 
@@ -84,6 +109,7 @@ class Product {
       if (productImages != null) 'ProductImages': productImages!.map((img) => img.toJson()).toList(),
       if (likes.isNotEmpty) 'Likes': likes.map((like) => like.toJson()).toList(),
       if (comments.isNotEmpty) 'Comments': comments.map((comment) => comment.toJson()).toList(),
+      'comment_count': commentsCount,
     };
   }
 
@@ -102,6 +128,7 @@ class Product {
     List<ProductImage>? productImages,
     List<Like>? likes,
     List<Comment>? comments,
+    int? commentCount,
   }) {
     return Product(
       id: id ?? this.id,
@@ -118,6 +145,7 @@ class Product {
       productImages: productImages ?? this.productImages,
       likes: likes ?? this.likes,
       comments: comments ?? this.comments,
+      commentCount: commentCount ?? this.commentCount,
     );
   }
 
@@ -138,7 +166,7 @@ class Product {
   int get likesCount => likes.length;
 
   /// Get number of comments
-  int get commentsCount => comments.length;
+  int get commentsCount => commentCount > comments.length ? commentCount : comments.length;
 
   /// Get list of comment texts
   List<String> get commentTexts => comments.map((c) => c.content).toList();
@@ -243,14 +271,45 @@ class Product {
       seller: user?.toEntity(),
       category: category?.toEntity(),
       imageUrls: imageUrls,
+      likes: likes
+          .map((like) => ProductLikeEntity(id: like.id, userId: like.userId))
+          .toList(),
       likeCount: likes.length,
-      commentCount: comments.length,
+      comments: comments
+          .map(
+            (comment) => ProductCommentEntity(
+              id: comment.id,
+              content: comment.content,
+              userId: comment.userId,
+              productId: comment.productId,
+              createdAt: comment.createdAt,
+              updatedAt: comment.updatedAt,
+              user: comment.user?.toEntity(),
+            ),
+          )
+          .toList(),
+      commentCount: commentsCount,
       isLiked: false,
     );
   }
 
   /// Create from domain entity
   factory Product.fromEntity(ProductEntity entity) {
+    final mappedImages = entity.imageUrls
+        .where((url) => url.trim().isNotEmpty)
+        .toList(growable: false);
+    final mappedLikes = entity.likes
+        .map(
+          (like) => Like(
+            id: like.id,
+            userId: like.userId,
+            productId: entity.id,
+            createdAt: entity.updatedAt,
+            updatedAt: entity.updatedAt,
+          ),
+        )
+        .toList(growable: false);
+
     return Product(
       id: entity.id,
       title: entity.title,
@@ -263,9 +322,36 @@ class Product {
       updatedAt: entity.updatedAt,
       user: entity.seller != null ? Seller.fromEntity(entity.seller!) : null,
       category: entity.category != null ? Category.fromEntity(entity.category!) : null,
-      // productImages will be reconstructed from imageUrls if needed
-      likes: [],
-      comments: [],
+      productImages: mappedImages.isEmpty
+          ? null
+          : List<ProductImage>.generate(
+              mappedImages.length,
+              (index) {
+                final now = DateTime.now();
+                return ProductImage(
+                  id: index + 1,
+                  imageUrl: mappedImages[index],
+                  productId: entity.id,
+                  createdAt: now,
+                  updatedAt: now,
+                );
+              },
+            ),
+      likes: mappedLikes,
+      comments: entity.comments
+          .map(
+            (comment) => Comment(
+              id: comment.id,
+              content: comment.content,
+              userId: comment.userId,
+              productId: comment.productId,
+              createdAt: comment.createdAt,
+              updatedAt: comment.updatedAt,
+              user: comment.user != null ? Seller.fromEntity(comment.user!) : null,
+            ),
+          )
+          .toList(growable: false),
+      commentCount: entity.commentCount,
     );
   }
 }
@@ -324,4 +410,12 @@ class ProductImage {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+}
+
+extension ProductEntityToModelX on ProductEntity {
+  Product toModel() => Product.fromEntity(this);
+}
+
+extension ProductEntityIterableToModelX on Iterable<ProductEntity> {
+  List<Product> toModels() => map((entity) => entity.toModel()).toList();
 }

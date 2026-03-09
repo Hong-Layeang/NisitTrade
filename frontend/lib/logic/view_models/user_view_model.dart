@@ -38,12 +38,17 @@ class UserViewModel extends ChangeNotifier {
       }
     } on ApiException catch (e) {
       _error = e.message;
-    } catch (_) {
-      // Ignore unknown errors to avoid crashing the UI tree.
+    } catch (e, st) {
+      _error = 'Unexpected error while loading profile.';
+      debugPrint('UserViewModel.load unexpected error: $e\n$st');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> refresh() async {
+    await load();
   }
 
   /// Uploads avatar and updates local profile cache on success.
@@ -62,7 +67,12 @@ class UserViewModel extends ChangeNotifier {
         return response.data;
       }
       return null;
-    } catch (_) {
+    } on ApiException catch (e) {
+      _error = e.message;
+      return null;
+    } catch (e, st) {
+      _error = 'Unexpected error while updating avatar.';
+      debugPrint('UserViewModel.updateAvatar unexpected error: $e\n$st');
       return null;
     }
   }
@@ -72,16 +82,25 @@ class UserViewModel extends ChangeNotifier {
     required int userId,
     required String filePath,
   }) async {
-    final response = await _userRepository.updateCoverImage(
-      userId: userId,
-      filePath: filePath,
-    );
-    if (response.isSuccess) {
-      // Reload profile to get updated data
-      await load();
-      return response.data;
+    try {
+      final response = await _userRepository.updateCoverImage(
+        userId: userId,
+        filePath: filePath,
+      );
+      if (response.isSuccess) {
+        // Reload profile to get updated data
+        await load();
+        return response.data;
+      }
+      return null;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return null;
+    } catch (e, st) {
+      _error = 'Unexpected error while updating cover image.';
+      debugPrint('UserViewModel.updateCover unexpected error: $e\n$st');
+      return null;
     }
-    return null;
   }
 
   /// Resets user-bound state. Useful on logout.

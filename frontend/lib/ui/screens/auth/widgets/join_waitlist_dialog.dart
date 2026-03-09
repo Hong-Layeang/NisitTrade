@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../widgets/app_buttons.dart';
 import '../../../widgets/app_form_fields.dart';
+import '../../../widgets/app_snack_bar.dart';
 
 class JoinWaitlistDialog extends StatefulWidget {
   const JoinWaitlistDialog({super.key});
@@ -118,23 +119,13 @@ class _JoinWaitlistDialogState extends State<JoinWaitlistDialog> {
     final email = _emailController.text.trim();
 
     if (schoolName.isEmpty || email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all fields'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.error(context, 'Please fill in all fields');
       return;
     }
 
     // TODO: Handle registration logic (API call)
 
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Successfully joined the waitlist!'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+    AppSnackBar.success(context, 'Successfully joined the waitlist!');
   }
 }

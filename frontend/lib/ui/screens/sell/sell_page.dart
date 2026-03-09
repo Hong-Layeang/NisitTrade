@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
-
 import 'package:get_it/get_it.dart';
-import '../../../domain/repository_interfaces/i_category_repository.dart';
-import '../../../domain/repository_interfaces/i_product_repository.dart';
-import '../../../domain/repository_interfaces/i_product_image_repository.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
-import '../../../data/models/category.dart';
+import '../../../core/constants/app_limits.dart';
 import '../../../core/errors/api_exception.dart';
-import '../../../core/constants/colors.dart';
+import '../../../data/models/category.dart';
+import '../../../domain/repository_interfaces/i_category_repository.dart';
+import '../../../domain/repository_interfaces/i_product_image_repository.dart';
+import '../../../domain/repository_interfaces/i_product_repository.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
-import '../../widgets/app_buttons.dart';
+import '../../widgets/app_snack_bar.dart';
+import 'product_form_image_picker.dart';
+import 'product_form_orchestrator.dart';
+import 'product_form_shared.dart';
 import 'widgets/sell_form_widgets.dart';
 
 final getIt = GetIt.instance;
@@ -25,8 +27,7 @@ class SellPage extends StatefulWidget {
 
 class _SellPageState extends State<SellPage> {
   late final ICategoryRepository _categoryRepository;
-  late final IProductRepository _productRepository;
-  late final IProductImageRepository _productImageRepository;
+  late final ProductFormOrchestrator _orchestrator;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
@@ -43,8 +44,10 @@ class _SellPageState extends State<SellPage> {
   void initState() {
     super.initState();
     _categoryRepository = getIt<ICategoryRepository>();
-    _productRepository = getIt<IProductRepository>();
-    _productImageRepository = getIt<IProductImageRepository>();
+    _orchestrator = ProductFormOrchestrator(
+      productRepository: getIt<IProductRepository>(),
+      productImageRepository: getIt<IProductImageRepository>(),
+    );
     _loadCategories();
   }
 
@@ -63,16 +66,13 @@ class _SellPageState extends State<SellPage> {
     });
 
     try {
-      final response = await _categoryRepository.getCategories();
-      if (!response.isSuccess) {
-        throw response.error!;
-      }
+      final categories = await ProductFormShared.loadCategories(
+        _categoryRepository,
+      );
 
       if (mounted) {
         setState(() {
-          _categories = (response.data ?? [])
-              .map((entity) => Category.fromEntity(entity))
-              .toList();
+          _categories = categories;
           _isLoading = false;
         });
       }
@@ -87,17 +87,20 @@ class _SellPageState extends State<SellPage> {
   }
 
   Future<void> _pickImages() async {
-    if (_selectedImages.length >= 8) {
-      _showSnack('You can upload up to 8 images.');
+    final pickResult = await ProductFormImagePicker.pickWithinLimit(
+      imagePicker: _imagePicker,
+      currentCount: _selectedImages.length,
+    );
+
+    if (pickResult.reachedLimit) {
+      _showSnack('You can upload up to $maxProductImages images.');
       return;
     }
 
-    final images = await _imagePicker.pickMultiImage();
-    if (images.isEmpty) return;
+    if (pickResult.images.isEmpty) return;
 
     setState(() {
-      final remaining = 8 - _selectedImages.length;
-      _selectedImages.addAll(images.take(remaining));
+      _selectedImages.addAll(pickResult.images);
     });
   }
 
@@ -110,29 +113,23 @@ class _SellPageState extends State<SellPage> {
   Future<void> _submit() async {
     if (_isLoading) return;
 
-    final title = _titleController.text.trim();
-    final description = _descriptionController.text.trim();
-    final price = double.tryParse(_priceController.text.trim());
+    final validation = ProductFormShared.validateSubmission(
+      titleInput: _titleController.text,
+      descriptionInput: _descriptionController.text,
+      priceInput: _priceController.text,
+      selectedCategoryId: _selectedCategoryId,
+      imageCount: _selectedImages.length,
+      imageRequiredMessage: 'Please add at least 1 photo.',
+    );
 
-    if (title.isEmpty) {
-      _showSnack('Title is required.');
+    if (!validation.isValid) {
+      _showSnack(validation.error!);
       return;
     }
 
-    if (price == null || price <= 0) {
-      _showSnack('Please enter a valid price.');
-      return;
-    }
-
-    if (_selectedCategoryId == null) {
-      _showSnack('Please select a category.');
-      return;
-    }
-
-    if (_selectedImages.length < 1) {
-      _showSnack('Please add at least 1 photo.');
-      return;
-    }
+    final title = validation.title;
+    final description = validation.description;
+    final price = validation.price!;
 
     setState(() {
       _isLoading = true;
@@ -140,36 +137,23 @@ class _SellPageState extends State<SellPage> {
     });
 
     try {
-      final createResponse = await _productRepository.createProduct(
+      final result = await _orchestrator.createProduct(
         title: title,
         description: description.isEmpty ? null : description,
         price: price,
         categoryId: _selectedCategoryId!,
+        images: _selectedImages,
       );
 
-      if (!createResponse.isSuccess) {
-        throw createResponse.error!;
-      }
+      if (!mounted) return;
 
-      final productId = createResponse.data!.id;
-      final imagePaths = _selectedImages.map((image) => image.path).toList();
-
-      final imageResponse = await _productImageRepository.addProductImages(
-        productId: productId,
-        imagePaths: imagePaths,
-      );
-
-      if (!imageResponse.isSuccess) {
-        throw imageResponse.error!;
-      }
-
-      context.read<ProductFeedViewModel>().refresh();
-      _showSnack('Product created successfully.');
-      _clearForm();
-    } on ApiException catch (e) {
-      if (mounted) {
-        setState(() => _error = e.message);
-        _showSnack(e.message);
+      if (result.success) {
+        context.read<ProductFeedViewModel>().refresh();
+        _showSnack(result.message);
+        _clearForm();
+      } else {
+        setState(() => _error = result.message);
+        _showSnack(result.message);
       }
     } finally {
       if (mounted) {
@@ -189,9 +173,7 @@ class _SellPageState extends State<SellPage> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppSnackBar.show(context, message);
   }
 
   @override
@@ -224,117 +206,24 @@ class _SellPageState extends State<SellPage> {
           children: [
             const SellHeaderRow(),
             const SizedBox(height: 12),
-            const SectionLabel(text: 'Title'),
-            const SizedBox(height: 6),
-            OutlinedField(
-              hintText: 'Name',
-              controller: _titleController,
-              textInputAction: TextInputAction.next,
-              isDense: true,
-            ),
-            const SizedBox(height: 12),
-            const SectionLabel(text: 'Description'),
-            const SizedBox(height: 6),
-            OutlinedField(
-              hintText: 'Detailed description of your product',
-              maxLines: 3,
-              controller: _descriptionController,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
+            ProductFormFieldsSection(
+              titleController: _titleController,
+              descriptionController: _descriptionController,
+              priceController: _priceController,
+              categories: _categories,
+              selectedCategoryId: _selectedCategoryId,
+              onCategoryChanged: (value) {
+                setState(() => _selectedCategoryId = value);
+              },
+              photoGrid: PhotoGrid(
+                imagePaths: _selectedImages.map((image) => image.path).toList(),
+                maxCount: 8,
+                onAddTap: _pickImages,
+                onRemoveTap: _removeImage,
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionLabel(text: 'Category'),
-                      const SizedBox(height: 6),
-                      CategoryDropdownField<int>(
-                        value: _selectedCategoryId,
-                        hint: 'Select category',
-                        items: _categories
-                            .map(
-                              (category) => DropdownMenuItem<int>(
-                                value: category.id,
-                                child: Text(
-                                  category.name,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() => _selectedCategoryId = value);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionLabel(text: 'Price (in \$)'),
-                      const SizedBox(height: 6),
-                      OutlinedField(
-                        hintText: '0.0',
-                        controller: _priceController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        isDense: true,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const SectionLabel(text: 'Photos'),
-            const SizedBox(height: 4),
-            Text.rich(
-              TextSpan(
-                text:
-                    'Capture all the angles and details. Your first square is the key image. ',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  height: 1.2,
-                ),
-                children: const [
-                  TextSpan(
-                    text: 'At least 1 photo required.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.primary,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            PhotoGrid(
-              imagePaths: _selectedImages.map((image) => image.path).toList(),
-              maxCount: 8,
-              onAddTap: _pickImages,
-              onRemoveTap: _removeImage,
-            ),
-            const SizedBox(height: 16),
-            AppPrimaryButton(
-              label: _isLoading ? 'Adding...' : 'Add',
-              isLoading: _isLoading,
-              onPressed: _isLoading ? null : _submit,
+              submitLabel: _isLoading ? 'Adding...' : 'Add',
+              isSubmitting: _isLoading,
+              onSubmit: _isLoading ? null : _submit,
             ),
           ],
         ),

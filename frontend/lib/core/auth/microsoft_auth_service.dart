@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:aad_oauth/aad_oauth.dart';
 import 'package:aad_oauth/model/config.dart';
+import 'package:flutter/foundation.dart';
 
 import '../navigation/app_navigator.dart';
 import 'auth_token_store.dart';
@@ -190,7 +191,8 @@ class MicrosoftAuthService {
         email: email,
         token: token,
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('MicrosoftAuthService.signIn failed: $e\n$st');
       await _safeLogout();
       return MicrosoftAuthResult.failure(_genericFailureMessage);
     }
@@ -238,7 +240,8 @@ class MicrosoftAuthService {
       final normalized = base64Url.normalize(payload);
       final decoded = utf8.decode(base64Url.decode(normalized));
       return json.decode(decoded) as Map<String, dynamic>;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('MicrosoftAuthService._decodeJwt failed: $e\n$st');
       return <String, dynamic>{};
     }
   }
@@ -281,8 +284,8 @@ class MicrosoftAuthService {
   Future<void> _safeLogout() async {
     try {
       await _oauth.logout();
-    } catch (_) {
-      // Ignore logout failures.
+    } catch (e, st) {
+      debugPrint('MicrosoftAuthService._safeLogout failed: $e\n$st');
     }
   }
 }
