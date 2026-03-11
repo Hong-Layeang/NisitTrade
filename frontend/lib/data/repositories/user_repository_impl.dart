@@ -108,4 +108,25 @@ class UserRepositoryImpl implements IUserRepository {
   }) async {
     return _apiService.updateAvatarImage(userId: userId, filePath: filePath);
   }
+
+  @override
+  Future<ApiResponse<UserEntity>> updateProfile({
+    required int userId,
+    required String fullName,
+    String? bio,
+    String? major,
+  }) async {
+    final response = await _apiService.updateProfile(
+      userId: userId,
+      fullName: fullName,
+      bio: bio,
+      major: major,
+    );
+
+    if (response.isSuccess && response.data != null) {
+      return ApiResponse.success(response.data!.toEntity());
+    }
+
+    return ApiResponse.error(response.error!);
+  }
 }

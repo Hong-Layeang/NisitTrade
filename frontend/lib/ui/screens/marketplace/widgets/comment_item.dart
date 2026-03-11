@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/colors.dart';
 import '../../../../data/models/comment.dart';
+import '../../../../domain/entities/university_entity.dart';
 import '../../../../logic/view_models/user_view_model.dart';
 import '../../profile/widgets/profile_widgets.dart';
 
@@ -43,14 +44,20 @@ class CommentItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<UserViewModel,
-        ({
-          int? userId,
-          String? profileImage,
-        })>(
+    return Selector<
+      UserViewModel,
+      ({
+        int? userId,
+        String? profileImage,
+        String? fullName,
+        UniversityEntity? university,
+      })
+    >(
       selector: (_, vm) => (
         userId: vm.userId,
         profileImage: vm.profile?.profileImage,
+        fullName: vm.profile?.fullName,
+        university: vm.profile?.university,
       ),
       builder: (context, userData, _) {
         final isCurrentUser =
@@ -58,22 +65,39 @@ class CommentItem extends StatelessWidget {
         final commentAvatarUrl = isCurrentUser
             ? userData.profileImage
             : comment.user?.profileImage;
+        final displayName = isCurrentUser
+            ? (userData.fullName ?? comment.user?.fullName ?? 'User')
+            : (comment.user?.fullName ?? 'User');
+        final university = isCurrentUser
+            ? (userData.university ?? comment.user?.university?.toEntity())
+            : comment.user?.university?.toEntity();
+        final schoolShortName = university == null
+            ? null
+            : '@${ProfileUtils.getSchoolShortName(university)}';
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            GestureDetector(
-              onTap: onUserTap,
-              child: RepaintBoundary(
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.surface,
-                  backgroundImage: commentAvatarUrl != null
-                      ? CachedNetworkImageProvider(commentAvatarUrl) as ImageProvider
-                      : null,
-                  child: commentAvatarUrl == null
-                      ? const Icon(Icons.person, color: AppColors.textSecondary, size: 18)
-                      : null,
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: GestureDetector(
+                onTap: onUserTap,
+                child: RepaintBoundary(
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.surface,
+                    backgroundImage: commentAvatarUrl != null
+                        ? CachedNetworkImageProvider(commentAvatarUrl)
+                              as ImageProvider
+                        : null,
+                    child: commentAvatarUrl == null
+                        ? const Icon(
+                            Icons.person,
+                            color: AppColors.textSecondary,
+                            size: 18,
+                          )
+                        : null,
+                  ),
                 ),
               ),
             ),
@@ -83,75 +107,89 @@ class CommentItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: GestureDetector(
                           onTap: onUserTap,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
                               Text(
-                                comment.user?.fullName ?? 'User',
+                                displayName,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textPrimary,
                                   fontSize: 14,
                                 ),
                               ),
-                              if (comment.user?.university != null)
+                              if (schoolShortName != null) ...[
+                                const SizedBox(width: 4),
                                 Text(
-                                  ProfileUtils.getSchoolShortName(comment.user!.university!.toEntity()),
+                                  schoolShortName,
                                   style: const TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 11,
                                   ),
                                 ),
+                              ],
                             ],
                           ),
                         ),
                       ),
                       if (isCurrentUser && (onEdit != null || onDelete != null))
-                        PopupMenuButton<String>(
-                          icon: const Icon(
-                            Icons.more_horiz,
-                            color: AppColors.textSecondary,
-                            size: 20,
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: PopupMenuButton<String>(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(
+                              Icons.more_horiz,
+                              color: AppColors.textSecondary,
+                              size: 18,
+                            ),
+                            onSelected: (value) {
+                              if (value == 'edit' && onEdit != null) {
+                                onEdit!();
+                              } else if (value == 'delete' && onDelete != null) {
+                                onDelete!();
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              if (onEdit != null)
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Edit'),
+                                    ],
+                                  ),
+                                ),
+                              if (onDelete != null)
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.delete,
+                                        size: 18,
+                                        color: Colors.red,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Delete',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
-                          onSelected: (value) {
-                            if (value == 'edit' && onEdit != null) {
-                              onEdit!();
-                            } else if (value == 'delete' && onDelete != null) {
-                              onDelete!();
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            if (onEdit != null)
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Edit'),
-                                  ],
-                                ),
-                              ),
-                            if (onDelete != null)
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete, size: 18, color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text('Delete', style: TextStyle(color: Colors.red)),
-                                  ],
-                                ),
-                              ),
-                          ],
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     comment.content,
                     style: const TextStyle(

@@ -43,6 +43,15 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard>
   with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  static const List<String> _reportReasonOptions = [
+    'Spam or scam',
+    'Prohibited or illegal item',
+    'Counterfeit item',
+    'Misleading description',
+    'Inappropriate content',
+    'Other',
+  ];
+
   int _currentImageIndex = 0;
   late PageController _pageController;
   late AnimationController _likeAnimationController;
@@ -232,50 +241,68 @@ class _ProductCardState extends State<ProductCard>
   }
 
   Future<void> _handleReportListing() async {
-    final reasonController = TextEditingController();
+    String selectedReason = _reportReasonOptions.first;
     final detailsController = TextEditingController();
 
     final shouldSubmit = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Report listing'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(labelText: 'Reason'),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Report listing'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: selectedReason,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Reason'),
+                  items: _reportReasonOptions
+                      .map(
+                        (reason) => DropdownMenuItem<String>(
+                          value: reason,
+                          child: Text(reason, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() => selectedReason = value);
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: detailsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Details (optional)',
+                  ),
+                  maxLines: 3,
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: detailsController,
-              decoration: const InputDecoration(labelText: 'Details (optional)'),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Submit'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
+        );
+      },
     );
 
-    if (shouldSubmit != true) return;
-
-    final reason = reasonController.text.trim();
-    final details = detailsController.text.trim();
-
-    if (reason.isEmpty) {
-      _showSnack('Reason is required.');
+    if (shouldSubmit != true) {
+      detailsController.dispose();
       return;
     }
+
+    final reason = selectedReason.trim();
+    final details = detailsController.text.trim();
+    detailsController.dispose();
 
     if (_isActionLoading) return;
     setState(() => _isActionLoading = true);

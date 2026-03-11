@@ -1,14 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
+import '../../../logic/view_models/marketplace_view_model.dart';
+import '../../../logic/view_models/search_view_model.dart';
 import 'widgets/auth_footer_links.dart';
 import 'widgets/join_waitlist_dialog.dart';
 import 'widgets/white_blur_gradient.dart';
 import '../../widgets/app_buttons.dart';
 
-class WelcomePage extends StatelessWidget {
+class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
+
+  @override
+  State<WelcomePage> createState() => _WelcomePageState();
+}
+
+class _WelcomePageState extends State<WelcomePage> {
+  @override
+  void initState() {
+    super.initState();
+    // Clear all ViewModels when user reaches welcome page
+    // This ensures no data persists between user sessions
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<ProductFeedViewModel>().clear();
+        context.read<UserViewModel>().clear();
+        context.read<SavedListingsViewModel>().clear();
+        context.read<MarketplaceViewModel>().clear();
+        context.read<SearchViewModel>().clear();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
+import '../../../logic/view_models/marketplace_view_model.dart';
+import '../../../logic/view_models/search_view_model.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/microsoft_auth_service.dart';
 import '../../../core/constants/colors.dart';
@@ -68,9 +71,12 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     if (result.isAuthenticated) {
-      // Clear stale product data from any previous user session
+      // Clear stale data from any previous user session
       if (mounted) {
         context.read<ProductFeedViewModel>().clear();
+        context.read<SavedListingsViewModel>().clear();
+        context.read<MarketplaceViewModel>().clear();
+        context.read<SearchViewModel>().clear();
         context.read<UserViewModel>().load();
       }
       Navigator.pushNamedAndRemoveUntil(
@@ -115,9 +121,12 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (result.isAuthenticated) {
-      // Clear stale product data from any previous user session
+      // Clear stale data from any previous user session
       if (mounted) {
         context.read<ProductFeedViewModel>().clear();
+        context.read<SavedListingsViewModel>().clear();
+        context.read<MarketplaceViewModel>().clear();
+        context.read<SearchViewModel>().clear();
         context.read<UserViewModel>().load();
       }
       Navigator.pushNamedAndRemoveUntil(

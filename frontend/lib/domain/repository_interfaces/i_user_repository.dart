@@ -40,4 +40,11 @@ abstract class IUserRepository {
     required int userId,
     required String filePath,
   });
+
+  Future<ApiResponse<UserEntity>> updateProfile({
+    required int userId,
+    required String fullName,
+    String? bio,
+    String? major,
+  });
 }

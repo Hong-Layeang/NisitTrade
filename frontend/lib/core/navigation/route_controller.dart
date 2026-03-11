@@ -6,6 +6,7 @@ import '../../ui/screens/auth/signup_page.dart';
 import '../../ui/screens/auth/welcome_page.dart';
 import '../../ui/screens/splash/splash_page.dart';
 import '../../ui/screens/marketplace/product_detail_page.dart';
+import '../../ui/screens/community/community_detail_page.dart';
 import '../../ui/layouts/main_shell.dart';
 import '../../ui/screens/profile/other_profile_page.dart';
 import '../../ui/screens/saved/saved_listings_page.dart';
@@ -79,6 +80,19 @@ Route<dynamic> controlRoute(RouteSettings settings) {
             productId: args.productId,
             focusComments: args.focusComments,
             initialProduct: args.initialProduct,
+          ),
+        );
+      }
+      return MaterialPageRoute(builder: (_) => const LoginPage());
+
+    case AppRoutes.communityDetail:
+      final args = settings.arguments;
+      if (args is CommunityDetailArgs) {
+        return MaterialPageRoute(
+          builder: (_) => CommunityDetailPage(
+            postId: args.postId,
+            focusComments: args.focusComments,
+            initialPost: args.initialPost,
           ),
         );
       }

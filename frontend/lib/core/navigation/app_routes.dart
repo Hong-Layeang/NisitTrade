@@ -16,6 +16,7 @@ class AppRoutes {
   static const chatRoom = '/chat-room';
   static const saved = '/saved';
   static const productDetail = '/product-detail';
+  static const communityDetail = '/community-detail';
   static const account = '/account';
   static const userProfile = '/user-profile';
 }

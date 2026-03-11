@@ -216,8 +216,8 @@ class UserStatsRow extends StatelessWidget {
     required this.major,
     required this.schoolShortName,
     required this.avatarTotalRadius,
-    this.sideSpacing = 12,
-    this.rowHeight = 32,
+    this.sideSpacing = 10,
+    this.rowHeight = 30,
     this.detailGap = 10,
   });
 
@@ -242,7 +242,7 @@ class UserStatsRow extends StatelessWidget {
                   ),
                   SizedBox(height: detailGap),
                   _ProfileCountStat(
-                    icon: Icons.people_outline,
+                    icon: Icons.people_outlined,
                     count: '$following',
                     label: 'Following',
                   ),

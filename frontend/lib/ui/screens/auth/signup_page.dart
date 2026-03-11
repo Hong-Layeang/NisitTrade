@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
+import '../../../logic/view_models/marketplace_view_model.dart';
+import '../../../logic/view_models/search_view_model.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
 import 'widgets/auth_back_link.dart';
@@ -204,6 +210,14 @@ class _SignupPageState extends State<SignupPage> {
                         label: 'Sign up',
                         onPressed: _agreedToTerms
                             ? () {
+                                // Clear all ViewModels before starting new session
+                                if (mounted) {
+                                  context.read<ProductFeedViewModel>().clear();
+                                  context.read<SavedListingsViewModel>().clear();
+                                  context.read<MarketplaceViewModel>().clear();
+                                  context.read<SearchViewModel>().clear();
+                                  context.read<UserViewModel>().load();
+                                }
                                 Navigator.pushNamedAndRemoveUntil(
                                   context,
                                   AppRoutes.marketplace,

@@ -8,6 +8,9 @@ import '../../../domain/entities/user_entity.dart';
 import '../../../data/models/product.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
+import '../../../logic/view_models/marketplace_view_model.dart';
+import '../../../logic/view_models/search_view_model.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/constants/colors.dart';
@@ -40,6 +43,7 @@ class ProfilePageState extends State<ProfilePage>
   bool _isLoading = false;
   bool _isUploadingCover = false;
   bool _isUploadingAvatar = false;
+  bool _isSavingProfile = false;
   String? _error;
   bool _productsLoaded = false;
 
@@ -207,9 +211,20 @@ class ProfilePageState extends State<ProfilePage>
               icon: const Icon(Icons.more_vert, color: Colors.white),
               padding: const EdgeInsets.all(8),
               onSelected: (value) {
+                if (value == 'edit_profile') _openEditProfileDialog();
                 if (value == 'logout') _handleLogout();
               },
               itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit_profile',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, size: 20),
+                      SizedBox(width: 8),
+                      Text('Edit profile'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'logout',
                   child: Row(
@@ -538,8 +553,12 @@ class ProfilePageState extends State<ProfilePage>
 
   Future<void> _handleLogout() async {
     if (mounted) {
+      // Clear all ViewModels to ensure no data persists between user sessions
       context.read<ProductFeedViewModel>().clear();
       context.read<UserViewModel>().clear();
+      context.read<SavedListingsViewModel>().clear();
+      context.read<MarketplaceViewModel>().clear();
+      context.read<SearchViewModel>().clear();
     }
     await AuthService.instance.logout();
     if (mounted) {
@@ -548,6 +567,42 @@ class ProfilePageState extends State<ProfilePage>
         AppRoutes.welcome,
         (route) => false,
       );
+    }
+  }
+
+  Future<void> _openEditProfileDialog() async {
+    final userProvider = context.read<UserViewModel>();
+    final profile = userProvider.profile;
+    if (profile == null || _isSavingProfile) return;
+
+    final result = await showDialog<_EditProfileResult>(
+      context: context,
+      builder: (_) => _EditProfileDialog(profile: profile),
+    );
+
+    if (!mounted || result == null) return;
+
+    setState(() => _isSavingProfile = true);
+
+    try {
+      final success = await userProvider.updateProfile(
+        fullName: result.fullName,
+        bio: result.bio,
+        major: result.major,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        AppSnackBar.success(context, 'Profile updated successfully.');
+      } else {
+        AppSnackBar.error(
+          context,
+          userProvider.error ?? 'Failed to update profile.',
+        );
+      }
+    } finally {
+      setStateIfMounted(() => _isSavingProfile = false);
     }
   }
 
@@ -621,6 +676,128 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_StickyTabBarDelegate oldDelegate) {
     return productCount != oldDelegate.productCount;
+  }
+}
+
+class _EditProfileResult {
+  const _EditProfileResult({
+    required this.fullName,
+    this.bio,
+    this.major,
+  });
+
+  final String fullName;
+  final String? bio;
+  final String? major;
+}
+
+class _EditProfileDialog extends StatefulWidget {
+  const _EditProfileDialog({required this.profile});
+
+  final UserEntity profile;
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _majorController;
+  late final TextEditingController _bioController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.profile.fullName);
+    _majorController = TextEditingController(text: widget.profile.major ?? '');
+    _bioController = TextEditingController(text: widget.profile.bio ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _majorController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit profile'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                textInputAction: TextInputAction.next,
+                maxLength: 80,
+                decoration: const InputDecoration(
+                  labelText: 'Full name',
+                  hintText: 'Enter your full name',
+                ),
+                validator: (value) {
+                  final text = value?.trim() ?? '';
+                  if (text.isEmpty) return 'Full name is required';
+                  if (text.length < 2) return 'Full name is too short';
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _majorController,
+                textInputAction: TextInputAction.next,
+                maxLength: 100,
+                decoration: const InputDecoration(
+                  labelText: 'Major',
+                  hintText: 'E.g. Computer Science',
+                ),
+              ),
+              TextFormField(
+                controller: _bioController,
+                minLines: 3,
+                maxLines: 4,
+                maxLength: 300,
+                decoration: const InputDecoration(
+                  labelText: 'Bio',
+                  hintText: 'Tell people about yourself',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final fullName = _nameController.text.trim();
+    final major = _majorController.text.trim();
+    final bio = _bioController.text.trim();
+
+    Navigator.pop(
+      context,
+      _EditProfileResult(
+        fullName: fullName,
+        major: major.isEmpty ? null : major,
+        bio: bio.isEmpty ? null : bio,
+      ),
+    );
   }
 }
 

@@ -218,4 +218,29 @@ class UserApiService {
       );
     }
   }
+
+  Future<ApiResponse<UserProfile>> updateProfile({
+    required int userId,
+    required String fullName,
+    String? bio,
+    String? major,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'full_name': fullName,
+        'bio': bio,
+        'major': major,
+      };
+
+      final response = await _dio.put('/users/$userId', data: payload);
+      final user = UserProfile.fromJson(response.data as Map<String, dynamic>);
+      return ApiResponse.success(user);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(
+        ApiException(message: 'Failed to update profile: $e'),
+      );
+    }
+  }
 }

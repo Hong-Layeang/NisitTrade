@@ -51,6 +51,51 @@ class UserViewModel extends ChangeNotifier {
     await load();
   }
 
+  Future<bool> updateProfile({
+    required String fullName,
+    String? bio,
+    String? major,
+  }) async {
+    final userId = _profile?.id;
+    if (userId == null) {
+      _error = 'Profile not loaded.';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final response = await _userRepository.updateProfile(
+        userId: userId,
+        fullName: fullName,
+        bio: bio,
+        major: major,
+      );
+
+      if (!response.isSuccess) {
+        _error = response.error?.message ?? 'Failed to update profile.';
+        notifyListeners();
+        return false;
+      }
+
+      _profile = response.data;
+      _error = null;
+      notifyListeners();
+
+      // Refresh from canonical source to keep all counters and derived fields current.
+      await load();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e, st) {
+      _error = 'Unexpected error while updating profile.';
+      debugPrint('UserViewModel.updateProfile unexpected error: $e\n$st');
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Uploads avatar and updates local profile cache on success.
   Future<String?> updateAvatar({
     required int userId,
