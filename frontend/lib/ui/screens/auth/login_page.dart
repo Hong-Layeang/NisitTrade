@@ -5,6 +5,7 @@ import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/marketplace_view_model.dart';
 import '../../../logic/view_models/search_view_model.dart';
+import '../../../logic/view_models/community_view_model.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/microsoft_auth_service.dart';
 import '../../../core/constants/colors.dart';
@@ -77,6 +78,7 @@ class _LoginPageState extends State<LoginPage> {
         context.read<SavedListingsViewModel>().clear();
         context.read<MarketplaceViewModel>().clear();
         context.read<SearchViewModel>().clear();
+        context.read<CommunityViewModel>().clear();
         context.read<UserViewModel>().load();
       }
       Navigator.pushNamedAndRemoveUntil(
@@ -127,6 +129,7 @@ class _LoginPageState extends State<LoginPage> {
         context.read<SavedListingsViewModel>().clear();
         context.read<MarketplaceViewModel>().clear();
         context.read<SearchViewModel>().clear();
+        context.read<CommunityViewModel>().clear();
         context.read<UserViewModel>().load();
       }
       Navigator.pushNamedAndRemoveUntil(

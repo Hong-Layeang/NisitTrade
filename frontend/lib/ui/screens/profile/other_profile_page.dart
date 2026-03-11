@@ -1,17 +1,24 @@
-import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import '../../../domain/repository_interfaces/i_user_repository.dart';
-import '../../../data/models/product.dart';
-import '../../../data/models/user_profile.dart';
-import '../../../core/errors/api_exception.dart';
-import '../../../core/constants/colors.dart';
+import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_dimensions.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/errors/api_exception.dart';
+import '../../../core/errors/app_error_messages.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/extensions/state_extensions.dart';
+import '../../../data/models/community_post.dart';
+import '../../../data/models/product.dart';
+import '../../../data/models/user_profile.dart';
+import '../../../data/repositories/community_repository_impl.dart';
+import '../../../domain/repository_interfaces/i_user_repository.dart';
+import '../../../logic/view_models/user_view_model.dart';
 import '../../widgets/empty_state.dart';
-import 'widgets/profile_widgets.dart';
+import '../community/community_detail_page.dart';
 import '../marketplace/product_detail_page.dart';
+import 'widgets/profile_widgets.dart';
 
 final getIt = GetIt.instance;
 
@@ -34,18 +41,21 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final IUserRepository _userRepository;
+  late final CommunityRepository _communityRepository;
 
   UserProfile? _profile;
   List<Product> _products = [];
+  List<CommunityPost> _posts = [];
   bool _isLoading = false;
   String? _error;
   bool _isFollowing = false;
 
-  // Using AppDimensions for layout constants
-
   @override
   void initState() {
-    super.initState();    _userRepository = getIt<IUserRepository>();    _tabController = TabController(length: 2, vsync: this);
+    super.initState();
+    _userRepository = getIt<IUserRepository>();
+    _communityRepository = getIt<CommunityRepository>();
+    _tabController = TabController(length: 2, vsync: this);
     _loadProfile();
   }
 
@@ -73,14 +83,26 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         limit: 50,
         offset: 0,
       );
+      final postsResponse = await _communityRepository.getPosts(
+        feed: 'community',
+        userId: profile.id,
+        limit: 50,
+        offset: 0,
+      );
 
       if (!productsResponse.isSuccess) {
         throw productsResponse.error!;
+      }
+      if (!postsResponse.isSuccess) {
+        throw postsResponse.error!;
       }
 
       setStateIfMounted(() {
         _profile = UserProfile.fromEntity(profile);
         _products = (productsResponse.data ?? []).toModels();
+        _posts = (postsResponse.data ?? [])
+            .where((post) => post.orderedImages.isNotEmpty)
+            .toList();
         _isFollowing = profile.isFollowing;
         _isLoading = false;
       });
@@ -95,9 +117,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
   Future<void> _toggleFollow() async {
     if (_profile == null) return;
 
-    // Optimistic update
     final wasFollowing = _isFollowing;
     final oldFollowerCount = _profile!.followerCount;
+
     setState(() {
       _isFollowing = !_isFollowing;
       _profile = _profile!.copyWith(
@@ -105,13 +127,13 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         followerCount: _isFollowing ? oldFollowerCount + 1 : oldFollowerCount - 1,
       );
     });
+    context.read<UserViewModel>().adjustFollowingCount(increment: _isFollowing);
 
     final response = wasFollowing
         ? await _userRepository.unfollowUser(widget.userId)
         : await _userRepository.followUser(widget.userId);
 
     if (!response.isSuccess && mounted) {
-      // Revert on error
       setState(() {
         _isFollowing = wasFollowing;
         _profile = _profile!.copyWith(
@@ -119,6 +141,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
           followerCount: oldFollowerCount,
         );
       });
+      context.read<UserViewModel>().adjustFollowingCount(increment: wasFollowing);
     }
   }
 
@@ -139,10 +162,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Error: $_error'),
+              Text(AppErrorMessages.resolve(_error)),
               const SizedBox(height: 16),
-              ElevatedButton(
-                  onPressed: _loadProfile, child: const Text('Retry')),
+              ElevatedButton(onPressed: _loadProfile, child: const Text('Retry')),
             ],
           ),
         ),
@@ -185,7 +207,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                         followerCount: profile.followerCount,
                         followingCount: profile.followingCount,
                         major: profile.major,
-                        schoolShortName: ProfileUtils.getSchoolShortName(profile.university?.toEntity()),
+                        schoolShortName: ProfileUtils.getSchoolShortName(
+                          profile.university?.toEntity(),
+                        ),
                       ),
                       coverHeight: AppDimensions.profileCoverHeight,
                       avatarRadius: AppDimensions.profileAvatarRadius,
@@ -199,6 +223,8 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                     pinned: true,
                     delegate: _StickyTabBarDelegate(
                       tabBar: _buildTabBar(context),
+                      productCount: _products.length,
+                      postCount: _posts.length,
                     ),
                   ),
                 ];
@@ -223,7 +249,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
             child: FilledButton.icon(
               onPressed: _toggleFollow,
               icon: Icon(
-                _isFollowing ? Icons.person_remove_outlined : Icons.person_add_outlined,
+                _isFollowing
+                    ? Icons.person_remove_outlined
+                    : Icons.person_add_outlined,
                 size: 18,
               ),
               label: Text(_isFollowing ? 'Unfollow' : 'Follow'),
@@ -270,8 +298,10 @@ class _OtherProfilePageState extends State<OtherProfilePage>
       ),
     );
   }
+
   Widget _buildTabBar(BuildContext context) {
     final productCount = _products.length;
+    final postCount = _posts.length;
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.background,
@@ -293,31 +323,88 @@ class _OtherProfilePageState extends State<OtherProfilePage>
               label: Text('$productCount'),
               backgroundColor: AppColors.primary,
               textColor: Colors.white,
-              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              textStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
               child: const Icon(Icons.shopping_bag_outlined, size: 24),
             ),
           ),
-          const Tab(icon: Icon(Icons.article_outlined, size: 24)),
+          Tab(
+            icon: Badge(
+              label: Text('$postCount'),
+              backgroundColor: AppColors.primary,
+              textColor: Colors.white,
+              textStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+              child: const Icon(Icons.article_outlined, size: 24),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildPostsTab() {
-    return const CustomScrollView(
-      slivers: [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: EmptyState(
-              icon: Icons.article_outlined,
-              title: 'Posts coming soon',
-              subtitle: 'Stay tuned for updates.',
+    if (_posts.isEmpty) {
+      return const CustomScrollView(
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: EmptyState(
+                icon: Icons.article_outlined,
+                title: 'No posts yet',
+                subtitle: 'This user has not shared any post images.',
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.only(top: 8, left: 2, right: 2, bottom: 2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
+      itemCount: _posts.length,
+      itemBuilder: (context, index) {
+        final post = _posts[index];
+        final imageUrl = post.orderedImages.first;
+
+        return GestureDetector(
+          onTap: () => _openPost(post),
+          child: RepaintBoundary(
+            child: CachedNetworkImage(
+              key: ValueKey('other_profile_post_${post.id}_$imageUrl'),
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              useOldImageOnUrlChange: true,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+              placeholder: (context, url) => Container(
+                color: AppColors.surface,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: AppColors.surface,
+                child: const Icon(Icons.image, color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -401,13 +488,29 @@ class _OtherProfilePageState extends State<OtherProfilePage>
       ),
     );
   }
+
+  void _openPost(CommunityPost post) {
+    Navigator.pushNamed(
+      context,
+      AppRoutes.communityDetail,
+      arguments: CommunityDetailArgs(
+        postId: post.id,
+        initialPost: post,
+      ),
+    );
+  }
 }
 
-// Delegate for sticky tab bar in NestedScrollView
 class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
-  const _StickyTabBarDelegate({required this.tabBar});
+  const _StickyTabBarDelegate({
+    required this.tabBar,
+    required this.productCount,
+    required this.postCount,
+  });
 
   final Widget tabBar;
+  final int productCount;
+  final int postCount;
 
   @override
   double get minExtent => 48;
@@ -426,6 +529,7 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_StickyTabBarDelegate oldDelegate) {
-    return false;
+    return productCount != oldDelegate.productCount ||
+        postCount != oldDelegate.postCount;
   }
 }

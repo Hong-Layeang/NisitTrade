@@ -27,6 +27,7 @@ class PostComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final composerHeight = selectedImagePaths.isNotEmpty ? 320.0 : 260.0;
 
     return Material(
       color: AppColors.background,
@@ -91,9 +92,9 @@ class PostComposer extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeInOut,
-              height: isOpen ? 290 : 0,
+              height: isOpen ? composerHeight : 0,
               child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
+                physics: const ClampingScrollPhysics(),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   child: Container(
@@ -323,7 +324,7 @@ class PostComposer extends StatelessWidget {
                             );
                           },
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                       ],
                     ),
                   ),

@@ -19,18 +19,23 @@ class CommunityComment {
     this.user,
   });
 
+  static DateTime _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
   factory CommunityComment.fromJson(Map<String, dynamic> json) {
     return CommunityComment(
       id: json['id'] as int? ?? 0,
-      userId: json['user_id'] as int? ?? 0,
-      communityPostId: json['community_post_id'] as int? ?? 0,
+      userId: (json['user_id'] ?? json['userId']) as int? ?? 0,
+      communityPostId:
+          (json['community_post_id'] ?? json['communityPostId']) as int? ?? 0,
       content: (json['content'] ?? '') as String,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : DateTime.now(),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : DateTime.now(),
+      createdAt: _parseDate(json['created_at'] ?? json['createdAt']),
+      updatedAt: _parseDate(json['updated_at'] ?? json['updatedAt']),
       user: json['User'] is Map<String, dynamic>
           ? Seller.fromJson(json['User'] as Map<String, dynamic>)
           : null,

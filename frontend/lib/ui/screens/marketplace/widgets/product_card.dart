@@ -8,6 +8,7 @@ import '../../../../domain/entities/product_entity.dart';
 import 'package:get_it/get_it.dart';
 import '../../../../logic/helpers/product_like_helpers.dart';
 import '../../../../logic/view_models/product_feed_view_model.dart';
+import '../../../../logic/view_models/saved_listings_view_model.dart';
 
 import '../../../../logic/view_models/user_view_model.dart';
 import '../../../../domain/repository_interfaces/i_product_repository.dart';
@@ -130,12 +131,34 @@ class _ProductCardState extends State<ProductCard>
     AppSnackBar.show(context, message);
   }
 
-  Future<void> _handleSaveListing() async {
+  bool _isSavedProduct() {
+    return context.read<SavedListingsViewModel>().hasSavedProduct(_product.id);
+  }
+
+  Future<void> _ensureSavedProductsLoaded() async {
+    final userId = context.read<UserViewModel>().userId;
+    if (userId == null) return;
+
+    await context.read<SavedListingsViewModel>().ensureLoadedForUser(userId: userId);
+  }
+
+  Future<void> _handleToggleSaveProduct() async {
+    final savedListingsVm = context.read<SavedListingsViewModel>();
+    final isSaved = _isSavedProduct();
+
     await executeAction(
-      () => context.read<ProductFeedViewModel>().saveListing(_product.id),
+      () async {
+        if (isSaved) {
+          await context.read<ProductFeedViewModel>().unsaveListing(_product.id);
+          savedListingsVm.removeSavedProductLocally(productId: _product.id);
+        } else {
+          await context.read<ProductFeedViewModel>().saveListing(_product.id);
+          savedListingsVm.addSavedProductLocally(_product);
+        }
+      },
       onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
-      successMessage: 'Saved to your list.',
-      errorMessage: 'Failed to save listing.',
+      successMessage: isSaved ? 'Removed from saved.' : 'Saved to your list.',
+      errorMessage: isSaved ? 'Failed to unsave product.' : 'Failed to save product.',
     );
   }
 
@@ -324,19 +347,81 @@ class _ProductCardState extends State<ProductCard>
     }
   }
 
-  void _showProductActions() {
+  Future<void> _showProductActions() async {
+    await _ensureSavedProductsLoaded();
+
     final handler = ProductCardActionHandler(
       context: context,
       product: _product,
       isOwner: _isOwner(),
-      onEditListing: _handleEditListing,
-      onDeleteListing: _handleDeleteListing,
-      onSaveListing: _handleSaveListing,
+      isSaved: _isSavedProduct(),
+      onEditProduct: _handleEditListing,
+      onDeleteProduct: _handleDeleteListing,
+      onToggleSaveProduct: _handleToggleSaveProduct,
       onHideToggle: _handleHideToggle,
-      onShareListing: _handleShareListing,
-      onReportListing: _handleReportListing,
+      onShareProduct: _handleShareListing,
+      onReportProduct: _handleReportListing,
     );
     handler.showActionSheet();
+  }
+
+  ProductEntity _optimisticallyLikeProduct(ProductEntity product, int userId) {
+    if (ProductLikeHelpers.isLikedByUser(product: product, userId: userId)) {
+      return product;
+    }
+
+    final optimisticLikeId = -DateTime.now().microsecondsSinceEpoch;
+    return ProductEntity(
+      id: product.id,
+      title: product.title,
+      description: product.description,
+      price: product.price,
+      status: product.status,
+      userId: product.userId,
+      categoryId: product.categoryId,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+      seller: product.seller,
+      category: product.category,
+      imageUrls: product.imageUrls,
+      likes: [
+        ...product.likes,
+        ProductLikeEntity(id: optimisticLikeId, userId: userId),
+      ],
+      comments: product.comments,
+      likeCount: product.likeCount + 1,
+      commentCount: product.commentCount,
+      isLiked: true,
+    );
+  }
+
+  ProductEntity _optimisticallyUnlikeProduct(ProductEntity product, int userId) {
+    if (!ProductLikeHelpers.isLikedByUser(product: product, userId: userId)) {
+      return product;
+    }
+
+    final updatedLikes = [...product.likes]..removeWhere((like) => like.userId == userId);
+    final nextLikeCount = product.likeCount > 0 ? product.likeCount - 1 : 0;
+
+    return ProductEntity(
+      id: product.id,
+      title: product.title,
+      description: product.description,
+      price: product.price,
+      status: product.status,
+      userId: product.userId,
+      categoryId: product.categoryId,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+      seller: product.seller,
+      category: product.category,
+      imageUrls: product.imageUrls,
+      likes: updatedLikes,
+      comments: product.comments,
+      likeCount: nextLikeCount,
+      commentCount: product.commentCount,
+      isLiked: false,
+    );
   }
 
   Future<void> _handleLikeTap() async {
@@ -358,14 +443,22 @@ class _ProductCardState extends State<ProductCard>
     HapticFeedback.lightImpact();
 
     final previousProduct = _product;
-    setState(() => _isLoading = true);
+    final isCurrentlyLiked = _isProductLikedByCurrentUser();
+    final unlikeLikeId = isCurrentlyLiked
+        ? ProductLikeHelpers.findUserLikeId(product: _product, userId: userId)
+        : null;
+    final optimisticProduct = isCurrentlyLiked
+        ? _optimisticallyUnlikeProduct(_product, userId)
+        : _optimisticallyLikeProduct(_product, userId);
+
+    setState(() {
+      _product = optimisticProduct;
+      _isLoading = true;
+    });
+    widget.onProductUpdated?.call(_product);
 
     try {
       final provider = context.read<ProductFeedViewModel>();
-      final isCurrentlyLiked = _isProductLikedByCurrentUser();
-      final unlikeLikeId = isCurrentlyLiked
-          ? ProductLikeHelpers.findUserLikeId(product: _product, userId: userId)
-          : null;
 
       ProductEntity? updatedProduct;
 
@@ -404,12 +497,6 @@ class _ProductCardState extends State<ProductCard>
         final nextProduct = updatedProduct;
         setState(() => _product = nextProduct);
         widget.onProductUpdated?.call(_product);
-      } else {
-        final refreshed = await provider.refreshProduct(_product.id);
-        if (refreshed != null && mounted) {
-          setState(() => _product = refreshed);
-          widget.onProductUpdated?.call(_product);
-        }
       }
 
       HapticFeedback.mediumImpact();

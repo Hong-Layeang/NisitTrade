@@ -20,3 +20,11 @@ class AppRoutes {
   static const account = '/account';
   static const userProfile = '/user-profile';
 }
+
+class MarketplaceRouteArgs {
+  final bool skipAuthCheck;
+
+  const MarketplaceRouteArgs({
+    this.skipAuthCheck = false,
+  });
+}

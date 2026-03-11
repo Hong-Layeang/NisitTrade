@@ -11,6 +11,8 @@ class CommunityPost {
   final int commentsCount;
   final bool isLikedByMe;
   final int? myLikeId;
+  final bool isSavedByMe;
+  final int? mySavedId;
   final List<CommunityComment> comments;
   final DateTime createdAt;
 
@@ -24,6 +26,8 @@ class CommunityPost {
     required this.commentsCount,
     this.isLikedByMe = false,
     this.myLikeId,
+    this.isSavedByMe = false,
+    this.mySavedId,
     this.comments = const [],
     required this.createdAt,
   });
@@ -32,6 +36,14 @@ class CommunityPost {
     if (imageUrls.isNotEmpty) return imageUrls;
     if (imageUrl != null && imageUrl!.isNotEmpty) return [imageUrl!];
     return const [];
+  }
+
+  static DateTime _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
   }
 
   factory CommunityPost.fromJson(Map<String, dynamic> json) {
@@ -60,10 +72,10 @@ class CommunityPost {
       commentsCount: json['comments_count'] as int? ?? 0,
       isLikedByMe: json['is_liked_by_me'] == true,
       myLikeId: json['my_like_id'] as int?,
+      isSavedByMe: json['is_saved_by_me'] == true,
+      mySavedId: json['my_saved_id'] as int?,
       comments: parsedComments,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : DateTime.now(),
+      createdAt: _parseDate(json['created_at'] ?? json['createdAt']),
     );
   }
 
@@ -77,6 +89,8 @@ class CommunityPost {
     int? commentsCount,
     bool? isLikedByMe,
     int? myLikeId,
+    bool? isSavedByMe,
+    int? mySavedId,
     List<CommunityComment>? comments,
     DateTime? createdAt,
   }) {
@@ -90,6 +104,8 @@ class CommunityPost {
       commentsCount: commentsCount ?? this.commentsCount,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
       myLikeId: myLikeId ?? this.myLikeId,
+      isSavedByMe: isSavedByMe ?? this.isSavedByMe,
+      mySavedId: mySavedId ?? this.mySavedId,
       comments: comments ?? this.comments,
       createdAt: createdAt ?? this.createdAt,
     );

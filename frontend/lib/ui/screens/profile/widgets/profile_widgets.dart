@@ -80,6 +80,16 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
+  String _stableImageKey(String? url) {
+    if (url == null || url.isEmpty) return '';
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    if ((uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority) {
+      return uri.replace(query: '', fragment: '').toString();
+    }
+    return url;
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasImage = widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
@@ -98,7 +108,7 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
             height: widget.radius * 2,
             child: hasImage
                 ? CachedNetworkImage(
-                    key: ValueKey('profile_avatar_${widget.imageUrl}'),
+                    key: ValueKey('profile_avatar_${_stableImageKey(widget.imageUrl)}'),
                     imageUrl: widget.imageUrl!,
                     fit: BoxFit.cover,
                     useOldImageOnUrlChange: true,
@@ -419,6 +429,16 @@ class ProfileHeaderSection extends StatelessWidget {
 
   double get _avatarTotalRadius => avatarRadius + avatarGap + avatarBorder;
 
+  String _stableImageKey(String? url) {
+    if (url == null || url.isEmpty) return '';
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    if ((uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority) {
+      return uri.replace(query: '', fragment: '').toString();
+    }
+    return url;
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -463,7 +483,7 @@ class ProfileHeaderSection extends StatelessWidget {
                 children: [
                   hasCover
                       ? CachedNetworkImage(
-                          key: ValueKey('cover_image_$coverUrl'),
+                          key: ValueKey('cover_image_${_stableImageKey(coverUrl)}'),
                           imageUrl: coverUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,

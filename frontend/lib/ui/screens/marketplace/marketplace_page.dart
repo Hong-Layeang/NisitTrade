@@ -151,8 +151,10 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
           _isBootstrapping || categories.isEmpty || filteredProducts.isEmpty,
       error: effectiveError,
       onRetry: () async {
-        await context.read<MarketplaceViewModel>().loadCategories();
-        await context.read<ProductFeedViewModel>().refresh();
+        final marketplaceVm = context.read<MarketplaceViewModel>();
+        final productVm = context.read<ProductFeedViewModel>();
+        await marketplaceVm.loadCategories();
+        await productVm.refresh();
       },
       child: Column(
         children: [

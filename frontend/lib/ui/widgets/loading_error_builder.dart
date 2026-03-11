@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/errors/app_error_messages.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/app_dimensions.dart';
 import '../../core/constants/app_values.dart';
@@ -93,6 +94,7 @@ class LoadingErrorBuilder extends StatelessWidget {
   }
 
   Widget _buildDefaultError(BuildContext context) {
+    final message = AppErrorMessages.resolve(error);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.spacingL),
@@ -106,7 +108,7 @@ class LoadingErrorBuilder extends StatelessWidget {
             ),
             const SizedBox(height: AppDimensions.spacingM),
             Text(
-              error ?? 'An error occurred',
+              message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppColors.textSecondary,
@@ -127,6 +129,7 @@ class LoadingErrorBuilder extends StatelessWidget {
   }
 
   Widget _buildErrorOverlay(BuildContext context) {
+    final message = AppErrorMessages.resolve(error);
     return Positioned.fill(
       child: Container(
         color: Colors.black.withValues(alpha: AppValues.opacityDisabled),
@@ -145,7 +148,7 @@ class LoadingErrorBuilder extends StatelessWidget {
                   ),
                   const SizedBox(height: AppDimensions.spacingM),
                   Text(
-                    error!,
+                    message,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),

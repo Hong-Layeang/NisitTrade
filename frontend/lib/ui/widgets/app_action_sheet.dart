@@ -110,7 +110,11 @@ class AppActionSheet extends StatelessWidget {
                         ? null
                         : () {
                             Navigator.of(context).pop();
-                            item.onTap?.call();
+                            if (item.onTap != null) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                item.onTap!.call();
+                              });
+                            }
                           },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(

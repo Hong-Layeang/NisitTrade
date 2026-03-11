@@ -2,6 +2,7 @@ import '../../core/errors/api_response.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/product_entity.dart';
 import '../../domain/repository_interfaces/i_user_repository.dart';
+import '../models/community_post.dart';
 import '../providers/user_api_service.dart';
 
 /// Implementation of IUserRepository using the API service
@@ -81,6 +82,19 @@ class UserRepositoryImpl implements IUserRepository {
       return ApiResponse.success(entities);
     }
     return ApiResponse.error(response.error!);
+  }
+
+  @override
+  Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
+    required int userId,
+    int? limit,
+    int? offset,
+  }) async {
+    return _apiService.getUserSavedPosts(
+      userId: userId,
+      limit: limit,
+      offset: offset,
+    );
   }
 
   @override

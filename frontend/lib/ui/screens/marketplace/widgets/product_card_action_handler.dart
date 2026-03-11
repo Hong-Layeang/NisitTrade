@@ -8,23 +8,25 @@ class ProductCardActionHandler {
   final BuildContext context;
   final ProductEntity product;
   final bool isOwner;
-  final Future<void> Function() onEditListing;
-  final Future<void> Function() onDeleteListing;
-  final Future<void> Function() onSaveListing;
+  final bool isSaved;
+  final Future<void> Function() onEditProduct;
+  final Future<void> Function() onDeleteProduct;
+  final Future<void> Function() onToggleSaveProduct;
   final Future<void> Function() onHideToggle;
-  final Future<void> Function() onShareListing;
-  final Future<void> Function() onReportListing;
+  final Future<void> Function() onShareProduct;
+  final Future<void> Function() onReportProduct;
 
   ProductCardActionHandler({
     required this.context,
     required this.product,
     required this.isOwner,
-    required this.onEditListing,
-    required this.onDeleteListing,
-    required this.onSaveListing,
+    required this.isSaved,
+    required this.onEditProduct,
+    required this.onDeleteProduct,
+    required this.onToggleSaveProduct,
     required this.onHideToggle,
-    required this.onShareListing,
-    required this.onReportListing,
+    required this.onShareProduct,
+    required this.onReportProduct,
   });
 
   /// Build action items based on user role and product state.
@@ -32,38 +34,38 @@ class ProductCardActionHandler {
     return <AppActionSheetItem>[
       if (isOwner)
         AppActionSheetItem(
-          label: 'Edit listing',
+          label: 'Edit product',
           icon: Icons.edit_outlined,
-          onTap: onEditListing,
+          onTap: onEditProduct,
         ),
       if (isOwner)
         AppActionSheetItem(
-          label: 'Delete listing',
+          label: 'Delete product',
           icon: Icons.delete_outline,
           isDestructive: true,
-          onTap: onDeleteListing,
+          onTap: onDeleteProduct,
         ),
       AppActionSheetItem(
-        label: 'Save listing',
-        icon: Icons.bookmark_border,
-        onTap: onSaveListing,
+        label: isSaved ? 'Unsave product' : 'Save product',
+        icon: isSaved ? Icons.bookmark_remove_outlined : Icons.bookmark_border,
+        onTap: onToggleSaveProduct,
       ),
       if (isOwner)
         AppActionSheetItem(
-          label: product.isHidden ? 'Unhide listing' : 'Hide listing',
+          label: product.isHidden ? 'Unhide product' : 'Hide product',
           icon: Icons.visibility_off_outlined,
           onTap: onHideToggle,
         ),
       AppActionSheetItem(
         label: 'Share',
         icon: Icons.share_outlined,
-        onTap: onShareListing,
+        onTap: onShareProduct,
       ),
       AppActionSheetItem(
-        label: 'Report',
+        label: 'Report product',
         icon: Icons.flag_outlined,
         isDestructive: true,
-        onTap: onReportListing,
+        onTap: onReportProduct,
       ),
     ];
   }
@@ -72,7 +74,7 @@ class ProductCardActionHandler {
   void showActionSheet() {
     AppActionSheet.show(
       context,
-      title: 'Listing options',
+      title: 'Product options',
       items: _buildActionItems(),
     );
   }

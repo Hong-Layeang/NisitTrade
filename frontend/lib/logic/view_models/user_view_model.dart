@@ -32,7 +32,7 @@ class UserViewModel extends ChangeNotifier {
     try {
       final response = await _userRepository.getCurrentUser();
       if (response.isSuccess) {
-        _profile = response.data;
+        _profile = _withStableImageUrls(existing: _profile, incoming: response.data);
       } else {
         _error = response.error?.message;
       }
@@ -49,6 +49,19 @@ class UserViewModel extends ChangeNotifier {
 
   Future<void> refresh() async {
     await load();
+  }
+
+  /// Applies an optimistic delta to the current user's following count.
+  void adjustFollowingCount({required bool increment}) {
+    final profile = _profile;
+    if (profile == null) return;
+
+    final next = increment
+        ? profile.followingCount + 1
+        : (profile.followingCount > 0 ? profile.followingCount - 1 : 0);
+
+    _profile = profile.copyWith(followingCount: next);
+    notifyListeners();
   }
 
   Future<bool> updateProfile({
@@ -77,12 +90,9 @@ class UserViewModel extends ChangeNotifier {
         return false;
       }
 
-      _profile = response.data;
+      _profile = _withStableImageUrls(existing: _profile, incoming: response.data);
       _error = null;
       notifyListeners();
-
-      // Refresh from canonical source to keep all counters and derived fields current.
-      await load();
       return true;
     } on ApiException catch (e) {
       _error = e.message;
@@ -107,9 +117,12 @@ class UserViewModel extends ChangeNotifier {
         filePath: filePath,
       );
       if (response.isSuccess) {
-        // Reload profile to get updated data
-        await load();
-        return response.data;
+        final nextAvatarUrl = response.data;
+        if (nextAvatarUrl != null && _profile != null) {
+          _profile = _profile!.copyWith(profileImage: nextAvatarUrl);
+          notifyListeners();
+        }
+        return nextAvatarUrl;
       }
       return null;
     } on ApiException catch (e) {
@@ -133,9 +146,12 @@ class UserViewModel extends ChangeNotifier {
         filePath: filePath,
       );
       if (response.isSuccess) {
-        // Reload profile to get updated data
-        await load();
-        return response.data;
+        final nextCoverUrl = response.data;
+        if (nextCoverUrl != null && _profile != null) {
+          _profile = _profile!.copyWith(coverImage: nextCoverUrl);
+          notifyListeners();
+        }
+        return nextCoverUrl;
       }
       return null;
     } on ApiException catch (e) {
@@ -154,5 +170,45 @@ class UserViewModel extends ChangeNotifier {
     _error = null;
     _isLoading = false;
     notifyListeners();
+  }
+
+  UserEntity? _withStableImageUrls({
+    required UserEntity? existing,
+    required UserEntity? incoming,
+  }) {
+    if (existing == null || incoming == null) return incoming;
+
+    final keepProfile = _isSameUnderlyingImage(
+      existing.profileImage,
+      incoming.profileImage,
+    );
+    final keepCover = _isSameUnderlyingImage(
+      existing.coverImage,
+      incoming.coverImage,
+    );
+
+    return incoming.copyWith(
+      profileImage: keepProfile ? existing.profileImage : incoming.profileImage,
+      coverImage: keepCover ? existing.coverImage : incoming.coverImage,
+    );
+  }
+
+  bool _isSameUnderlyingImage(String? a, String? b) {
+    if (a == null || b == null) return false;
+    final aTrim = a.trim();
+    final bTrim = b.trim();
+    if (aTrim.isEmpty || bTrim.isEmpty) return false;
+    return _normalizeImageUrl(aTrim) == _normalizeImageUrl(bTrim);
+  }
+
+  String _normalizeImageUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+
+    if ((uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority) {
+      return uri.replace(query: '', fragment: '').toString();
+    }
+
+    return url;
   }
 }

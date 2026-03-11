@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../data/models/product.dart';
 import '../../../data/models/category.dart';
+import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/app_limits.dart';
 import '../../../core/constants/colors.dart';
@@ -285,7 +286,7 @@ class _EditProductPageState extends State<EditProductPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Error: $_error'),
+                      Text(AppErrorMessages.resolve(_error)),
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadCategories,

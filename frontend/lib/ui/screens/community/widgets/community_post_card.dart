@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:timeago_flutter/timeago_flutter.dart';
 import '../../../../data/models/community_post.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/formatters.dart';
@@ -13,6 +14,7 @@ class CommunityPostCard extends StatefulWidget {
   final CommunityPost post;
   final bool isLiked;
   final VoidCallback? onTap;
+  final ValueChanged<int>? onImageTap;
   final VoidCallback? onUserTap;
   final VoidCallback? onLikeTap;
   final VoidCallback? onCommentTap;
@@ -24,6 +26,7 @@ class CommunityPostCard extends StatefulWidget {
     required this.post,
     this.isLiked = false,
     this.onTap,
+    this.onImageTap,
     this.onUserTap,
     this.onLikeTap,
     this.onCommentTap,
@@ -44,15 +47,6 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       universityDomain: widget.post.author.university?.domain,
       fallback: '',
     );
-  }
-
-  String _timeAgo() {
-    final diff = DateTime.now().difference(widget.post.createdAt);
-    if (diff.inSeconds < 60) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${(diff.inDays / 7).floor()}w ago';
   }
 
   String? _resolveAvatarUrl(BuildContext context) {
@@ -137,25 +131,26 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          _timeAgo(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                        Timeago(
+                          date: widget.post.createdAt,
+                          builder: (context, value) => Text(
+                            value,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 2),
                         SizedBox(
-                          width: 36,
-                          height: 36,
+                          width: 24,
+                          height: 24,
                           child: IconButton(
                             onPressed: widget.onMoreTap,
-                            splashRadius: 18,
-                            icon: const Icon(
-                              Icons.more_horiz,
-                              color: AppColors.textSecondary,
-                              size: 22,
-                            ),
+                            icon: const Icon(Icons.more_horiz, size: 18),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -181,7 +176,13 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         if (widget.post.orderedImages.isNotEmpty) ...[
           const SizedBox(height: 10),
           InkWell(
-            onTap: widget.onTap,
+            onTap: () {
+              if (widget.onImageTap != null) {
+                widget.onImageTap!(_currentImageIndex);
+                return;
+              }
+              widget.onTap?.call();
+            },
             child: AspectRatio(
               aspectRatio: 1,
               child: Stack(
@@ -195,9 +196,29 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     },
                     itemBuilder: (context, index) {
                       final imageUrl = widget.post.orderedImages[index];
+                      final isNetwork =
+                          imageUrl.startsWith('http://') || imageUrl.startsWith('https://');
+
+                      if (!isNetwork) {
+                        return Image.asset(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: AppColors.surface,
+                              child: const Center(
+                                child: Icon(Icons.image_not_supported_outlined),
+                              ),
+                            );
+                          },
+                        );
+                      }
+
                       return RepaintBoundary(
                         child: CachedNetworkImage(
-                          key: ValueKey('post_image_${widget.post.id}_${index}_$imageUrl'),
+                          key: ValueKey('post_image_${widget.post.id}_$index'),
                           imageUrl: imageUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,

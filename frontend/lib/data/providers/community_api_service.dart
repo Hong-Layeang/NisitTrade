@@ -13,11 +13,17 @@ class CommunityApiService extends BaseApiService {
     String feed = 'community',
     int limit = 20,
     int offset = 0,
+    int? userId,
   }) async {
     return executeListApiCall<CommunityPost>(
       call: () => dio.get(
         '/community',
-        queryParameters: {'feed': feed, 'limit': limit, 'offset': offset},
+        queryParameters: {
+          'feed': feed,
+          'limit': limit,
+          'offset': offset,
+          if (userId != null) 'user_id': userId,
+        },
       ),
       itemParser: (json) => CommunityPost.fromJson(json as Map<String, dynamic>),
       errorMessage: 'Failed to fetch community posts',
@@ -57,6 +63,57 @@ class CommunityApiService extends BaseApiService {
     );
   }
 
+  Future<ApiResponse<void>> updatePost({
+    required int postId,
+    required String content,
+    List<String> imagePaths = const [],
+    List<String> retainedImageUrls = const [],
+  }) {
+    final formData = FormData.fromMap({
+      'content': content,
+      'image_urls': retainedImageUrls,
+    });
+
+    for (final imagePath in imagePaths) {
+      formData.files.add(
+        MapEntry('images', MultipartFile.fromFileSync(imagePath)),
+      );
+    }
+
+    return executeVoidApiCall(
+      call: () => dio.put(
+        '/community/$postId',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      ),
+      errorMessage: 'Failed to update community post',
+    );
+  }
+
+  Future<ApiResponse<void>> deletePost(int postId) {
+    return executeVoidApiCall(
+      call: () => dio.delete('/community/$postId'),
+      errorMessage: 'Failed to delete community post',
+    );
+  }
+
+  Future<ApiResponse<void>> reportPost({
+    required int postId,
+    required String reason,
+    String? details,
+  }) {
+    return executeVoidApiCall(
+      call: () => dio.post(
+        '/community/$postId/reports',
+        data: {
+          'reason': reason,
+          if (details != null && details.trim().isNotEmpty) 'details': details.trim(),
+        },
+      ),
+      errorMessage: 'Failed to report community post',
+    );
+  }
+
   Future<ApiResponse<void>> likePost(int postId) {
     return executeVoidApiCall(
       call: () => dio.post('/community/$postId/likes'),
@@ -68,6 +125,20 @@ class CommunityApiService extends BaseApiService {
     return executeVoidApiCall(
       call: () => dio.delete('/community/$postId/likes'),
       errorMessage: 'Failed to unlike community post',
+    );
+  }
+
+  Future<ApiResponse<void>> savePost(int postId) {
+    return executeVoidApiCall(
+      call: () => dio.post('/community/$postId/saves'),
+      errorMessage: 'Failed to save community post',
+    );
+  }
+
+  Future<ApiResponse<void>> unsavePost(int postId) {
+    return executeVoidApiCall(
+      call: () => dio.delete('/community/$postId/saves'),
+      errorMessage: 'Failed to unsave community post',
     );
   }
 

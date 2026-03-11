@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:timeago_flutter/timeago_flutter.dart';
 import '../../../../domain/entities/product_entity.dart';
 import '../../../../core/constants/colors.dart';
 
@@ -35,11 +36,14 @@ class ProductCardInfo extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
-          Text(
-            product.timeAgo,
-            style: textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontSize: 12,
+          Timeago(
+            date: product.createdAt,
+            builder: (context, value) => Text(
+              value,
+              style: textTheme.labelSmall?.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
             ),
           ),
         ],

@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:get_it/get_it.dart';
 import '../../../domain/repository_interfaces/i_user_repository.dart';
+import '../../../data/models/community_post.dart';
+import '../../../data/repositories/community_repository_impl.dart';
 import '../../../domain/entities/user_entity.dart';
 import '../../../data/models/product.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
@@ -11,6 +13,8 @@ import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/marketplace_view_model.dart';
 import '../../../logic/view_models/search_view_model.dart';
+import '../../../logic/view_models/community_view_model.dart';
+import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/constants/colors.dart';
@@ -23,6 +27,7 @@ import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_refresh_indicator.dart';
 import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
+import '../community/community_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 final getIt = GetIt.instance;
@@ -38,8 +43,10 @@ class ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final IUserRepository _userRepository;
+  late final CommunityRepository _communityRepository;
 
   List<Product> _products = [];
+  List<CommunityPost> _posts = [];
   bool _isLoading = false;
   bool _isUploadingCover = false;
   bool _isUploadingAvatar = false;
@@ -63,7 +70,7 @@ class ProfilePageState extends State<ProfilePage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Error: $_error'),
+            Text(AppErrorMessages.resolve(_error)),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _loadProfile, child: const Text('Retry')),
           ],
@@ -118,6 +125,7 @@ class ProfilePageState extends State<ProfilePage>
                   delegate: _StickyTabBarDelegate(
                     tabBar: _buildTabBar(context),
                     productCount: _products.length,
+                    postCount: _posts.length,
                   ),
                 ),
               ];
@@ -288,6 +296,7 @@ class ProfilePageState extends State<ProfilePage>
 
   Widget _buildTabBar(BuildContext context) {
     final productCount = _products.length;
+    final postCount = _posts.length;
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.background,
@@ -313,27 +322,82 @@ class ProfilePageState extends State<ProfilePage>
               child: const Icon(Icons.shopping_bag_outlined, size: 24),
             ),
           ),
-          const Tab(icon: Icon(Icons.article_outlined, size: 24)),
+          Tab(
+            icon: Badge(
+              label: Text('$postCount'),
+              backgroundColor: AppColors.primary,
+              textColor: Colors.white,
+              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              child: const Icon(Icons.article_outlined, size: 24),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildPostsTab() {
-    return const CustomScrollView(
-      slivers: [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: EmptyState(
-              icon: Icons.article_outlined,
-              title: 'Posts coming soon',
-              subtitle: 'Stay tuned for updates.',
+    if (_isLoading && _posts.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_posts.isEmpty) {
+      return const CustomScrollView(
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: EmptyState(
+                icon: Icons.article_outlined,
+                title: 'No posts yet',
+                subtitle: 'Share your first post with an image.',
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.only(top: 8, left: 2, right: 2, bottom: 2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
+      itemCount: _posts.length,
+      itemBuilder: (context, index) {
+        final post = _posts[index];
+        final imageUrl = post.orderedImages.first;
+
+        return GestureDetector(
+          onTap: () => _openPost(post),
+          child: RepaintBoundary(
+            child: CachedNetworkImage(
+              key: ValueKey('profile_post_${post.id}_$imageUrl'),
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              useOldImageOnUrlChange: true,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+              placeholder: (context, url) => Container(
+                color: AppColors.surface,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: AppColors.surface,
+                child: const Icon(Icons.image, color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -422,9 +486,23 @@ class ProfilePageState extends State<ProfilePage>
     );
   }
 
+  void _openPost(CommunityPost post) {
+    Navigator.pushNamed(
+      context,
+      AppRoutes.communityDetail,
+      arguments: CommunityDetailArgs(
+        postId: post.id,
+        initialPost: post,
+      ),
+    );
+  }
+
   @override
   void initState() {
-    super.initState();    _userRepository = getIt<IUserRepository>();    _tabController = TabController(length: 2, vsync: this);
+    super.initState();
+    _userRepository = getIt<IUserRepository>();
+    _communityRepository = getIt<CommunityRepository>();
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -435,7 +513,9 @@ class ProfilePageState extends State<ProfilePage>
       if (userId != null) {
         _productsLoaded = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _loadProducts();
+          if (mounted) {
+            refresh();
+          }
         });
       }
     }
@@ -559,6 +639,7 @@ class ProfilePageState extends State<ProfilePage>
       context.read<SavedListingsViewModel>().clear();
       context.read<MarketplaceViewModel>().clear();
       context.read<SearchViewModel>().clear();
+      context.read<CommunityViewModel>().clear();
     }
     await AuthService.instance.logout();
     if (mounted) {
@@ -612,7 +693,7 @@ class ProfilePageState extends State<ProfilePage>
     if (userProvider.profile == null && !userProvider.isLoading) {
       await userProvider.load();
     }
-    await _loadProducts();
+    await refresh();
   }
 
   Future<void> _loadProducts() async {
@@ -630,13 +711,25 @@ class ProfilePageState extends State<ProfilePage>
         limit: 50,
         offset: 0,
       );
+      final postsResponse = await _communityRepository.getPosts(
+        feed: 'community',
+        userId: userId,
+        limit: 50,
+        offset: 0,
+      );
 
       if (!productsResponse.isSuccess) {
         throw productsResponse.error!;
       }
+      if (!postsResponse.isSuccess) {
+        throw postsResponse.error!;
+      }
 
       setStateIfMounted(() {
         _products = (productsResponse.data ?? []).toModels();
+        _posts = (postsResponse.data ?? [])
+            .where((post) => post.orderedImages.isNotEmpty)
+            .toList();
         _isLoading = false;
       });
     } on ApiException catch (e) {
@@ -646,6 +739,7 @@ class ProfilePageState extends State<ProfilePage>
       });
     }
   }
+
 }
 
 // Delegate for sticky tab bar in NestedScrollView
@@ -653,10 +747,12 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
   const _StickyTabBarDelegate({
     required this.tabBar,
     required this.productCount,
+    required this.postCount,
   });
 
   final Widget tabBar;
   final int productCount;
+  final int postCount;
 
   @override
   double get minExtent => 48;
@@ -675,7 +771,8 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_StickyTabBarDelegate oldDelegate) {
-    return productCount != oldDelegate.productCount;
+    return productCount != oldDelegate.productCount ||
+        postCount != oldDelegate.postCount;
   }
 }
 

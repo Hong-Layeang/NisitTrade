@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/errors/app_error_messages.dart';
+
 /// Centralized app feedback helper for transient snack messages.
 class AppSnackBar {
   AppSnackBar._();
@@ -23,7 +25,7 @@ class AppSnackBar {
   }
 
   static void error(BuildContext context, String message) {
-    show(context, message);
+    show(context, AppErrorMessages.resolve(message));
   }
 
   static void success(BuildContext context, String message) {

@@ -6,6 +6,7 @@ import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/marketplace_view_model.dart';
 import '../../../logic/view_models/search_view_model.dart';
+import '../../../logic/view_models/community_view_model.dart';
 import '../../../core/auth/microsoft_auth_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
@@ -131,6 +132,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
         context.read<SavedListingsViewModel>().clear();
         context.read<MarketplaceViewModel>().clear();
         context.read<SearchViewModel>().clear();
+        context.read<CommunityViewModel>().clear();
         context.read<UserViewModel>().load();
       }
       Navigator.pushNamedAndRemoveUntil(

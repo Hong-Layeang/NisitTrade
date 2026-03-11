@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:timeago_flutter/timeago_flutter.dart';
+import 'dart:io';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/errors/app_error_messages.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/school_short_name.dart';
 import '../../../data/models/community_comment.dart';
@@ -10,6 +14,9 @@ import '../../../data/models/community_post.dart';
 import '../../../logic/view_models/community_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../profile/other_profile_page.dart';
+import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_action_sheet.dart';
+import '../../widgets/full_screen_image_viewer.dart';
 import 'widgets/community_post_card.dart';
 
 class CommunityDetailArgs {
@@ -41,7 +48,16 @@ class CommunityDetailPage extends StatefulWidget {
 }
 
 class _CommunityDetailPageState extends State<CommunityDetailPage> {
+  static const List<String> _reportReasonOptions = [
+    'Spam or scam',
+    'Harassment or hate speech',
+    'Inappropriate content',
+    'False information',
+    'Other',
+  ];
+
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _picker = ImagePicker();
   final TextEditingController _commentController = TextEditingController();
   final FocusNode _commentFocusNode = FocusNode();
   final GlobalKey _commentsKey = GlobalKey();
@@ -75,13 +91,17 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       });
     }
 
-    final post = await context.read<CommunityViewModel>().getPostDetail(widget.postId);
+    final post = await context.read<CommunityViewModel>().getPostDetail(
+      widget.postId,
+    );
 
     if (!mounted) return;
 
     setState(() {
       _post = post ?? _post;
-      _error = post == null ? context.read<CommunityViewModel>().error ?? 'Failed to load post.' : null;
+      _error = post == null
+          ? context.read<CommunityViewModel>().error ?? 'Failed to load post.'
+          : null;
       _isLoading = false;
     });
 
@@ -112,22 +132,39 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     final post = _post;
     if (post == null || _isTogglingLike) return;
 
-    setState(() => _isTogglingLike = true);
+    final wasLiked = post.isLikedByMe;
+    final optimisticPost = post.copyWith(
+      isLikedByMe: !wasLiked,
+      likesCount: wasLiked
+          ? (post.likesCount > 0 ? post.likesCount - 1 : 0)
+          : post.likesCount + 1,
+    );
+
+    setState(() {
+      _post = optimisticPost;
+      _isTogglingLike = true;
+    });
+
     final updated = await context.read<CommunityViewModel>().toggleLike(
       post.id,
-      shouldLike: !post.isLikedByMe,
+      shouldLike: !wasLiked,
     );
 
     if (!mounted) return;
 
     setState(() {
-      _post = updated ?? _post;
+      if (updated == null) {
+        _post = post;
+      } else {
+        _post = updated;
+      }
       _isTogglingLike = false;
     });
 
     if (updated == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.read<CommunityViewModel>().error ?? 'Failed to update like.')),
+      AppSnackBar.error(
+        context,
+        context.read<CommunityViewModel>().error ?? 'Failed to update like.',
       );
     }
   }
@@ -154,8 +191,9 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     });
 
     if (updated == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.read<CommunityViewModel>().error ?? 'Failed to add comment.')),
+      AppSnackBar.error(
+        context,
+        context.read<CommunityViewModel>().error ?? 'Failed to add comment.',
       );
       return;
     }
@@ -176,7 +214,9 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
             maxLength: 500,
             minLines: 2,
             maxLines: 5,
-            decoration: const InputDecoration(hintText: 'Write your comment...'),
+            decoration: const InputDecoration(
+              hintText: 'Write your comment...',
+            ),
           ),
           actions: [
             TextButton(
@@ -184,7 +224,8 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
               child: const Text('Save'),
             ),
           ],
@@ -192,7 +233,10 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       },
     );
 
-    if (!mounted || newContent == null || newContent.isEmpty || newContent == comment.content) {
+    if (!mounted ||
+        newContent == null ||
+        newContent.isEmpty ||
+        newContent == comment.content) {
       return;
     }
 
@@ -204,8 +248,9 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
 
     if (!mounted) return;
     if (updated == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.read<CommunityViewModel>().error ?? 'Failed to update comment.')),
+      AppSnackBar.error(
+        context,
+        context.read<CommunityViewModel>().error ?? 'Failed to update comment.',
       );
       return;
     }
@@ -246,9 +291,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
 
     if (!mounted) return;
     if (updated == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(vm.error ?? 'Failed to delete comment.')),
-      );
+      AppSnackBar.error(context, vm.error ?? 'Failed to delete comment.');
       return;
     }
 
@@ -278,38 +321,406 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     );
   }
 
+  bool _isOwner(CommunityPost post) {
+    final userId = context.read<UserViewModel>().userId;
+    return userId != null && userId == post.author.id;
+  }
+
+  Future<void> _editPost(CommunityPost post) async {
+    final retainedImageUrls = List<String>.from(post.orderedImages);
+    final newImagePaths = <String>[];
+    final controller = TextEditingController(text: post.content);
+    final newContent = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        Future<void> pickImage(StateSetter setDialogState) async {
+          final remaining = 8 - retainedImageUrls.length - newImagePaths.length;
+          if (remaining <= 0) return;
+          final picked = await _picker.pickMultiImage(
+            imageQuality: 85,
+            maxWidth: 1800,
+          );
+          if (picked.isEmpty) return;
+          setDialogState(() {
+            final incoming = picked.map((f) => f.path).toList();
+            newImagePaths.addAll(incoming.take(remaining));
+          });
+        }
+
+        return AlertDialog(
+          title: const Text('Edit post'),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              final totalImages = retainedImageUrls.length + newImagePaths.length;
+              final canAddImages = totalImages < 8;
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      maxLength: 1000,
+                      minLines: 3,
+                      maxLines: 8,
+                      decoration: const InputDecoration(
+                        hintText: 'What\'s on your mind?',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: canAddImages ? () => pickImage(setDialogState) : null,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.border),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.image_outlined, size: 16),
+                          label: const Text('Add image'),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            totalImages == 0
+                                ? 'No images selected'
+                                : '$totalImages/8 images attached',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: totalImages == 0
+                                  ? AppColors.textSecondary
+                                  : AppColors.primary,
+                              fontWeight: totalImages == 0
+                                  ? FontWeight.w500
+                                  : FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (totalImages > 0) const SizedBox(height: 8),
+                    if (totalImages > 0)
+                      SizedBox(
+                        height: 64,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: totalImages,
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final isExisting = index < retainedImageUrls.length;
+                            final image = isExisting
+                                ? retainedImageUrls[index]
+                                : newImagePaths[index - retainedImageUrls.length];
+
+                            final imageWidget = isExisting
+                                ? Image.network(
+                                    image,
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    File(image),
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                  );
+
+                            return Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: imageWidget,
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: InkWell(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        if (isExisting) {
+                                          retainedImageUrls.removeAt(index);
+                                        } else {
+                                          newImagePaths.removeAt(index - retainedImageUrls.length);
+                                        }
+                                      });
+                                    },
+                                    customBorder: const CircleBorder(),
+                                    child: Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: const Icon(Icons.close, size: 12, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+
+    final imagesChanged =
+        retainedImageUrls.length != post.orderedImages.length ||
+        !retainedImageUrls.asMap().entries.every(
+          (entry) => entry.value == post.orderedImages[entry.key],
+        ) ||
+        newImagePaths.isNotEmpty;
+
+    if (!mounted || newContent == null || (newContent == post.content && !imagesChanged)) {
+      return;
+    }
+
+    if (newContent.isEmpty && retainedImageUrls.isEmpty && newImagePaths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post content or image is required.')),
+      );
+      return;
+    }
+
+    final vm = context.read<CommunityViewModel>();
+    final updated = await vm.updatePost(
+      postId: post.id,
+      content: newContent,
+      imagePaths: newImagePaths,
+      retainedImageUrls: retainedImageUrls,
+    );
+    if (!mounted) return;
+
+    if (updated == null) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to update post.');
+      return;
+    }
+
+    setState(() => _post = updated);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Post updated.')));
+  }
+
+  Future<void> _deletePost(CommunityPost post) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete post'),
+        content: const Text('Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true || !mounted) return;
+
+    final vm = context.read<CommunityViewModel>();
+    final ok = await vm.deletePost(post.id);
+    if (!mounted) return;
+
+    if (!ok) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to delete post.');
+      return;
+    }
+
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _reportPost(CommunityPost post) async {
+    var selectedReason = _reportReasonOptions.first;
+    final detailsController = TextEditingController();
+
+    final shouldSubmit = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Report post'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReason,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Reason'),
+                    items: _reportReasonOptions
+                        .map(
+                          (reason) => DropdownMenuItem<String>(
+                            value: reason,
+                            child: Text(
+                              reason,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => selectedReason = value);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: detailsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Details (optional)',
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    final details = detailsController.text.trim();
+    detailsController.dispose();
+    if (shouldSubmit != true || !mounted) return;
+
+    final vm = context.read<CommunityViewModel>();
+    final ok = await vm.reportPost(
+      postId: post.id,
+      reason: selectedReason,
+      details: details.isEmpty ? null : details,
+    );
+
+    if (!mounted) return;
+    if (!ok) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to submit report.');
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Report submitted.')));
+  }
+
   Future<void> _showPostActions() async {
     final post = _post;
     if (!mounted || post == null) return;
+    final effectivePost = post;
+    final isOwner = _isOwner(effectivePost);
 
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: const Text('View profile'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openUserProfile(post.author.id);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.near_me_outlined),
-                title: const Text('Share post'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _sharePost();
-                },
-              ),
-            ],
+    await AppActionSheet.show(
+      context,
+      title: 'Post options',
+      items: [
+        if (isOwner)
+          AppActionSheetItem(
+            label: 'Edit post',
+            icon: Icons.edit_outlined,
+            onTap: () => _editPost(effectivePost),
           ),
-        );
-      },
+        if (isOwner)
+          AppActionSheetItem(
+            label: 'Delete post',
+            icon: Icons.delete_outline,
+            isDestructive: true,
+            onTap: () => _deletePost(effectivePost),
+          ),
+        AppActionSheetItem(
+          label: 'Copy link',
+          icon: Icons.link,
+          onTap: _sharePost,
+        ),
+        AppActionSheetItem(
+          label: effectivePost.isSavedByMe ? 'Unsave post' : 'Save post',
+          icon: effectivePost.isSavedByMe
+              ? Icons.bookmark_remove_outlined
+              : Icons.bookmark_add_outlined,
+          onTap: () => _toggleSavePost(effectivePost),
+        ),
+        if (!isOwner)
+          AppActionSheetItem(
+            label: 'Report post',
+            icon: Icons.flag_outlined,
+            isDestructive: true,
+            onTap: () => _reportPost(effectivePost),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _toggleSavePost(CommunityPost post) async {
+    final vm = context.read<CommunityViewModel>();
+    final updated = await vm.toggleSave(post.id, shouldSave: !post.isSavedByMe);
+    if (!mounted) return;
+
+    if (updated == null) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to update saved status.');
+      return;
+    }
+
+    setState(() => _post = updated);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.'),
+      ),
+    );
+  }
+
+  void _showImageViewer(List<String> images, int initialIndex) {
+    if (!mounted || images.isEmpty) return;
+    final safeIndex = initialIndex.clamp(0, images.length - 1);
+    FullScreenImageViewer.show(
+      context,
+      images[safeIndex],
+      allImages: images,
+      initialIndex: safeIndex,
     );
   }
 
@@ -318,79 +729,84 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     final post = _post;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Post Detail'),
-      ),
+      appBar: AppBar(title: const Text('Post Detail')),
       body: _isLoading && post == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : _error != null && post == null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
-                      const SizedBox(height: 12),
-                      FilledButton(
-                        onPressed: _loadPost,
-                        child: const Text('Retry'),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AppErrorMessages.resolve(_error),
+                    style: const TextStyle(color: AppColors.textSecondary),
                   ),
-                )
-              : Column(
-                  children: [
-                    Expanded(
-                      child: RefreshIndicator(
-                        color: AppColors.primary,
-                        onRefresh: () => _loadPost(silent: true),
-                        child: ListView(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.only(top: 12, bottom: 12),
-                          children: [
-                            if (post != null)
-                              CommunityPostCard(
-                                post: post,
-                                isLiked: post.isLikedByMe,
-                                onTap: () {},
-                                onUserTap: () => _openUserProfile(post.author.id),
-                                onLikeTap: _isTogglingLike ? null : _toggleLike,
-                                onCommentTap: _scrollToComments,
-                                onShareTap: _sharePost,
-                                onMoreTap: _showPostActions,
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: _loadPost,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                Expanded(
+                  child: RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () => _loadPost(silent: true),
+                    child: ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.only(top: 12, bottom: 12),
+                      children: [
+                        if (post != null)
+                          CommunityPostCard(
+                            post: post,
+                            isLiked: post.isLikedByMe,
+                            onTap: () {},
+                            onImageTap: (index) =>
+                                _showImageViewer(post.orderedImages, index),
+                            onUserTap: () => _openUserProfile(post.author.id),
+                            onLikeTap: _isTogglingLike ? null : _toggleLike,
+                            onCommentTap: _scrollToComments,
+                            onShareTap: _sharePost,
+                            onMoreTap: _showPostActions,
+                          ),
+                        Padding(
+                          key: _commentsKey,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              const Text(
+                                'Comments',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
-                            Padding(
-                              key: _commentsKey,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Row(
-                                children: [
-                                  const Text(
-                                    'Comments',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    (post?.commentsCount ?? 0).toString(),
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                              const SizedBox(width: 8),
+                              Text(
+                                (post?.commentsCount ?? 0).toString(),
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            _buildComments(),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        _buildComments(),
+                      ],
                     ),
-                    _buildCommentComposer(),
-                  ],
+                  ),
                 ),
+                _buildCommentComposer(),
+              ],
+            ),
     );
   }
 
@@ -408,20 +824,20 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       );
     }
 
-    return Column(
-      children: [
-        for (var i = 0; i < comments.length; i++) ...[
-          _buildCommentItem(
-            comment: comments[i],
-            canEdit: userId != null && userId == comments[i].userId,
-          ),
-          if (i != comments.length - 1)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Divider(height: 16, color: AppColors.border),
-            ),
-        ],
-      ],
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      itemCount: comments.length,
+      separatorBuilder: (_, _) =>
+          const Divider(height: 16, color: AppColors.border),
+      itemBuilder: (context, index) {
+        final comment = comments[index];
+        return _buildCommentItem(
+          comment: comment,
+          canEdit: userId != null && userId == comment.userId,
+        );
+      },
     );
   }
 
@@ -435,12 +851,12 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       fallback: '',
     );
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: GestureDetector(
             onTap: () => _openUserProfile(comment.userId),
             child: CircleAvatar(
               radius: 16,
@@ -457,43 +873,57 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
                     ),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _openUserProfile(comment.userId),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          children: [
-                            Text(
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _openUserProfile(comment.userId),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
                               comment.user?.fullName ?? 'User',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
                                 fontSize: 14,
                               ),
                             ),
-                            if (handle.isNotEmpty) ...[
-                              const SizedBox(width: 4),
-                              Text(
+                          ),
+                          if (handle.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
                                 '@$handle',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 11,
                                 ),
                               ),
-                            ],
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
-                    if (canEdit)
-                      PopupMenuButton<String>(
+                  ),
+                  if (canEdit)
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
                         icon: const Icon(
                           Icons.more_horiz,
                           size: 18,
@@ -508,33 +938,54 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
                           }
                         },
                         itemBuilder: (context) => const [
-                          PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(value: 'delete', child: Text('Delete')),
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit, size: 18),
+                                SizedBox(width: 8),
+                                Text('Edit'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, size: 18, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Delete', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                  ],
+                    ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                comment.content,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  height: 1.4,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  comment.content,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _timeAgo(comment.createdAt),
+              ),
+              const SizedBox(height: 4),
+              Timeago(
+                date: comment.createdAt,
+                builder: (context, value) => Text(
+                  value,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -577,7 +1028,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
                       width: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.send_rounded),
+                  : const Icon(Icons.send_rounded, color: AppColors.primary),
             ),
           ],
         ),
@@ -585,12 +1036,4 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     );
   }
 
-  String _timeAgo(DateTime time) {
-    final diff = DateTime.now().difference(time);
-    if (diff.inSeconds < 60) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${(diff.inDays / 7).floor()}w ago';
-  }
 }

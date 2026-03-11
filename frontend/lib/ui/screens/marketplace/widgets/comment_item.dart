@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:timeago_flutter/timeago_flutter.dart';
 
 import '../../../../core/constants/colors.dart';
 import '../../../../data/models/comment.dart';
@@ -23,23 +24,10 @@ class CommentItem extends StatelessWidget {
     this.onDelete,
   });
 
-  String _formatTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
-
-    if (diff.inSeconds < 60) {
-      return 'just now';
-    }
-    if (diff.inMinutes < 60) {
-      return '${diff.inMinutes}m ago';
-    }
-    if (diff.inHours < 24) {
-      return '${diff.inHours}h ago';
-    }
-    if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
-    }
-    return '${(diff.inDays / 7).floor()}w ago';
+  bool _isValidNetworkUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return false;
+    final uri = Uri.tryParse(url.trim());
+    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority;
   }
 
   @override
@@ -86,11 +74,11 @@ class CommentItem extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 16,
                     backgroundColor: AppColors.surface,
-                    backgroundImage: commentAvatarUrl != null
-                        ? CachedNetworkImageProvider(commentAvatarUrl)
+                    backgroundImage: _isValidNetworkUrl(commentAvatarUrl)
+                      ? CachedNetworkImageProvider(commentAvatarUrl!.trim())
                               as ImageProvider
                         : null,
-                    child: commentAvatarUrl == null
+                    child: !_isValidNetworkUrl(commentAvatarUrl)
                         ? const Icon(
                             Icons.person,
                             color: AppColors.textSecondary,
@@ -198,11 +186,14 @@ class CommentItem extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    _formatTimeAgo(comment.createdAt),
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
+                  Timeago(
+                    date: comment.createdAt,
+                    builder: (context, value) => Text(
+                      value,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],

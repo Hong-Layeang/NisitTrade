@@ -5,6 +5,7 @@ import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/marketplace_view_model.dart';
 import '../../../logic/view_models/search_view_model.dart';
+import '../../../logic/view_models/community_view_model.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
 import 'widgets/auth_back_link.dart';
@@ -216,6 +217,7 @@ class _SignupPageState extends State<SignupPage> {
                                   context.read<SavedListingsViewModel>().clear();
                                   context.read<MarketplaceViewModel>().clear();
                                   context.read<SearchViewModel>().clear();
+                                  context.read<CommunityViewModel>().clear();
                                   context.read<UserViewModel>().load();
                                 }
                                 Navigator.pushNamedAndRemoveUntil(

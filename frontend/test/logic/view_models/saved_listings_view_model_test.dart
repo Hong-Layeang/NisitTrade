@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/core/errors/api_exception.dart';
 import 'package:frontend/core/errors/api_response.dart';
+import 'package:frontend/data/models/community_post.dart';
+import 'package:frontend/data/repositories/community_repository_impl.dart';
 import 'package:frontend/domain/entities/product_entity.dart';
 import 'package:frontend/domain/entities/user_entity.dart';
 import 'package:frontend/domain/repository_interfaces/i_product_repository.dart';
@@ -17,10 +19,12 @@ void main() {
       );
       final productRepo = _FakeProductRepository();
       final saveRepo = _FakeProductSaveRepository();
+      final communityRepo = _FakeCommunityRepository();
       final vm = SavedListingsViewModel(
         userRepository: userRepo,
         productRepository: productRepo,
         productSaveRepository: saveRepo,
+        communityRepository: communityRepo,
       );
 
       await vm.loadSavedListings(userId: 99);
@@ -43,10 +47,12 @@ void main() {
       final saveRepo = _FakeProductSaveRepository(
         unsaveResponse: ApiResponse.success(null),
       );
+      final communityRepo = _FakeCommunityRepository();
       final vm = SavedListingsViewModel(
         userRepository: userRepo,
         productRepository: productRepo,
         productSaveRepository: saveRepo,
+        communityRepository: communityRepo,
       );
 
       await vm.loadSavedListings(userId: 99);
@@ -69,17 +75,19 @@ void main() {
         ),
       );
       final saveRepo = _FakeProductSaveRepository();
+      final communityRepo = _FakeCommunityRepository();
       final vm = SavedListingsViewModel(
         userRepository: userRepo,
         productRepository: productRepo,
         productSaveRepository: saveRepo,
+        communityRepository: communityRepo,
       );
 
       await vm.loadSavedListings(userId: 99);
       final ok = await vm.deleteListing(productId: 1);
 
       expect(ok, isFalse);
-      expect(vm.error, 'Delete failed on server');
+      expect(vm.actionError, 'Delete failed on server');
       expect(vm.savedProducts.length, 1);
       expect(productRepo.lastDeleteProductId, 1);
     });
@@ -105,7 +113,10 @@ ProductEntity _sampleProductEntity({required int id}) {
 class _FakeUserRepository implements IUserRepository {
   _FakeUserRepository({
     required this.savedListingsResponse,
-  });
+    ApiResponse<List<CommunityPost>>? savedPostsResponse,
+  }) : _savedPostsResponse = savedPostsResponse ?? ApiResponse.success(const []);
+
+  final ApiResponse<List<CommunityPost>> _savedPostsResponse;
 
   final ApiResponse<List<ProductEntity>> savedListingsResponse;
   int? lastSavedListingsUserId;
@@ -170,6 +181,25 @@ class _FakeUserRepository implements IUserRepository {
   Future<ApiResponse<String>> updateAvatarImage({
     required int userId,
     required String filePath,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
+    required int userId,
+    int? limit,
+    int? offset,
+  }) async {
+    return _savedPostsResponse;
+  }
+
+  @override
+  Future<ApiResponse<UserEntity>> updateProfile({
+    required int userId,
+    required String fullName,
+    String? bio,
+    String? major,
   }) {
     throw UnimplementedError();
   }
@@ -270,5 +300,81 @@ class _FakeProductSaveRepository implements IProductSaveRepository {
   Future<ApiResponse<void>> unsaveListing(int productId) async {
     lastUnsaveProductId = productId;
     return _unsaveResponse;
+  }
+}
+
+class _FakeCommunityRepository implements CommunityRepository {
+  _FakeCommunityRepository({
+    ApiResponse<void>? unsaveResponse,
+  }) : _unsaveResponse = unsaveResponse ?? ApiResponse.success(null);
+
+  final ApiResponse<void> _unsaveResponse;
+
+  @override
+  Future<ApiResponse<void>> unsavePost(int postId) async => _unsaveResponse;
+
+  @override
+  Future<ApiResponse<void>> addComment({required int postId, required String content}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<CommunityPost>> createPost({required String content, List<String> imagePaths = const []}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> deleteComment({required int postId, required int commentId}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> deletePost(int postId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<CommunityPost>> getPost(int postId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<List<CommunityPost>>> getPosts({
+    String feed = 'community',
+    int limit = 20,
+    int offset = 0,
+    int? userId,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> likePost(int postId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> reportPost({required int postId, required String reason, String? details}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> savePost(int postId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> unlikePost(int postId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> updateComment({required int postId, required int commentId, required String content}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> updatePost({required int postId, required String content, List<String> imagePaths = const [], List<String> retainedImageUrls = const []}) {
+    throw UnimplementedError();
   }
 }

@@ -33,10 +33,11 @@ class _SearchPageState extends State<SearchPage>
   final TextEditingController _searchController = TextEditingController();
   bool _isBootstrapping = true;
   late final FocusNode _searchFocusNode;
+  final Map<int, ValueNotifier<int>> _optimisticLikeNotifiers =
+      <int, ValueNotifier<int>>{};
 
   late final TabController _tabController;
   late final ScrollController _scrollController;
-  int _activeTabIndex = 0;
 
   // Optimistic like state for instant UI feedback
   final Set<int> _optimisticallyLikedIds = {};
@@ -58,18 +59,12 @@ class _SearchPageState extends State<SearchPage>
     _tabController.addListener(_onTabChanged);
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode = FocusNode();
-    _searchFocusNode.addListener(_onSearchFocusChanged);
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadInitialData();
     });
-  }
-
-  void _onSearchFocusChanged() {
-    if (!mounted) return;
-    setState(() {});
   }
 
   void _onScroll() {
@@ -88,24 +83,30 @@ class _SearchPageState extends State<SearchPage>
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _searchController.dispose();
-    _searchFocusNode.removeListener(_onSearchFocusChanged);
     _searchFocusNode.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    for (final notifier in _optimisticLikeNotifiers.values) {
+      notifier.dispose();
+    }
+    _optimisticLikeNotifiers.clear();
     super.dispose();
   }
 
   void _onTabChanged() {
     final nextIndex = _tabController.index;
-    if (nextIndex == _activeTabIndex) return;
-    _activeTabIndex = nextIndex;
+    context.read<SearchViewModel>().toggleUserSearch(nextIndex == 1);
+  }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final viewModel = context.read<SearchViewModel>();
-      viewModel.toggleUserSearch(nextIndex == 1);
-      setState(() {});
-    });
+  ValueNotifier<int> _likeNotifierFor(int productId) {
+    return _optimisticLikeNotifiers.putIfAbsent(
+      productId,
+      () => ValueNotifier<int>(0),
+    );
+  }
+
+  void _notifyOptimisticLikeChanged(int productId) {
+    _likeNotifierFor(productId).value++;
   }
 
   Future<void> _loadInitialData() async {
@@ -188,16 +189,15 @@ class _SearchPageState extends State<SearchPage>
 
     final isCurrentlyLiked = _isLiked(product);
 
-    setState(() {
-      _likingProductIds.add(product.id);
-      if (isCurrentlyLiked) {
-        _optimisticallyLikedIds.remove(product.id);
-        _optimisticallyUnlikedIds.add(product.id);
-      } else {
-        _optimisticallyUnlikedIds.remove(product.id);
-        _optimisticallyLikedIds.add(product.id);
-      }
-    });
+    _likingProductIds.add(product.id);
+    if (isCurrentlyLiked) {
+      _optimisticallyLikedIds.remove(product.id);
+      _optimisticallyUnlikedIds.add(product.id);
+    } else {
+      _optimisticallyUnlikedIds.remove(product.id);
+      _optimisticallyLikedIds.add(product.id);
+    }
+    _notifyOptimisticLikeChanged(product.id);
 
     HapticFeedback.lightImpact();
 
@@ -223,13 +223,12 @@ class _SearchPageState extends State<SearchPage>
       debugPrint('Like operation error: $e');
       // Revert optimistic update on error
       if (mounted) {
-        setState(() {
-          if (isCurrentlyLiked) {
-            _optimisticallyUnlikedIds.remove(product.id);
-          } else {
-            _optimisticallyLikedIds.remove(product.id);
-          }
-        });
+        if (isCurrentlyLiked) {
+          _optimisticallyUnlikedIds.remove(product.id);
+        } else {
+          _optimisticallyLikedIds.remove(product.id);
+        }
+        _notifyOptimisticLikeChanged(product.id);
         AppSnackBar.error(
           context,
           isCurrentlyLiked
@@ -239,11 +238,10 @@ class _SearchPageState extends State<SearchPage>
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _likingProductIds.remove(product.id);
-          _optimisticallyLikedIds.remove(product.id);
-          _optimisticallyUnlikedIds.remove(product.id);
-        });
+        _likingProductIds.remove(product.id);
+        _optimisticallyLikedIds.remove(product.id);
+        _optimisticallyUnlikedIds.remove(product.id);
+        _notifyOptimisticLikeChanged(product.id);
       }
     }
   }
@@ -257,65 +255,46 @@ class _SearchPageState extends State<SearchPage>
       SearchViewModel,
       ProductFeedViewModel,
       ({
-        List<CategoryEntity> categories,
         bool isLoading,
-        bool isLoadingUsers,
         String? error,
-        String searchQuery,
-        int? selectedCategoryIndex,
-        List<ProductEntity> products,
+        int categoriesCount,
+        int productsCount,
         bool productsLoading,
         String? productsError,
       })
     >(
       selector: (_, searchVm, productVm) => (
-        categories: searchVm.categories,
         isLoading: searchVm.isLoading,
-        isLoadingUsers: searchVm.isLoadingUsers,
         error: searchVm.error,
-        searchQuery: searchVm.searchQuery,
-        selectedCategoryIndex: searchVm.selectedCategoryIndex,
-        products: productVm.products,
+        categoriesCount: searchVm.categories.length,
+        productsCount: productVm.products.length,
         productsLoading: productVm.isLoading,
         productsError: productVm.error,
       ),
       builder: (context, data, _) {
-        final filteredProducts = _getFilteredProductsFromData(
-          data.products,
-          data.searchQuery,
-          data.selectedCategoryIndex,
-          data.categories,
-        );
-
-        final isInitialLoad = data.categories.isEmpty || data.products.isEmpty;
+        final isInitialLoad = data.categoriesCount == 0 || data.productsCount == 0;
         final isLoading = _isBootstrapping || data.isLoading || data.productsLoading;
         final error = data.error ?? data.productsError;
 
-        return _buildContent(
-          context,
-          filteredProducts,
-          isInitialLoad,
-          isLoading,
-          error,
-        );
+        return _buildContent(context, isInitialLoad, isLoading, error);
       },
     );
   }
 
   Widget _buildContent(
     BuildContext context,
-    List<ProductEntity> filteredProducts,
     bool isInitialLoad,
     bool isLoading,
     String? error,
   ) {
+    final productFeedViewModel = context.read<ProductFeedViewModel>();
     return LoadingErrorBuilder(
       isLoading: isLoading,
       isInitialLoad: isInitialLoad,
       error: error,
       onRetry: () async {
         await _loadInitialData();
-        await context.read<ProductFeedViewModel>().refresh();
+        await productFeedViewModel.refresh();
       },
       child: Column(
         children: [
@@ -324,7 +303,7 @@ class _SearchPageState extends State<SearchPage>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildProductsTab(filteredProducts),
+                _buildProductsTab(),
                 _buildStudentsTab(),
               ],
             ),
@@ -349,14 +328,15 @@ class _SearchPageState extends State<SearchPage>
         showCategoryFilter: vm.showCategoryFilter,
       ),
       builder: (context, data, _) {
-        final onProductsTab = _tabController.index == 0;
-
-        return _buildHeaderContent(
-          context,
-          data.categories,
-          data.selectedCategoryIndex,
-          data.showCategoryFilter,
-          onProductsTab,
+        return AnimatedBuilder(
+          animation: Listenable.merge([_tabController, _searchFocusNode]),
+          builder: (context, _) => _buildHeaderContent(
+            context,
+            data.categories,
+            data.selectedCategoryIndex,
+            data.showCategoryFilter,
+            _tabController.index == 0,
+          ),
         );
       },
     );
@@ -428,18 +408,49 @@ class _SearchPageState extends State<SearchPage>
   }
 
   // Products tab
-  Widget _buildProductsTab(List<ProductEntity> filteredProducts) {
+  Widget _buildProductsTab() {
+    final searchViewModel = context.read<SearchViewModel>();
+    final productFeedViewModel = context.read<ProductFeedViewModel>();
     return AppRefreshIndicator(
       onRefresh: () async {
-        await context.read<SearchViewModel>().refresh();
-        await context.read<ProductFeedViewModel>().refresh();
+        await searchViewModel.refresh();
+        await productFeedViewModel.refresh();
       },
-      child: _buildProductGrid(filteredProducts),
+      child: Selector2<
+        SearchViewModel,
+        ProductFeedViewModel,
+        ({
+          List<CategoryEntity> categories,
+          String searchQuery,
+          int? selectedCategoryIndex,
+          List<ProductEntity> products,
+        })
+      >(
+        selector: (_, searchVm, productVm) => (
+          categories: searchVm.categories,
+          searchQuery: searchVm.searchQuery,
+          selectedCategoryIndex: searchVm.selectedCategoryIndex,
+          products: productVm.products,
+        ),
+        builder: (context, data, _) {
+          final filteredProducts = _getFilteredProductsFromData(
+            data.products,
+            data.searchQuery,
+            data.selectedCategoryIndex,
+            data.categories,
+          );
+          final filteredProductIds = filteredProducts
+              .map((product) => product.id)
+              .toList(growable: false);
+
+          return _buildProductGrid(filteredProductIds);
+        },
+      ),
     );
   }
 
-  Widget _buildProductGrid(List<ProductEntity> filteredProducts) {
-    if (filteredProducts.isEmpty) {
+  Widget _buildProductGrid(List<int> filteredProductIds) {
+    if (filteredProductIds.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -486,26 +497,39 @@ class _SearchPageState extends State<SearchPage>
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: filteredProducts.length,
+      itemCount: filteredProductIds.length,
       itemBuilder: (context, index) {
-        final product = filteredProducts[index];
-        final isLiked = _isLiked(product);
+        final productId = filteredProductIds[index];
+        return Selector<ProductFeedViewModel, ProductEntity?>(
+          selector: (_, vm) => vm.getCachedProduct(productId),
+          builder: (context, product, _) {
+            if (product == null) {
+              return const SizedBox.shrink();
+            }
 
-        return ProductGridCard(
-          key: ValueKey(product.id),
-          product: product,
-          isLiked: isLiked,
-          onTap: () async {
-            await Navigator.pushNamed(
-              context,
-              AppRoutes.productDetail,
-              arguments: ProductDetailArgs(
-                productId: product.id,
-                initialProduct: product,
-              ),
+            return ValueListenableBuilder<int>(
+              valueListenable: _likeNotifierFor(product.id),
+              builder: (context, value, child) {
+                final isLiked = _isLiked(product);
+                return ProductGridCard(
+                  key: ValueKey(product.id),
+                  product: product,
+                  isLiked: isLiked,
+                  onTap: () async {
+                    await Navigator.pushNamed(
+                      context,
+                      AppRoutes.productDetail,
+                      arguments: ProductDetailArgs(
+                        productId: product.id,
+                        initialProduct: product,
+                      ),
+                    );
+                  },
+                  onLikeTap: () => _handleLikeTap(product),
+                );
+              },
             );
           },
-          onLikeTap: () => _handleLikeTap(product),
         );
       },
     );
@@ -515,12 +539,18 @@ class _SearchPageState extends State<SearchPage>
   Widget _buildStudentsTab() {
     return Selector<
       SearchViewModel,
-      ({bool isLoadingUsers, List<UserEntity> users, String searchQuery})
+      ({
+        bool isLoadingUsers,
+        List<UserEntity> users,
+        String searchQuery,
+        Set<int> updatingFollowUserIds,
+      })
     >(
       selector: (_, vm) => (
         isLoadingUsers: vm.isLoadingUsers,
         users: vm.users,
         searchQuery: vm.searchQuery,
+        updatingFollowUserIds: Set<int>.from(vm.updatingFollowUserIds),
       ),
       builder: (context, data, _) {
         if (data.isLoadingUsers) {
@@ -536,7 +566,11 @@ class _SearchPageState extends State<SearchPage>
           onRefresh: () async {
             await context.read<SearchViewModel>().loadUsers();
           },
-          child: _buildStudentsContent(context, filtered),
+          child: _buildStudentsContent(
+            context,
+            filtered,
+            data.updatingFollowUserIds,
+          ),
         );
       },
     );
@@ -558,6 +592,7 @@ class _SearchPageState extends State<SearchPage>
   Widget _buildStudentsContent(
     BuildContext context,
     List<UserEntity> filtered,
+    Set<int> updatingFollowUserIds,
   ) {
     if (filtered.isEmpty) {
       return ListView(
@@ -601,22 +636,47 @@ class _SearchPageState extends State<SearchPage>
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final user = filtered[index];
+        final currentUserId = context.read<UserViewModel>().userId;
+        final isCurrentUser = currentUserId == user.id;
         return UserProfileListTile(
           user: user,
-          onTap: () {
-            final currentUserId = context.read<UserViewModel>().userId;
+          isFollowing: user.isFollowing,
+          isFollowLoading: updatingFollowUserIds.contains(user.id),
+          showFollowButton: !isCurrentUser,
+          onTap: () async {
             if (currentUserId == user.id) {
               // Navigate to own profile tab
-              Navigator.pushNamed(context, AppRoutes.profile);
+              await Navigator.pushNamed(context, AppRoutes.profile);
             } else {
               // Navigate to other user's profile
-              Navigator.pushNamed(
+              await Navigator.pushNamed(
                 context,
                 AppRoutes.userProfile,
                 arguments: OtherProfileArgs(userId: user.id),
               );
             }
+
+            if (!context.mounted) return;
+            await context.read<SearchViewModel>().loadUsers();
           },
+          onFollowTap: isCurrentUser
+              ? null
+              : () async {
+                  final nextIsFollowing = !user.isFollowing;
+                  final ok = await context.read<SearchViewModel>().toggleFollow(user.id);
+                  if (ok && context.mounted) {
+                    context
+                        .read<UserViewModel>()
+                        .adjustFollowingCount(increment: nextIsFollowing);
+                  }
+                  if (!ok && context.mounted) {
+                    AppSnackBar.error(
+                      context,
+                      context.read<SearchViewModel>().actionError ??
+                          'Failed to update follow status',
+                    );
+                  }
+                },
         );
       },
     );

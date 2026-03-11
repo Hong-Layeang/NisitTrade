@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/errors/app_error_messages.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/school_short_name.dart';
 import '../../../logic/view_models/community_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../data/models/community_post.dart';
+import '../../widgets/app_action_sheet.dart';
+import '../../widgets/app_snack_bar.dart';
 import '../profile/other_profile_page.dart';
 import 'community_detail_page.dart';
 import 'widgets/community_post_card.dart';
@@ -23,6 +27,14 @@ class CommunityPage extends StatefulWidget {
 
 class _CommunityPageState extends State<CommunityPage>
     with SingleTickerProviderStateMixin {
+  static const List<String> _reportReasonOptions = [
+    'Spam or scam',
+    'Harassment or hate speech',
+    'Inappropriate content',
+    'False information',
+    'Other',
+  ];
+
   late final TabController _tabController;
   late final ScrollController _scrollController;
   final ImagePicker _picker = ImagePicker();
@@ -51,10 +63,6 @@ class _CommunityPageState extends State<CommunityPage>
   }
 
   void _onTabChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-
     if (!_tabController.indexIsChanging && mounted) {
       final feed = _tabController.index == 0 ? 'community' : 'following';
       context.read<CommunityViewModel>().load(feed: feed);
@@ -101,7 +109,8 @@ class _CommunityPageState extends State<CommunityPage>
     }
   }
 
-  Future<void> _submitPost(CommunityViewModel vm) async {
+  Future<void> _submitPost() async {
+    final vm = context.read<CommunityViewModel>();
     final content = _postController.text.trim();
     if (content.isEmpty && _selectedImagePaths.isEmpty) {
       return;
@@ -143,17 +152,13 @@ class _CommunityPageState extends State<CommunityPage>
         initialPost: post,
       ),
     );
-    if (!mounted) return;
-    await context.read<CommunityViewModel>().getPostDetail(post.id);
   }
 
   Future<void> _toggleLike(CommunityPost post) async {
     final vm = context.read<CommunityViewModel>();
     final updated = await vm.toggleLike(post.id, shouldLike: !post.isLikedByMe);
     if (!mounted || updated != null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(vm.error ?? 'Failed to update like.')),
-    );
+    AppSnackBar.error(context, vm.error ?? 'Failed to update like.');
   }
 
   void _openUserProfile(int userId) {
@@ -178,44 +183,389 @@ class _CommunityPageState extends State<CommunityPage>
     );
   }
 
-  Future<void> _showPostActions(CommunityPost post) async {
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
+  bool _isOwner(CommunityPost post) {
+    final userId = context.read<UserViewModel>().userId;
+    return userId != null && userId == post.author.id;
+  }
+
+  Future<void> _editPost(CommunityPost post) async {
+    final retainedImageUrls = List<String>.from(post.orderedImages);
+    final newImagePaths = <String>[];
+    final controller = TextEditingController(text: post.content);
+    final newContent = await showDialog<String>(
       context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.visibility_outlined),
-                title: const Text('View detail'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openPostDetail(post);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: const Text('View profile'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openUserProfile(post.author.id);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.near_me_outlined),
-                title: const Text('Share post'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _sharePost(post);
-                },
-              ),
-            ],
+      builder: (context) {
+        Future<void> pickImage(StateSetter setDialogState) async {
+          final remaining = 8 - retainedImageUrls.length - newImagePaths.length;
+          if (remaining <= 0) return;
+          final picked = await _picker.pickMultiImage(
+            imageQuality: 85,
+            maxWidth: 1800,
+          );
+          if (picked.isEmpty) return;
+          setDialogState(() {
+            final incoming = picked.map((f) => f.path).toList();
+            newImagePaths.addAll(incoming.take(remaining));
+          });
+        }
+
+        return AlertDialog(
+          title: const Text('Edit post'),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              final totalImages = retainedImageUrls.length + newImagePaths.length;
+              final canAddImages = totalImages < 8;
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      maxLength: 1000,
+                      minLines: 3,
+                      maxLines: 8,
+                      decoration: const InputDecoration(
+                        hintText: 'What\'s on your mind?',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: canAddImages ? () => pickImage(setDialogState) : null,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.border),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.image_outlined, size: 16),
+                          label: const Text('Add image'),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            totalImages == 0
+                                ? 'No images selected'
+                                : '$totalImages/8 images attached',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: totalImages == 0
+                                  ? AppColors.textSecondary
+                                  : AppColors.primary,
+                              fontWeight: totalImages == 0
+                                  ? FontWeight.w500
+                                  : FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (totalImages > 0) const SizedBox(height: 8),
+                    if (totalImages > 0)
+                      SizedBox(
+                        height: 64,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: totalImages,
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final isExisting = index < retainedImageUrls.length;
+                            final image = isExisting
+                                ? retainedImageUrls[index]
+                                : newImagePaths[index - retainedImageUrls.length];
+
+                            final imageWidget = isExisting
+                                ? Image.network(
+                                    image,
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    File(image),
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                  );
+
+                            return Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: imageWidget,
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: InkWell(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        if (isExisting) {
+                                          retainedImageUrls.removeAt(index);
+                                        } else {
+                                          newImagePaths.removeAt(index - retainedImageUrls.length);
+                                        }
+                                      });
+                                    },
+                                    customBorder: const CircleBorder(),
+                                    child: Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: const Icon(Icons.close, size: 12, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
         );
       },
+    );
+    controller.dispose();
+
+    final imagesChanged =
+        retainedImageUrls.length != post.orderedImages.length ||
+        !retainedImageUrls.asMap().entries.every(
+          (entry) => entry.value == post.orderedImages[entry.key],
+        ) ||
+        newImagePaths.isNotEmpty;
+
+    if (!mounted || newContent == null || (newContent == post.content && !imagesChanged)) {
+      return;
+    }
+
+    if (newContent.isEmpty && retainedImageUrls.isEmpty && newImagePaths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post content or image is required.')),
+      );
+      return;
+    }
+
+    final vm = context.read<CommunityViewModel>();
+    final updated = await vm.updatePost(
+      postId: post.id,
+      content: newContent,
+      imagePaths: newImagePaths,
+      retainedImageUrls: retainedImageUrls,
+    );
+    if (!mounted) return;
+
+    if (updated == null) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to update post.');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Post updated.')),
+    );
+  }
+
+  Future<void> _deletePost(CommunityPost post) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete post'),
+        content: const Text('Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true || !mounted) return;
+
+    final vm = context.read<CommunityViewModel>();
+    final ok = await vm.deletePost(post.id);
+    if (!mounted) return;
+
+    if (!ok) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to delete post.');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Post deleted.')),
+    );
+  }
+
+  Future<void> _reportPost(CommunityPost post) async {
+    var selectedReason = _reportReasonOptions.first;
+    final detailsController = TextEditingController();
+
+    final shouldSubmit = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Report post'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReason,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Reason'),
+                    items: _reportReasonOptions
+                        .map(
+                          (reason) => DropdownMenuItem<String>(
+                            value: reason,
+                            child: Text(reason, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => selectedReason = value);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: detailsController,
+                    decoration: const InputDecoration(labelText: 'Details (optional)'),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    final details = detailsController.text.trim();
+    detailsController.dispose();
+    if (shouldSubmit != true || !mounted) return;
+
+    final vm = context.read<CommunityViewModel>();
+    final ok = await vm.reportPost(
+      postId: post.id,
+      reason: selectedReason,
+      details: details.isEmpty ? null : details,
+    );
+
+    if (!mounted) return;
+    if (!ok) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to submit report.');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Report submitted.')),
+    );
+  }
+
+  Future<void> _toggleSavePost(CommunityPost post) async {
+    final vm = context.read<CommunityViewModel>();
+    final updated = await vm.toggleSave(post.id, shouldSave: !post.isSavedByMe);
+    if (!mounted) return;
+
+    if (updated == null) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to update saved status.');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.'),
+      ),
+    );
+  }
+
+  Future<void> _showPostActions(CommunityPost post) async {
+    if (!mounted) return;
+    final effectivePost = post;
+    final isOwner = _isOwner(effectivePost);
+
+    await AppActionSheet.show(
+      context,
+      title: 'Post options',
+      items: [
+        if (isOwner)
+          AppActionSheetItem(
+            label: 'Edit post',
+            icon: Icons.edit_outlined,
+            onTap: () => _editPost(effectivePost),
+          ),
+        if (isOwner)
+          AppActionSheetItem(
+            label: 'Delete post',
+            icon: Icons.delete_outline,
+            isDestructive: true,
+            onTap: () => _deletePost(effectivePost),
+          ),
+        AppActionSheetItem(
+          label: 'Copy link',
+          icon: Icons.link,
+          onTap: () => _sharePost(effectivePost),
+        ),
+        AppActionSheetItem(
+          label: effectivePost.isSavedByMe ? 'Unsave post' : 'Save post',
+          icon: effectivePost.isSavedByMe
+              ? Icons.bookmark_remove_outlined
+              : Icons.bookmark_add_outlined,
+          onTap: () => _toggleSavePost(effectivePost),
+        ),
+        if (!isOwner)
+          AppActionSheetItem(
+            label: 'Report post',
+            icon: Icons.flag_outlined,
+            isDestructive: true,
+            onTap: () => _reportPost(effectivePost),
+          ),
+      ],
     );
   }
 
@@ -227,21 +577,36 @@ class _CommunityPageState extends State<CommunityPage>
       universityDomain: currentUser?.university?.domain,
       fallback: 'campus',
     );
-    final isCommunitySelected = _tabController.index == 0;
-
     return Column(
       children: [
-        _buildTabBar(
-          context,
-          handle: handle,
-          isCommunitySelected: isCommunitySelected,
+        _buildTabBar(context, handle: handle),
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (_, _) {
+            if (_tabController.index != 0) return const SizedBox.shrink();
+            return Selector<CommunityViewModel, bool>(
+              selector: (_, vm) => vm.isPosting,
+              builder: (_, isPosting, _) => PostComposer(
+                isOpen: _isComposerOpen,
+                isPosting: isPosting,
+                controller: _postController,
+                selectedImagePaths: _selectedImagePaths,
+                onPickImage: _pickImage,
+                onRemoveImage: (index) =>
+                    setState(() => _selectedImagePaths.removeAt(index)),
+                onToggle: () =>
+                    setState(() => _isComposerOpen = !_isComposerOpen),
+                onSend: () => _submitPost(),
+              ),
+            );
+          },
         ),
         Expanded(
           child: TabBarView(
             controller: _tabController,
             children: [
               _buildCommunityTab(),
-              _buildFollowingTab(context),
+              _buildFollowingTab(handle),
             ],
           ),
         ),
@@ -252,12 +617,8 @@ class _CommunityPageState extends State<CommunityPage>
   Widget _buildTabBar(
     BuildContext context, {
     required String handle,
-    required bool isCommunitySelected,
   }) {
     final textTheme = Theme.of(context).textTheme;
-    final baseActiveColor = AppColors.primary;
-    final baseInactiveColor = AppColors.textSecondary;
-    final communityBaseColor = isCommunitySelected ? baseActiveColor : baseInactiveColor;
 
     return Container(
       color: AppColors.background,
@@ -277,20 +638,14 @@ class _CommunityPageState extends State<CommunityPage>
             child: Text.rich(
               TextSpan(
                 children: [
-                  TextSpan(
+                  const TextSpan(
                     text: 'Community',
-                    style: TextStyle(
-                      color: communityBaseColor,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   if (handle.isNotEmpty)
                     TextSpan(
                       text: ' @$handle',
-                      style: TextStyle(
-                        color: communityBaseColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                 ],
               ),
@@ -311,10 +666,12 @@ class _CommunityPageState extends State<CommunityPage>
     );
   }
 
-  Widget _buildFollowingTab(BuildContext context) {
+  Widget _buildFollowingTab(String handle) {
     return _buildFeedTab(
       feed: 'following',
-      emptyMessage: 'No posts from people you follow yet.',
+      emptyMessage: handle.isEmpty
+          ? 'No posts from people you follow in this community yet.'
+          : 'No posts from people you follow in @$handle yet.',
     );
   }
 
@@ -338,7 +695,7 @@ class _CommunityPageState extends State<CommunityPage>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  vm.error!,
+                  AppErrorMessages.resolve(vm.error),
                   style: const TextStyle(color: AppColors.textSecondary),
                   textAlign: TextAlign.center,
                 ),
@@ -352,31 +709,10 @@ class _CommunityPageState extends State<CommunityPage>
           );
         }
 
-        return Column(
-          children: [
-            PostComposer(
-              isOpen: _isComposerOpen,
-              isPosting: vm.isPosting,
-              controller: _postController,
-              selectedImagePaths: _selectedImagePaths,
-              onPickImage: _pickImage,
-              onRemoveImage: (index) {
-                setState(() {
-                  _selectedImagePaths.removeAt(index);
-                });
-              },
-              onToggle: () {
-                setState(() {
-                  _isComposerOpen = !_isComposerOpen;
-                });
-              },
-              onSend: () => _submitPost(vm),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () => vm.load(feed: feed),
-                child: !isCurrentFeed
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => vm.load(feed: feed),
+          child: !isCurrentFeed
                     ? const SizedBox.shrink()
                     : vm.posts.isEmpty
                     ? ListView(
@@ -412,9 +748,6 @@ class _CommunityPageState extends State<CommunityPage>
                           );
                         },
                       ),
-              ),
-            ),
-          ],
         );
       },
     );

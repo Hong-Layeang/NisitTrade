@@ -10,6 +10,8 @@ class ProductGridCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLikeTap;
   final VoidCallback? onLongPress;
+  final IconData? actionIcon;
+  final Color? actionIconColor;
 
   const ProductGridCard({
     super.key,
@@ -18,10 +20,16 @@ class ProductGridCard extends StatelessWidget {
     this.onTap,
     this.onLikeTap,
     this.onLongPress,
+    this.actionIcon,
+    this.actionIconColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final firstImageUrl = product.firstImageUrl;
+    final isNetworkImage = (firstImageUrl?.startsWith('http://') ?? false) ||
+        (firstImageUrl?.startsWith('https://') ?? false);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -49,10 +57,19 @@ class ProductGridCard extends StatelessWidget {
                         child: Container(
                           width: double.infinity,
                           color: AppColors.surface,
-                          child: product.firstImageUrl != null
-                              ? CachedNetworkImage(
-                                  key: ValueKey('grid_image_${product.id}_${product.firstImageUrl}'),
-                                  imageUrl: product.firstImageUrl!,
+                          child: firstImageUrl == null
+                              ? Container(
+                                  color: AppColors.surface,
+                                  child: const Icon(
+                                    Icons.image,
+                                    size: 40,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                )
+                              : isNetworkImage
+                                  ? CachedNetworkImage(
+                                  key: ValueKey('grid_image_${product.id}_$firstImageUrl'),
+                                  imageUrl: firstImageUrl,
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   height: double.infinity,
@@ -61,11 +78,10 @@ class ProductGridCard extends StatelessWidget {
                                   fadeOutDuration: Duration.zero,
                                   placeholder: (context, url) => Container(
                                     color: AppColors.surface,
-                                    child: const Center(
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.primary,
-                                      ),
+                                    child: const Icon(
+                                      Icons.image,
+                                      size: 40,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                   errorWidget: (context, url, error) => Container(
@@ -77,14 +93,20 @@ class ProductGridCard extends StatelessWidget {
                                     ),
                                   ),
                                 )
-                              : Container(
-                                  color: AppColors.surface,
-                                  child: const Icon(
-                                    Icons.image,
-                                    size: 40,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
+                                  : Image.asset(
+                                      firstImageUrl,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        color: AppColors.surface,
+                                        child: const Icon(
+                                          Icons.image,
+                                          size: 40,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
                         ),
                       ),
                     ),
@@ -121,7 +143,12 @@ class ProductGridCard extends StatelessWidget {
                 Positioned(
                   top: 8,
                   right: 8,
-                  child: LikeButton(isLiked: isLiked, onTap: onLikeTap),
+                  child: LikeButton(
+                    isLiked: isLiked,
+                    onTap: onLikeTap,
+                    iconOverride: actionIcon,
+                    iconOverrideColor: actionIconColor,
+                  ),
                 ),
               ],
             ),
@@ -137,12 +164,16 @@ class LikeButton extends StatelessWidget {
   final bool isLiked;
   final VoidCallback? onTap;
   final double size;
+  final IconData? iconOverride;
+  final Color? iconOverrideColor;
 
   const LikeButton({
     super.key,
     this.isLiked = false,
     this.onTap,
     this.size = 36,
+    this.iconOverride,
+    this.iconOverrideColor,
   });
 
   @override
@@ -160,8 +191,8 @@ class LikeButton extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: Icon(
-            isLiked ? Icons.favorite : Icons.favorite_border,
-            color: isLiked ? Colors.red : AppColors.textSecondary,
+            iconOverride ?? (isLiked ? Icons.favorite : Icons.favorite_border),
+            color: iconOverrideColor ?? (isLiked ? Colors.red : AppColors.textSecondary),
             size: size * 0.55,
           ),
         ),

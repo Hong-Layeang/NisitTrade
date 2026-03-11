@@ -140,18 +140,20 @@ class UserAvatar extends StatelessWidget {
 /// Reusable follow/add person button
 class FollowButton extends StatelessWidget {
   final bool isFollowing;
+  final bool isLoading;
   final VoidCallback? onTap;
 
   const FollowButton({
     super.key,
     this.isFollowing = false,
+    this.isLoading = false,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: isLoading ? null : onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -160,10 +162,19 @@ class FollowButton extends StatelessWidget {
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(
-          isFollowing ? Icons.person : Icons.person_add_outlined,
-          color: isFollowing ? AppColors.primary : AppColors.textSecondary,
-          size: 24,
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: isLoading
+              ? const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                )
+              : Icon(
+                  isFollowing ? Icons.person : Icons.person_add_outlined,
+                  color: isFollowing ? AppColors.primary : AppColors.textSecondary,
+                  size: 24,
+                ),
         ),
       ),
     );
@@ -172,12 +183,20 @@ class FollowButton extends StatelessWidget {
 
 class UserProfileListTile extends StatelessWidget {
   final UserEntity user;
+  final bool isFollowing;
+  final bool isFollowLoading;
+  final bool showFollowButton;
   final VoidCallback? onTap;
+  final VoidCallback? onFollowTap;
 
   const UserProfileListTile({
     super.key,
     required this.user,
+    this.isFollowing = false,
+    this.isFollowLoading = false,
+    this.showFollowButton = true,
     this.onTap,
+    this.onFollowTap,
   });
 
   @override
@@ -223,7 +242,12 @@ class UserProfileListTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            if (showFollowButton)
+              FollowButton(
+                isFollowing: isFollowing,
+                isLoading: isFollowLoading,
+                onTap: onFollowTap,
+              ),
           ],
         ),
       ),

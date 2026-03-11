@@ -79,13 +79,27 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   }
 
   Future<void> _navigateNext() async {
-    await Future.delayed(AppDurations.splashDelay);
+    final startTime = DateTime.now();
     final isAuthenticated = await AuthSession.instance.hasValidSession();
-    if (mounted) {
-      final nextRoute =
-          isAuthenticated ? AppRoutes.marketplace : AppRoutes.welcome;
-      Navigator.pushReplacementNamed(context, nextRoute);
+    if (!mounted) return;
+
+    if (isAuthenticated) {
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.marketplace,
+        arguments: const MarketplaceRouteArgs(skipAuthCheck: true),
+      );
+      return;
     }
+
+    final elapsed = DateTime.now().difference(startTime);
+    final remainingDelay = AppDurations.splashDelay - elapsed;
+    if (remainingDelay > Duration.zero) {
+      await Future.delayed(remainingDelay);
+    }
+
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, AppRoutes.welcome);
   }
 
   @override

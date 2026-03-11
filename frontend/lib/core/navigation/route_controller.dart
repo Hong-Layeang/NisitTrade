@@ -9,7 +9,7 @@ import '../../ui/screens/marketplace/product_detail_page.dart';
 import '../../ui/screens/community/community_detail_page.dart';
 import '../../ui/layouts/main_shell.dart';
 import '../../ui/screens/profile/other_profile_page.dart';
-import '../../ui/screens/saved/saved_listings_page.dart';
+import '../../ui/screens/saved/saved_page.dart';
 import 'app_routes.dart';
 import 'auth_gate.dart';
 
@@ -38,6 +38,16 @@ Route<dynamic> controlRoute(RouteSettings settings) {
       return MaterialPageRoute(builder: (_) => const LoginPage());
 
     case AppRoutes.marketplace:
+      final args = settings.arguments;
+      final skipAuthCheck =
+          args is MarketplaceRouteArgs && args.skipAuthCheck;
+
+      if (skipAuthCheck) {
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialIndex: 0),
+        );
+      }
+
       return MaterialPageRoute(
         builder: (_) => const AuthGate(
           child: MainShell(initialIndex: 0),

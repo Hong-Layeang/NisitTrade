@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../models/product.dart';
 import '../models/user_profile.dart';
+import '../models/community_post.dart';
 import 'api_client.dart';
 import '../../core/errors/api_exception.dart';
 import '../../core/errors/api_response.dart';
@@ -158,6 +159,34 @@ class UserApiService {
     } catch (e) {
       return ApiResponse.error(
         ApiException(message: 'Failed to unfollow user: $e'),
+      );
+    }
+  }
+
+  Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
+    required int userId,
+    int? limit,
+    int? offset,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (limit != null) queryParams['limit'] = limit;
+      if (offset != null) queryParams['offset'] = offset;
+
+      final response = await _dio.get(
+        '/users/$userId/saved/posts',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+      final data = response.data as Map<String, dynamic>;
+      final posts = (data['posts'] as List)
+          .map((json) => CommunityPost.fromJson(json as Map<String, dynamic>))
+          .toList();
+      return ApiResponse.success(posts);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(
+        ApiException(message: 'Failed to fetch saved posts: $e'),
       );
     }
   }

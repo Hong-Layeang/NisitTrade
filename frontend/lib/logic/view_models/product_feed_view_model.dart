@@ -262,17 +262,78 @@ class ProductFeedViewModel extends ChangeNotifier {
   }
 
   void _upsertProduct(ProductEntity product) {
+    final existing = _productCache[product.id];
+    final nextProduct = _withStableImageUrls(existing: existing, incoming: product);
+
     // Update cache
-    _productCache[product.id] = product;
+    _productCache[nextProduct.id] = nextProduct;
     
-    final index = _products.indexWhere((item) => item.id == product.id);
+    final index = _products.indexWhere((item) => item.id == nextProduct.id);
     if (index == -1) {
-      _products = [..._products, product];
+      _products = [..._products, nextProduct];
     } else {
       final updated = [..._products];
-      updated[index] = product;
+      updated[index] = nextProduct;
       _products = updated;
     }
     notifyListeners();
+  }
+
+  ProductEntity _withStableImageUrls({
+    required ProductEntity? existing,
+    required ProductEntity incoming,
+  }) {
+    if (existing == null) return incoming;
+    if (existing.imageUrls.isEmpty || incoming.imageUrls.isEmpty) return incoming;
+    if (existing.imageUrls.length != incoming.imageUrls.length) return incoming;
+
+    final sameUnderlyingImages = _hasSameUnderlyingImageSet(
+      existing.imageUrls,
+      incoming.imageUrls,
+    );
+    if (!sameUnderlyingImages) return incoming;
+
+    return ProductEntity(
+      id: incoming.id,
+      title: incoming.title,
+      description: incoming.description,
+      price: incoming.price,
+      status: incoming.status,
+      userId: incoming.userId,
+      categoryId: incoming.categoryId,
+      createdAt: incoming.createdAt,
+      updatedAt: incoming.updatedAt,
+      seller: incoming.seller,
+      category: incoming.category,
+      imageUrls: existing.imageUrls,
+      likes: incoming.likes,
+      comments: incoming.comments,
+      likeCount: incoming.likeCount,
+      commentCount: incoming.commentCount,
+      isLiked: incoming.isLiked,
+    );
+  }
+
+  bool _hasSameUnderlyingImageSet(
+    List<String> existingUrls,
+    List<String> incomingUrls,
+  ) {
+    for (var i = 0; i < existingUrls.length; i++) {
+      if (_normalizeImageUrl(existingUrls[i]) != _normalizeImageUrl(incomingUrls[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  String _normalizeImageUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+
+    if ((uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority) {
+      return uri.replace(query: '', fragment: '').toString();
+    }
+
+    return url;
   }
 }

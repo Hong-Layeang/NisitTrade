@@ -1,12 +1,19 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
+import 'package:timeago_flutter/timeago_flutter.dart';
 
 import '../../../data/models/comment.dart';
+import '../../../data/models/like.dart';
 import '../../../data/models/product.dart';
 import '../../../domain/entities/product_entity.dart';
+import '../../../domain/repository_interfaces/i_product_repository.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_durations.dart';
@@ -14,10 +21,14 @@ import '../../../core/navigation/app_routes.dart';
 import '../../widgets/app_action_chip.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/full_screen_image_viewer.dart';
+import '../edit/edit_product_page.dart';
 import 'widgets/product_card_image_carousel.dart';
 import 'widgets/comment_item.dart';
 import 'widgets/edit_comment_dialog.dart';
+import 'widgets/product_card_action_handler.dart';
 import '../profile/other_profile_page.dart';
+
+final getIt = GetIt.instance;
 
 class ProductDetailArgs {
   final int productId;
@@ -49,22 +60,40 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage>
     with TickerProviderStateMixin {
+  static const List<String> _reportReasonOptions = [
+    'Spam or scam',
+    'Prohibited or illegal item',
+    'Counterfeit item',
+    'Misleading description',
+    'Inappropriate content',
+    'Other',
+  ];
+
   final TextEditingController _commentController = TextEditingController();
   final PageController _pageController = PageController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _commentFocusNode = FocusNode();
   late AnimationController _likeAnimationController;
+  late IProductRepository _productRepository;
 
   Product? _product;
   String? _error;
   bool _isLoading = false;
   bool _isSubmittingComment = false;
+  bool _isActionLoading = false;
+
+  bool _isValidNetworkUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return false;
+    final uri = Uri.tryParse(url.trim());
+    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority;
+  }
   bool _isTogglingLike = false;
   int _currentImageIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _productRepository = getIt<IProductRepository>();
     _likeAnimationController = AnimationController(
       duration: AppDurations.slow,
       vsync: this,
@@ -172,9 +201,32 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         .map((like) => like.id)
         .cast<int?>()
         .firstWhere((id) => id != null, orElse: () => null);
+    final wasLiked = likeId != null;
+    final previousProduct = product;
+
+    final optimisticProduct = wasLiked
+        ? product.copyWith(
+            likes: [...product.likes]..removeWhere((like) => like.userId == userId),
+          )
+        : product.copyWith(
+            likes: [
+              ...product.likes,
+              Like(
+                id: -DateTime.now().microsecondsSinceEpoch,
+                userId: userId,
+                productId: product.id,
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              ),
+            ],
+          );
 
     _likeAnimationController.forward(from: 0.0);
-    setState(() => _isTogglingLike = true);
+    setState(() {
+      _product = optimisticProduct;
+      _isTogglingLike = true;
+    });
+
     try {
       final provider = context.read<ProductFeedViewModel>();
       final updatedProduct = likeId == null
@@ -188,6 +240,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       }
     } on ApiException catch (e) {
       if (mounted) {
+        setState(() => _product = previousProduct);
         AppSnackBar.error(context, e.message);
       }
     } finally {
@@ -291,6 +344,264 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
   }
 
+  bool _isOwner() {
+    final product = _product;
+    final userId = context.read<UserViewModel>().userId;
+    return product != null && userId != null && product.userId == userId;
+  }
+
+  bool _isSavedProduct() {
+    return context.read<SavedListingsViewModel>().hasSavedProduct(widget.productId);
+  }
+
+  Future<void> _ensureSavedProductsLoaded() async {
+    final userId = context.read<UserViewModel>().userId;
+    if (userId == null) return;
+
+    await context.read<SavedListingsViewModel>().ensureLoadedForUser(userId: userId);
+  }
+
+  Future<void> _handleToggleSaveProduct() async {
+    final product = _product;
+    if (product == null) return;
+
+    final savedListingsVm = context.read<SavedListingsViewModel>();
+    final isSaved = _isSavedProduct();
+
+    await executeAction(
+      () async {
+        if (isSaved) {
+          await context.read<ProductFeedViewModel>().unsaveListing(widget.productId);
+          savedListingsVm.removeSavedProductLocally(productId: widget.productId);
+        } else {
+          await context.read<ProductFeedViewModel>().saveListing(widget.productId);
+          savedListingsVm.addSavedProductLocally(product.toEntity());
+        }
+      },
+      onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
+      successMessage: isSaved ? 'Removed from saved.' : 'Saved to your list.',
+      errorMessage: isSaved ? 'Failed to unsave product.' : 'Failed to save product.',
+    );
+  }
+
+  Future<void> _handleEditProduct() async {
+    final product = _product;
+    if (product == null) return;
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProductPage(product: product),
+      ),
+    );
+
+    if (result == true && mounted) {
+      await _refreshProduct();
+    }
+  }
+
+  Future<void> _handleDeleteProduct() async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete product'),
+        content: const Text('Are you sure you want to delete this product?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true || _isActionLoading) return;
+
+    setState(() => _isActionLoading = true);
+
+    try {
+      final response = await _productRepository.deleteProduct(widget.productId);
+      if (!response.isSuccess) {
+        throw response.error!;
+      }
+
+      if (!mounted) return;
+      context.read<ProductFeedViewModel>().refresh();
+      AppSnackBar.success(context, 'Product deleted.');
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        AppSnackBar.error(context, 'Failed to delete product.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleHideToggle() async {
+    if (_isActionLoading) return;
+    setState(() => _isActionLoading = true);
+
+    try {
+      final product = _product;
+      if (product == null) return;
+
+      final provider = context.read<ProductFeedViewModel>();
+      final updated = product.isHidden
+          ? await provider.unhideProduct(widget.productId)
+          : await provider.hideProduct(widget.productId);
+
+      if (updated != null && mounted) {
+        setState(() => _product = Product.fromEntity(updated));
+        AppSnackBar.success(
+          context,
+          product.isHidden ? 'Product unhidden.' : 'Product hidden.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        AppSnackBar.error(context, 'Failed to update product visibility.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleShareProduct() async {
+    await executeAction(
+      () async {
+        final shareUrl = await context.read<ProductFeedViewModel>().shareProduct(widget.productId);
+        if (shareUrl == null || shareUrl.isEmpty) {
+          throw Exception('Failed to get share link');
+        }
+        await Clipboard.setData(ClipboardData(text: shareUrl));
+      },
+      onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
+      successMessage: 'Share link copied to clipboard.',
+      errorMessage: 'Failed to get share link.',
+    );
+  }
+
+  Future<void> _handleReportProduct() async {
+    String selectedReason = _reportReasonOptions.first;
+    final detailsController = TextEditingController();
+
+    final shouldSubmit = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Report product'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReason,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Reason'),
+                    items: _reportReasonOptions
+                        .map(
+                          (reason) => DropdownMenuItem<String>(
+                            value: reason,
+                            child: Text(reason, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => selectedReason = value);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: detailsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Details (optional)',
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Submit'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (shouldSubmit != true) {
+      detailsController.dispose();
+      return;
+    }
+
+    final reason = selectedReason.trim();
+    final details = detailsController.text.trim();
+    detailsController.dispose();
+
+    if (_isActionLoading) return;
+    setState(() => _isActionLoading = true);
+
+    try {
+      await context.read<ProductFeedViewModel>().reportProduct(
+            productId: widget.productId,
+            reason: reason,
+            details: details.isEmpty ? null : details,
+          );
+      if (mounted) {
+        AppSnackBar.success(context, 'Report submitted.');
+      }
+    } catch (_) {
+      if (mounted) {
+        AppSnackBar.error(context, 'Failed to submit report.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
+  }
+
+  Future<void> _showProductActions() async {
+    final product = _product;
+    if (product == null) return;
+
+    await _ensureSavedProductsLoaded();
+    FocusScope.of(context).unfocus();
+
+    final handler = ProductCardActionHandler(
+      context: context,
+      product: product.toEntity(),
+      isOwner: _isOwner(),
+      isSaved: _isSavedProduct(),
+      onEditProduct: _handleEditProduct,
+      onDeleteProduct: _handleDeleteProduct,
+      onToggleSaveProduct: _handleToggleSaveProduct,
+      onHideToggle: _handleHideToggle,
+      onShareProduct: _handleShareProduct,
+      onReportProduct: _handleReportProduct,
+    );
+    handler.showActionSheet();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -308,7 +619,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Error: $_error'),
+              Text(AppErrorMessages.resolve(_error)),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _loadData,
@@ -330,6 +641,12 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Product'),
+        actions: [
+          IconButton(
+            onPressed: _isActionLoading ? null : _showProductActions,
+            icon: const Icon(Icons.more_vert),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshProduct,
@@ -440,11 +757,14 @@ class _ProductDetailPageState extends State<ProductDetailPage>
             const SizedBox(width: 10),
             _buildStatusChip(product.statusLabel),
             const Spacer(),
-            Text(
-              product.timeAgo,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
+            Timeago(
+              date: product.createdAt,
+              builder: (context, value) => Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
             ),
           ],
@@ -531,10 +851,10 @@ class _ProductDetailPageState extends State<ProductDetailPage>
                 child: CircleAvatar(
                   radius: 18,
                   backgroundColor: AppColors.surface,
-                  backgroundImage: avatarUrl != null
-                      ? CachedNetworkImageProvider(avatarUrl) as ImageProvider
+                  backgroundImage: _isValidNetworkUrl(avatarUrl)
+                    ? CachedNetworkImageProvider(avatarUrl!.trim()) as ImageProvider
                       : null,
-                  child: avatarUrl == null
+                  child: !_isValidNetworkUrl(avatarUrl)
                       ? const Icon(Icons.person, color: AppColors.textSecondary)
                       : null,
                 ),

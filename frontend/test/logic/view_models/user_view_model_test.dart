@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/core/errors/api_exception.dart';
 import 'package:frontend/core/errors/api_response.dart';
+import 'package:frontend/data/models/community_post.dart';
 import 'package:frontend/domain/entities/product_entity.dart';
 import 'package:frontend/domain/entities/user_entity.dart';
 import 'package:frontend/domain/repository_interfaces/i_user_repository.dart';
@@ -137,6 +138,25 @@ class _FakeUserRepository implements IUserRepository {
 
   @override
   Future<ApiResponse<bool>> unfollowUser(int userId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
+    required int userId,
+    int? limit,
+    int? offset,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<UserEntity>> updateProfile({
+    required int userId,
+    required String fullName,
+    String? bio,
+    String? major,
+  }) {
     throw UnimplementedError();
   }
 }

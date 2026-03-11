@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/errors/api_exception.dart';
@@ -144,10 +146,54 @@ class CommunityViewModel extends ChangeNotifier {
   }
 
   Future<CommunityPost?> toggleLike(int postId, {required bool shouldLike}) async {
+    final index = _posts.indexWhere((post) => post.id == postId);
+    CommunityPost? previousPost;
+
+    if (index >= 0) {
+      previousPost = _posts[index];
+      final current = _posts[index];
+      final nextLikeCount = shouldLike
+          ? current.likesCount + 1
+          : (current.likesCount > 0 ? current.likesCount - 1 : 0);
+      final optimistic = current.copyWith(
+        isLikedByMe: shouldLike,
+        likesCount: nextLikeCount,
+      );
+      _posts = [..._posts]..[index] = optimistic;
+      notifyListeners();
+    }
+
     try {
       final response = shouldLike
           ? await _repository.likePost(postId)
           : await _repository.unlikePost(postId);
+      if (!response.isSuccess) throw response.error!;
+
+      unawaited(getPostDetail(postId));
+      final refreshedIndex = _posts.indexWhere((post) => post.id == postId);
+      return refreshedIndex >= 0 ? _posts[refreshedIndex] : previousPost;
+    } on ApiException catch (e) {
+      if (index >= 0 && previousPost != null) {
+        _posts = [..._posts]..[index] = previousPost;
+      }
+      _error = e.message;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      if (index >= 0 && previousPost != null) {
+        _posts = [..._posts]..[index] = previousPost;
+      }
+      _error = shouldLike ? 'Failed to like post.' : 'Failed to unlike post.';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<CommunityPost?> toggleSave(int postId, {required bool shouldSave}) async {
+    try {
+      final response = shouldSave
+          ? await _repository.savePost(postId)
+          : await _repository.unsavePost(postId);
       if (!response.isSuccess) throw response.error!;
       return getPostDetail(postId);
     } on ApiException catch (e) {
@@ -155,9 +201,77 @@ class CommunityViewModel extends ChangeNotifier {
       notifyListeners();
       return null;
     } catch (e) {
-      _error = shouldLike ? 'Failed to like post.' : 'Failed to unlike post.';
+      _error = shouldSave ? 'Failed to save post.' : 'Failed to unsave post.';
       notifyListeners();
       return null;
+    }
+  }
+
+  Future<CommunityPost?> updatePost({
+    required int postId,
+    required String content,
+    List<String> imagePaths = const [],
+    List<String> retainedImageUrls = const [],
+  }) async {
+    try {
+      final response = await _repository.updatePost(
+        postId: postId,
+        content: content,
+        imagePaths: imagePaths,
+        retainedImageUrls: retainedImageUrls,
+      );
+      if (!response.isSuccess) throw response.error!;
+      return getPostDetail(postId);
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _error = 'Failed to update post.';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> deletePost(int postId) async {
+    try {
+      final response = await _repository.deletePost(postId);
+      if (!response.isSuccess) throw response.error!;
+      _posts = _posts.where((post) => post.id != postId).toList();
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Failed to delete post.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> reportPost({
+    required int postId,
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      final response = await _repository.reportPost(
+        postId: postId,
+        reason: reason,
+        details: details,
+      );
+      if (!response.isSuccess) throw response.error!;
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Failed to submit report.';
+      notifyListeners();
+      return false;
     }
   }
 
@@ -226,12 +340,64 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
+  void clear() {
+    _posts = [];
+    _isLoading = false;
+    _isLoadingMore = false;
+    _isPosting = false;
+    _error = null;
+    _offset = 0;
+    _hasMore = true;
+    _activeFeed = 'community';
+    notifyListeners();
+  }
+
   void _replacePost(CommunityPost updatedPost) {
     final index = _posts.indexWhere((post) => post.id == updatedPost.id);
     if (index < 0) {
       return;
     }
-    _posts = [..._posts]..[index] = updatedPost;
+    final existing = _posts[index];
+    final merged = _withStableImageUrls(existing: existing, incoming: updatedPost);
+    _posts = [..._posts]..[index] = merged;
     notifyListeners();
+  }
+
+  CommunityPost _withStableImageUrls({
+    required CommunityPost existing,
+    required CommunityPost incoming,
+  }) {
+    final existingImages = existing.orderedImages;
+    final incomingImages = incoming.orderedImages;
+
+    if (existingImages.isEmpty || incomingImages.isEmpty) {
+      return incoming;
+    }
+
+    if (existingImages.length != incomingImages.length) {
+      return incoming;
+    }
+
+    for (var i = 0; i < existingImages.length; i++) {
+      if (_normalizeImageUrl(existingImages[i]) != _normalizeImageUrl(incomingImages[i])) {
+        return incoming;
+      }
+    }
+
+    return incoming.copyWith(
+      imageUrls: existing.imageUrls,
+      imageUrl: existing.imageUrl,
+    );
+  }
+
+  String _normalizeImageUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+
+    if ((uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority) {
+      return uri.replace(query: '', fragment: '').toString();
+    }
+
+    return url;
   }
 }

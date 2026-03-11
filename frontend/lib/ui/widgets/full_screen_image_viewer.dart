@@ -65,19 +65,15 @@ class _FullScreenImagePage extends StatefulWidget {
 class _FullScreenImagePageState extends State<_FullScreenImagePage>
     with TickerProviderStateMixin {
   // page controller (multi-image mode)
-  late final PageController _pageCtrl =
-      PageController(initialPage: widget.initialIndex);
-  late int _pageIndex = widget.initialIndex;
+  late final PageController _pageCtrl;
+  late int _pageIndex;
 
   // drag state
   Offset _drag = Offset.zero;
   bool _isDragging = false;
 
   // spring snap-back controller
-  late final AnimationController _snapCtrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  );
+  late final AnimationController _snapCtrl;
   late Animation<Offset> _snapAnim;
 
   //derived values
@@ -85,8 +81,26 @@ class _FullScreenImagePageState extends State<_FullScreenImagePage>
   double get _bgOpacity => 1.0 - _progress * 0.95;
   double get _blurSigma => 18.0 * (1.0 - _progress);
 
+  void _handleSnapTick() {
+    if (!mounted) return;
+    setState(() => _drag = _snapAnim.value);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController(initialPage: widget.initialIndex);
+    _pageIndex = widget.initialIndex;
+    _snapCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _snapCtrl.addListener(_handleSnapTick);
+  }
+
   @override
   void dispose() {
+    _snapCtrl.removeListener(_handleSnapTick);
     _snapCtrl.dispose();
     _pageCtrl.dispose();
     super.dispose();
@@ -116,9 +130,6 @@ class _FullScreenImagePageState extends State<_FullScreenImagePage>
     _snapCtrl
       ..reset()
       ..forward();
-    _snapCtrl.addListener(() {
-      if (mounted) setState(() => _drag = _snapAnim.value);
-    });
     setState(() => _isDragging = false);
   }
 

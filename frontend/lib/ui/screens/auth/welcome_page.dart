@@ -8,6 +8,7 @@ import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/marketplace_view_model.dart';
 import '../../../logic/view_models/search_view_model.dart';
+import '../../../logic/view_models/community_view_model.dart';
 import 'widgets/auth_footer_links.dart';
 import 'widgets/join_waitlist_dialog.dart';
 import 'widgets/white_blur_gradient.dart';
@@ -33,6 +34,7 @@ class _WelcomePageState extends State<WelcomePage> {
         context.read<SavedListingsViewModel>().clear();
         context.read<MarketplaceViewModel>().clear();
         context.read<SearchViewModel>().clear();
+        context.read<CommunityViewModel>().clear();
       }
     });
   }

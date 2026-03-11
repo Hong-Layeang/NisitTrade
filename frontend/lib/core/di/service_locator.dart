@@ -148,6 +148,7 @@ Future<void> setupServiceLocator() async {
       userRepository: getIt<IUserRepository>(),
       productRepository: getIt<IProductRepository>(),
       productSaveRepository: getIt<IProductSaveRepository>(),
+      communityRepository: getIt<CommunityRepository>(),
     ),
   );
 

@@ -56,7 +56,7 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
           IconButton(
             onPressed: onFavoriteTap,
             icon: Icon(
-              Icons.favorite_border,
+              Icons.bookmark_border,
               color: onPrimary,
               size: 26,
             ),

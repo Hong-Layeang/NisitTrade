@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_limits.dart';
+import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../data/models/category.dart';
 import '../../../domain/repository_interfaces/i_category_repository.dart';
@@ -187,7 +188,7 @@ class _SellPageState extends State<SellPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Error: $_error'),
+            Text(AppErrorMessages.resolve(_error)),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadCategories,

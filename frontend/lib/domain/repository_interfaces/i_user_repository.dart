@@ -1,6 +1,7 @@
 import '../entities/user_entity.dart';
 import '../entities/product_entity.dart';
 import '../../core/errors/api_response.dart';
+import '../../data/models/community_post.dart';
 
 /// Repository interface for managing user data
 /// This belongs in the domain layer and defines the contract
@@ -23,6 +24,12 @@ abstract class IUserRepository {
 
   Future<ApiResponse<List<UserEntity>>> getAllUsers({
     String? search,
+    int? limit,
+    int? offset,
+  });
+
+  Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
+    required int userId,
     int? limit,
     int? offset,
   });
