@@ -6,6 +6,7 @@ import '../../data/providers/community_api_service.dart';
 import '../../data/providers/product_api_service.dart';
 import '../../data/providers/user_api_service.dart';
 import '../../data/repositories/category_repository_impl.dart';
+import '../../data/repositories/chat_repository.dart';
 import '../../data/repositories/community_repository_impl.dart';
 import '../../data/repositories/product_repository_impl.dart';
 import '../../data/repositories/product_image_repository_impl.dart';
@@ -26,6 +27,7 @@ import '../../domain/repository_interfaces/i_product_comment_repository.dart';
 import '../../domain/repository_interfaces/i_user_repository.dart';
 
 // Logic layer (ViewModels)
+import '../../logic/view_models/chat_view_model.dart';
 import '../../logic/view_models/community_view_model.dart';
 import '../../logic/view_models/product_feed_view_model.dart';
 import '../../logic/view_models/saved_listings_view_model.dart';
@@ -33,15 +35,10 @@ import '../../logic/view_models/search_view_model.dart';
 import '../../logic/view_models/marketplace_view_model.dart';
 import '../../logic/view_models/user_view_model.dart';
 
-/// Global service locator instance
 final getIt = GetIt.instance;
 
 /// Setup all dependency injection bindings
-/// This should be called in main() before runApp()
 Future<void> setupServiceLocator() async {
-  // ============================================================================
-  // API SERVICES (Singletons)
-  // ============================================================================
   
   // API services are already singletons, just register them
   getIt.registerLazySingleton<CategoryApiService>(
@@ -59,11 +56,8 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<UserApiService>(
     () => UserApiService.instance,
   );
-
-  // ============================================================================
-  // REPOSITORIES (Singletons)
-  // ============================================================================
   
+
   // Category Repository
   getIt.registerLazySingleton<ICategoryRepository>(
     () => CategoryRepositoryImpl(
@@ -78,14 +72,14 @@ Future<void> setupServiceLocator() async {
     ),
   );
   
-  // Product Repository (core CRUD only)
+  // Product Repository
   getIt.registerLazySingleton<IProductRepository>(
     () => ProductRepositoryImpl(
       apiService: getIt<ProductApiService>(),
     ),
   );
   
-  // Product-related repositories (separated concerns)
+  // Product-related repositories 
   getIt.registerLazySingleton<IProductImageRepository>(
     () => ProductImageRepositoryImpl(
       apiService: getIt<ProductApiService>(),
@@ -116,17 +110,17 @@ Future<void> setupServiceLocator() async {
     ),
   );
   
-  // User Repository
   getIt.registerLazySingleton<IUserRepository>(
     () => UserRepositoryImpl(
       apiService: getIt<UserApiService>(),
     ),
   );
 
-  // ============================================================================
-  // VIEW MODELS (Factories)
-  // ============================================================================
-  
+  getIt.registerLazySingleton<ChatRepository>(
+    () => ChatRepository.instance,
+  );
+
+
   getIt.registerFactory<ProductFeedViewModel>(
     () => ProductFeedViewModel(
       productRepository: getIt<IProductRepository>(),
@@ -170,9 +164,15 @@ Future<void> setupServiceLocator() async {
       categoryRepository: getIt<ICategoryRepository>(),
     ),
   );
+
+  getIt.registerFactory<ChatRoomViewModel>(
+    () => ChatRoomViewModel(
+      chatRepository: getIt<ChatRepository>(),
+    ),
+  );
 }
 
-/// Reset the service locator (useful for testing)
+/// Reset the service locator
 Future<void> resetServiceLocator() async {
   await getIt.reset();
 }

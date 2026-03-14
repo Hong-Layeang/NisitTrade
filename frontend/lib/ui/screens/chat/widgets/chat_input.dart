@@ -1,95 +1,119 @@
 import 'package:flutter/material.dart';
 
-class ChatInputArea extends StatelessWidget {
-  const ChatInputArea({Key? key}) : super(key: key);
+class ChatInput extends StatefulWidget {
+  final Function(String) onSendMessage;
+  final bool isLoading;
+  final bool isSendingMessage;
+
+  const ChatInput({
+    Key? key,
+    required this.onSendMessage,
+    this.isLoading = false,
+    this.isSendingMessage = false,
+  }) : super(key: key);
+
+  @override
+  State<ChatInput> createState() => _ChatInputState();
+}
+
+class _ChatInputState extends State<ChatInput> {
+  late TextEditingController _controller;
+  bool _isEmpty = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _controller.addListener(_handleTextChange);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTextChange() {
+    setState(() {
+      _isEmpty = _controller.text.trim().isEmpty;
+    });
+  }
+
+  void _handleSend() {
+    final message = _controller.text.trim();
+    if (message.isNotEmpty && !widget.isSendingMessage) {
+      widget.onSendMessage(message);
+      _controller.clear();
+      setState(() {
+        _isEmpty = true;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 20),
-      color: Colors.white,
-      child: Column(
-        mainAxisSize: MainAxisSize.min, // Keep column as tight as possible
-        children: [
-          Row(
-            children: [
-              // Message Text Field
-              Expanded(
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F0F0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Colors.grey[300]!, width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                enabled: !widget.isLoading && !widget.isSendingMessage,
+                maxLines: null,
+                decoration: InputDecoration(
+                  hintText: 'Type a message...',
+                  border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
                   ),
-                  child: Row(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                        child:
-                            Icon(Icons.image_outlined, color: Colors.blue[400]),
-                      ),
-                      const Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: "Type here ...",
-                            hintStyle: TextStyle(color: Colors.grey),
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-                    ],
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
                   ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 ),
               ),
-              const SizedBox(width: 12),
-              // Send Button
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: const Color(0xFFF1F0F0),
-                child: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.grey),
-                  onPressed: () {
-                    // Send message logical action
-                  },
-                ),
-              )
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Horizontal scrolling Chips for quick replies
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildQuickReplyChip("Is this available?"),
-                const SizedBox(width: 10),
-                _buildQuickReplyChip("What's the price?"),
-                const SizedBox(width: 10),
-                _buildQuickReplyChip("Hi, there"),
-              ],
             ),
-          )
-        ],
-      ),
-    );
-  }
-
-  // Quick Reply Button Chip
-  Widget _buildQuickReplyChip(String label) {
-    return InkWell(
-      onTap: () {
-        // Chip action
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF00A2E8),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _isEmpty || widget.isSendingMessage ? null : _handleSend,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isEmpty || widget.isSendingMessage
+                      ? Colors.grey[300]
+                      : Theme.of(context).primaryColor,
+                ),
+                padding: const EdgeInsets.all(12),
+                child: widget.isSendingMessage
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.send,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+              ),
+            ),
+          ],
         ),
       ),
     );

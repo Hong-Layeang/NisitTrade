@@ -12,4 +12,8 @@ class Student {
     required this.avatarUrl,
     this.isFollowing = false,
   });
+
+  get profileImage => null;
+
+  static fromJson(Map<String, dynamic> userJson) {}
 }

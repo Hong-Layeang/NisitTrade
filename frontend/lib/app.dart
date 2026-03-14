@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/di/service_locator.dart';
+import 'logic/view_models/chat_view_model.dart';
 import 'logic/view_models/community_view_model.dart';
 import 'logic/view_models/marketplace_view_model.dart';
 import 'logic/view_models/product_feed_view_model.dart';
@@ -38,6 +39,9 @@ class NisitTradeApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<CommunityViewModel>(
           create: (_) => getIt<CommunityViewModel>(),
+        ),
+        ChangeNotifierProvider<ChatRoomViewModel>(
+          create: (_) => getIt<ChatRoomViewModel>(),
         ),
       ],
       child: MaterialApp(

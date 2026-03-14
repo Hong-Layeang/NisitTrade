@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
-import '../screens/chat/chat_screen.dart';
+import '../../core/navigation/app_routes.dart';
 
 class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int chatBadgeCount;
@@ -67,12 +67,7 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
             children: [
               IconButton(
                 onPressed: onChatTap ?? () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ChatScreen(),
-                    ),
-                  );
+                  Navigator.of(context).pushNamed(AppRoutes.chat);
                 },
                 icon: Icon(
                   Icons.chat_bubble_outline,

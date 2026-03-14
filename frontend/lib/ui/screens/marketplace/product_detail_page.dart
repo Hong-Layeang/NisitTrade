@@ -26,7 +26,6 @@ import 'widgets/comment_item.dart';
 import 'widgets/edit_comment_dialog.dart';
 import 'widgets/product_card_action_handler.dart';
 import '../profile/other_profile_page.dart' hide getIt;
-import '../chat/chat_screen.dart';
 
 class ProductDetailArgs {
   final int productId;
@@ -881,19 +880,6 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           ),
         ),
         const Spacer(),
-        OutlinedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(
-                  initialProduct: product,
-                ),
-              ),
-            );
-          },
-          child: const Text('Chat'),
-        ),
       ],
     );
   }

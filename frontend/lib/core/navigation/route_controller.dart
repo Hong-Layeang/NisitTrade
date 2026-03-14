@@ -10,6 +10,8 @@ import '../../ui/screens/community/community_detail_page.dart';
 import '../../ui/layouts/main_shell.dart';
 import '../../ui/screens/profile/other_profile_page.dart';
 import '../../ui/screens/saved/saved_page.dart';
+import '../../ui/screens/chat/chat_room_screen.dart';
+import '../../ui/screens/chat/conversations_list_screen.dart';
 import 'app_routes.dart';
 import 'auth_gate.dart';
 
@@ -121,6 +123,24 @@ Route<dynamic> controlRoute(RouteSettings settings) {
         return MaterialPageRoute(
           builder: (_) => AuthGate(
             child: OtherProfilePage(userId: args.userId),
+          ),
+        );
+      }
+      return MaterialPageRoute(builder: (_) => const LoginPage());
+
+    case AppRoutes.chat:
+      return MaterialPageRoute(
+        builder: (_) => const AuthGate(
+          child: ConversationsListScreen(),
+        ),
+      );
+
+    case AppRoutes.chatRoom:
+      final args = settings.arguments;
+      if (args is int) {
+        return MaterialPageRoute(
+          builder: (_) => AuthGate(
+            child: ChatRoomScreen(conversationId: args),
           ),
         );
       }
