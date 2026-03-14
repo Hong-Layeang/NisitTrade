@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 
@@ -26,9 +25,8 @@ import 'widgets/product_card_image_carousel.dart';
 import 'widgets/comment_item.dart';
 import 'widgets/edit_comment_dialog.dart';
 import 'widgets/product_card_action_handler.dart';
-import '../profile/other_profile_page.dart';
-
-final getIt = GetIt.instance;
+import '../profile/other_profile_page.dart' hide getIt;
+import '../chat/chat_screen.dart';
 
 class ProductDetailArgs {
   final int productId;
@@ -885,7 +883,14 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         const Spacer(),
         OutlinedButton(
           onPressed: () {
-            AppSnackBar.show(context, 'Chat is not implemented yet.');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(
+                  initialProduct: product,
+                ),
+              ),
+            );
           },
           child: const Text('Chat'),
         ),
