@@ -20,7 +20,12 @@ import 'widgets/sell_form_widgets.dart';
 final getIt = GetIt.instance;
 
 class SellPage extends StatefulWidget {
-  const SellPage({super.key});
+  final VoidCallback? onProductUploaded;
+
+  const SellPage({
+    super.key,
+    this.onProductUploaded,
+  });
 
   @override
   State<SellPage> createState() => _SellPageState();
@@ -149,9 +154,10 @@ class _SellPageState extends State<SellPage> {
       if (!mounted) return;
 
       if (result.success) {
-        context.read<ProductFeedViewModel>().refresh();
+        await context.read<ProductFeedViewModel>().refresh();
         _showSnack(result.message);
         _clearForm();
+        widget.onProductUploaded?.call();
       } else {
         setState(() => _error = result.message);
         _showSnack(result.message);

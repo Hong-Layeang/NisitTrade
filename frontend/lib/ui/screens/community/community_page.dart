@@ -88,9 +88,7 @@ class _CommunityPageState extends State<CommunityPage>
     final remaining = 8 - _selectedImagePaths.length;
     if (remaining <= 0) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 8 images allowed')),
-      );
+      AppSnackBar.info(context, 'Maximum 8 images allowed.');
       return;
     }
 
@@ -108,9 +106,7 @@ class _CommunityPageState extends State<CommunityPage>
     });
 
     if (picked.length > remaining && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the first 8 images were kept')),
-      );
+      AppSnackBar.info(context, 'Only the first 8 images were kept.');
     }
   }
 
@@ -133,15 +129,11 @@ class _CommunityPageState extends State<CommunityPage>
         _selectedImagePaths.clear();
       });
       FocusScope.of(context).unfocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Posted to community')),
-      );
+      AppSnackBar.success(context, 'Post shared with your community.');
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(vm.error ?? 'Failed to create post')),
-    );
+    AppSnackBar.error(context, vm.error ?? 'Failed to create post.');
   }
 
   Future<void> _openPostDetail(
@@ -183,9 +175,7 @@ class _CommunityPageState extends State<CommunityPage>
     final shareLink = 'https://nisittrade.app/community/${post.id}';
     await Clipboard.setData(ClipboardData(text: shareLink));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Post link copied to clipboard.')),
-    );
+    AppSnackBar.info(context, 'Post link copied to clipboard.');
   }
 
   bool _isOwner(CommunityPost post) {
@@ -375,9 +365,7 @@ class _CommunityPageState extends State<CommunityPage>
     }
 
     if (newContent.isEmpty && retainedImageUrls.isEmpty && newImagePaths.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post content or image is required.')),
-      );
+      AppSnackBar.info(context, 'Post content or image is required.');
       return;
     }
 
@@ -395,9 +383,7 @@ class _CommunityPageState extends State<CommunityPage>
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Post updated.')),
-    );
+    AppSnackBar.success(context, 'Post updated.');
   }
 
   Future<void> _deletePost(CommunityPost post) async {
@@ -432,9 +418,7 @@ class _CommunityPageState extends State<CommunityPage>
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Post deleted.')),
-    );
+    AppSnackBar.success(context, 'Post deleted.');
   }
 
   Future<void> _reportPost(CommunityPost post) async {
@@ -510,9 +494,7 @@ class _CommunityPageState extends State<CommunityPage>
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Report submitted.')),
-    );
+    AppSnackBar.success(context, 'Report submitted.');
   }
 
   Future<void> _toggleSavePost(CommunityPost post) async {
@@ -535,10 +517,9 @@ class _CommunityPageState extends State<CommunityPage>
       savedListingsVm.removeSavedPostLocally(postId: post.id);
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.'),
-      ),
+    AppSnackBar.info(
+      context,
+      updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.',
     );
   }
 

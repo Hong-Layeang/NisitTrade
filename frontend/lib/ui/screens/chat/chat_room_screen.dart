@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../../logic/view_models/chat_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../data/models/conversation.dart';
 import '../../../ui/widgets/app_app_bar.dart';
+import '../../../ui/widgets/app_snack_bar.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input.dart';
 
@@ -11,10 +13,12 @@ class ChatRoomScreen extends StatefulWidget {
   static const routeName = '/chat-room';
 
   final int conversationId;
+  final bool attachProductOnCompose;
 
   const ChatRoomScreen({
     super.key,
     required this.conversationId,
+    this.attachProductOnCompose = false,
   });
 
   @override
@@ -25,10 +29,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   late ChatRoomViewModel _viewModel;
   late ScrollController _scrollController;
   bool _hasInitialized = false;
+  late bool _attachConversationProductOnNextSend;
 
   @override
   void initState() {
     super.initState();
+    _attachConversationProductOnNextSend = widget.attachProductOnCompose;
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
   }
@@ -74,24 +80,45 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  Future<void> _handleSendMessage(String messageText) async {
-    final success = await _viewModel.sendMessage(messageText);
+  Future<void> _handleSendMessage(
+    String messageText,
+    bool includeAttachedProduct,
+  ) async {
+    final success = await _viewModel.sendMessage(
+      messageText,
+      attachConversationProduct: includeAttachedProduct,
+    );
     if (success) {
+      if (includeAttachedProduct && mounted) {
+        setState(() {
+          _attachConversationProductOnNextSend = false;
+        });
+      }
       _scrollToBottom();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_viewModel.sendMessageError ?? 'Failed to send message'),
-          backgroundColor: Colors.red,
-        ),
+      AppSnackBar.error(
+        context,
+        _viewModel.sendMessageError ?? 'Failed to send message',
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final chatBadgeCount = context.select<ChatRoomViewModel, int>(
+      (viewModel) => viewModel.totalUnreadCount,
+    );
+
     return Scaffold(
-      appBar: const AppAppBar(showChat: false),
+      appBar: AppAppBar(
+        chatBadgeCount: chatBadgeCount,
+        onFavoriteTap: () {
+          Navigator.pushNamed(context, AppRoutes.saved);
+        },
+        onChatTap: () {
+          Navigator.pushReplacementNamed(context, AppRoutes.chat);
+        },
+      ),
       body: Consumer<ChatRoomViewModel>(
         builder: (context, viewModel, child) {
           if (viewModel.isLoadingCurrentConversation) {
@@ -138,6 +165,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 onSendMessage: _handleSendMessage,
                 isLoading: viewModel.isLoadingCurrentConversation,
                 isSendingMessage: viewModel.isSendingMessage,
+                attachedProduct: conversation.product,
+                attachProductOnCompose: _attachConversationProductOnNextSend,
               ),
             ],
           );
@@ -147,7 +176,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Widget _buildConversationHeader(Conversation conversation) {
+    final currentUserId = _getCurrentUserId();
     final participant = conversation.participants?.firstWhere(
+      (p) => p.user != null && p.userId != currentUserId,
+      orElse: () => ConversationParticipant(
+        id: 0,
+        conversationId: conversation.id,
+        userId: 0,
+        joinedAt: DateTime.now(),
+      ),
+    ) ?? conversation.participants?.firstWhere(
       (p) => p.user != null,
       orElse: () => ConversationParticipant(
         id: 0,
@@ -157,30 +195,58 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       ),
     );
 
-    final productTitle = conversation.product?.title ?? 'Chat';
+    final productTitle = conversation.product?.title ?? '';
+    final displayName = participant?.user?.name ?? 'User';
+    final avatarUrl = participant?.user?.avatarUrl;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            participant?.user?.name ?? 'User',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          ),
+          CircleAvatar(
+            radius: 18,
+            backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+              ? NetworkImage(avatarUrl)
+                : null,
+            child: avatarUrl == null || avatarUrl.isEmpty
+                ? const Icon(Icons.person)
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (productTitle.isNotEmpty)
+                  Text(
+                    productTitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
             ),
           ),
-          if (productTitle.isNotEmpty)
-            Text(
-              productTitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.more_vert),
+          ),
         ],
       ),
     );
@@ -219,8 +285,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         }
 
         final message = viewModel.messages[messageIndex];
-        final isCurrentUser = message.senderId ==
-            _getCurrentUserId(); // You need to implement this
+        final isCurrentUser = message.senderId == _getCurrentUserId();
 
         // Mark message as read if not current user
         if (!isCurrentUser && !message.isReadBy(_getCurrentUserId())) {
@@ -230,6 +295,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         return ChatBubble(
           message: message,
           isCurrentUser: isCurrentUser,
+          attachedProduct: message.attachedProduct ??
+              (viewModel.hasProductAttachmentForMessage(message.id)
+                  ? viewModel.currentConversation?.product
+                  : null),
         );
       },
     );

@@ -34,23 +34,49 @@ class Conversation {
   }
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
-    final productJson = json['Product'] ?? json['product'];
-    final participantsJson = json['ConversationParticipants'] ?? json['participants'] ?? [];
+    final baseConversation =
+      (json['Conversation'] is Map<String, dynamic>) ? json['Conversation'] as Map<String, dynamic> : json;
+    final productJson =
+      baseConversation['Product'] ?? baseConversation['product'] ?? json['Product'] ?? json['product'];
+    final participantsJson =
+      json['ConversationParticipants'] ?? baseConversation['ConversationParticipants'] ?? json['participants'] ?? [];
+    final lastMessageJson =
+      json['last_message'] ?? json['lastMessage'] ?? baseConversation['last_message'] ?? baseConversation['lastMessage'];
     
     return Conversation(
-      id: _toInt(json['id']),
-      productId: json['product_id'] != null ? _toInt(json['product_id']) : null,
-      createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
-      updatedAt: DateTime.parse(json['updatedAt'] ?? json['updated_at'] ?? DateTime.now().toIso8601String()),
-      unreadCount: _toInt(json['unread_count'] ?? json['unreadCount'], fallback: 0),
+      id: _toInt(baseConversation['id'] ?? json['conversation_id'] ?? json['id']),
+      productId: (baseConversation['product_id'] ?? json['product_id']) != null
+          ? _toInt(baseConversation['product_id'] ?? json['product_id'])
+          : null,
+      createdAt: DateTime.parse(
+        baseConversation['createdAt'] ??
+            baseConversation['created_at'] ??
+            json['createdAt'] ??
+            json['created_at'] ??
+            DateTime.now().toIso8601String(),
+      ),
+      updatedAt: DateTime.parse(
+        baseConversation['updatedAt'] ??
+            baseConversation['updated_at'] ??
+            json['updatedAt'] ??
+            json['updated_at'] ??
+            DateTime.now().toIso8601String(),
+      ),
+      unreadCount: _toInt(
+        json['unread_count'] ??
+            json['unreadCount'] ??
+            baseConversation['unread_count'] ??
+            baseConversation['unreadCount'],
+        fallback: 0,
+      ),
       product: productJson != null ? Product.fromJson(productJson as Map<String, dynamic>) : null,
       participants: participantsJson is List
           ? participantsJson
               .map((p) => ConversationParticipant.fromJson(p as Map<String, dynamic>))
               .toList()
           : null,
-      lastMessage: json['lastMessage'] != null 
-          ? Message.fromJson(json['lastMessage'] as Map<String, dynamic>)
+      lastMessage: lastMessageJson != null
+          ? Message.fromJson(lastMessageJson as Map<String, dynamic>)
           : null,
     );
   }
@@ -110,6 +136,7 @@ class Message {
   final int conversationId;
   final DateTime sentAt;
   final List<int> readBy; // List of user IDs who have read this message
+  final Product? attachedProduct;
 
   // Associated data
   final Student? sender;
@@ -121,6 +148,7 @@ class Message {
     required this.conversationId,
     required this.sentAt,
     this.readBy = const [],
+    this.attachedProduct,
     this.sender,
   });
 
@@ -138,6 +166,7 @@ class Message {
 
   factory Message.fromJson(Map<String, dynamic> json) {
     final senderJson = json['User'] ?? json['user'];
+    final attachedProductJson = json['AttachedProduct'] ?? json['attached_product'];
     final readByData = json['MessageReads'] ?? json['message_reads'] ?? [];
     
     List<int> readByList = [];
@@ -158,6 +187,9 @@ class Message {
       conversationId: _toInt(json['conversation_id'] ?? json['conversationId']),
       sentAt: DateTime.parse(json['sent_at'] ?? json['sentAt'] ?? DateTime.now().toIso8601String()),
       readBy: readByList,
+      attachedProduct: attachedProductJson != null
+          ? Product.fromJson(attachedProductJson as Map<String, dynamic>)
+          : null,
       sender: senderJson != null ? Student.fromJson(senderJson as Map<String, dynamic>) : null,
     );
   }

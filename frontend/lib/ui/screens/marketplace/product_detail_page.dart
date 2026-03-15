@@ -12,12 +12,14 @@ import '../../../domain/repository_interfaces/i_product_repository.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../logic/view_models/chat_view_model.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_durations.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../widgets/app_action_chip.dart';
+import '../../widgets/app_comment_composer.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/full_screen_image_viewer.dart';
 import '../edit/edit_product_page.dart';
@@ -57,6 +59,8 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage>
     with TickerProviderStateMixin {
+  static const double _productImageAspectRatio = 5 / 4;
+
   static const List<String> _reportReasonOptions = [
     'Spam or scam',
     'Prohibited or illegal item',
@@ -69,6 +73,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   final TextEditingController _commentController = TextEditingController();
   final PageController _pageController = PageController();
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _commentsSectionKey = GlobalKey();
   final FocusNode _commentFocusNode = FocusNode();
   late AnimationController _likeAnimationController;
   late IProductRepository _productRepository;
@@ -113,14 +118,69 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
   void _scrollToComments() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final commentContext = _commentsSectionKey.currentContext;
+      if (commentContext != null) {
+        Scrollable.ensureVisible(
+          commentContext,
+          duration: AppDurations.standard,
+          curve: Curves.easeOut,
+          alignment: 0.2,
+        );
+        return;
+      }
+
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: AppDurations.medium,
+          duration: AppDurations.standard,
           curve: Curves.easeOut,
         );
       }
     });
+  }
+
+  void _scrollToLatestComment() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: AppDurations.standard,
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _openChatWithSeller(Product product) async {
+    final userId = context.read<UserViewModel>().userId;
+    if (userId == null) {
+      AppSnackBar.error(context, 'Please sign in to start chatting.');
+      return;
+    }
+    if (product.userId == userId) {
+      AppSnackBar.show(context, 'You cannot chat on your own listing.');
+      return;
+    }
+
+    final chatViewModel = context.read<ChatRoomViewModel>();
+    final conversation = await chatViewModel.createConversation(product.id);
+    if (!mounted) return;
+
+    if (conversation == null) {
+      AppSnackBar.error(
+        context,
+        chatViewModel.currentConversationError ?? 'Unable to open chat.',
+      );
+      return;
+    }
+
+    await Navigator.pushNamed(
+      context,
+      AppRoutes.chatRoom,
+      arguments: ChatRoomRouteArgs(
+        conversationId: conversation.id,
+        attachProductOnCompose: true,
+      ),
+    );
   }
 
   @override
@@ -156,7 +216,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
             _isLoading = false;
           }
         });
-        if (widget.focusComments && !silent) {
+        if (widget.focusComments) {
           _scrollToComments();
         }
       }
@@ -261,7 +321,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       _commentController.clear();
       if (mounted && updatedProduct != null) {
         setState(() => _product = Product.fromEntity(updatedProduct));
-        AppSnackBar.success(context, 'Comment added successfully');
+        _scrollToLatestComment();
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -645,46 +705,52 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshProduct,
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildImageSection(product),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: _buildHeader(product),
+      body: Column(
+        children: [
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshProduct,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildImageSection(product),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: _buildHeader(product),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildSellerRow(product),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildActions(product),
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildDescription(product),
+                    ),
+                    const SizedBox(height: 18),
+                    const Divider(height: 1, color: AppColors.border),
+                    Padding(
+                      key: _commentsSectionKey,
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                      child: _buildCommentsHeader(product),
+                    ),
+                    _buildComments(product.comments),
+                    const SizedBox(height: 12),
+                  ],
+                ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildSellerRow(product),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildActions(product),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildDescription(product),
-              ),
-              const SizedBox(height: 18),
-              const Divider(height: 1, color: AppColors.border),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                child: _buildCommentsHeader(product),
-              ),
-              _buildComments(product.comments),
-              const SizedBox(height: 12),
-              _buildCommentComposer(),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
-        ),
+          _buildCommentComposer(),
+        ],
       ),
     );
   }
@@ -693,7 +759,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     final images = product.imageUrls;
     if (images.isEmpty) {
       return AspectRatio(
-        aspectRatio: 4 / 3,
+        aspectRatio: _productImageAspectRatio,
         child: Container(
           width: double.infinity,
           color: AppColors.surface,
@@ -707,7 +773,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
 
     return AspectRatio(
-      aspectRatio: 4 / 3,
+      aspectRatio: _productImageAspectRatio,
       child: GestureDetector(
         onTap: () => FullScreenImageViewer.show(
           context,
@@ -880,6 +946,19 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           ),
         ),
         const Spacer(),
+        if (!isCurrentUser)
+          FilledButton.icon(
+            onPressed: _isActionLoading ? null : () => _openChatWithSeller(product),
+            icon: const Icon(Icons.send_rounded, size: 16),
+            label: const Text('Chat'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
       ],
     );
   }
@@ -1002,40 +1081,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Widget _buildCommentComposer() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _commentController,
-              focusNode: _commentFocusNode,
-              minLines: 1,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Write a comment...',
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            onPressed: _isSubmittingComment ? null : _submitComment,
-            icon: _isSubmittingComment
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.send_rounded, color: AppColors.primary),
-          ),
-        ],
-      ),
+    return AppCommentComposer(
+      controller: _commentController,
+      focusNode: _commentFocusNode,
+      onSend: _submitComment,
+      isSubmitting: _isSubmittingComment,
+      maxLines: 3,
+      pinnedToBottom: true,
     );
   }
 

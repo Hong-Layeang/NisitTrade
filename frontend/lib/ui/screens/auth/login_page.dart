@@ -200,7 +200,7 @@ class _LoginPageState extends State<LoginPage> {
                       AppTextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        hintText: 'lastname.fistname@university.com',
+                        hintText: 'lastname.firstname@university.com',
                         textInputAction: TextInputAction.next,
                         autofillHints: const [AutofillHints.email],
                       ),
@@ -340,4 +340,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

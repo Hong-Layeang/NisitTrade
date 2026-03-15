@@ -44,10 +44,12 @@ class ChatRepository {
   Future<ApiResponse<Message>> sendMessage({
     required int conversationId,
     required String messageText,
+    int? attachedProductId,
   }) async {
     return _apiService.sendMessage(
       conversationId: conversationId,
       messageText: messageText,
+      attachedProductId: attachedProductId,
     );
   }
 

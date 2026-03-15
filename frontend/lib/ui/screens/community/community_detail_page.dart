@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:timeago_flutter/timeago_flutter.dart';
 import 'dart:io';
 
 import '../../../core/constants/colors.dart';
@@ -17,7 +16,9 @@ import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../profile/other_profile_page.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_action_sheet.dart';
+import '../../widgets/app_comment_composer.dart';
 import '../../widgets/full_screen_image_viewer.dart';
+import 'widgets/community_comment_item.dart';
 import 'widgets/community_post_card.dart';
 
 class CommunityDetailArgs {
@@ -124,8 +125,6 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
           alignment: 0.2,
         );
       }
-
-      _commentFocusNode.requestFocus();
     });
   }
 
@@ -317,9 +316,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       ClipboardData(text: 'https://nisittrade.app/community/${widget.postId}'),
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Post link copied to clipboard.')),
-    );
+    AppSnackBar.info(context, 'Post link copied to clipboard.');
   }
 
   bool _isOwner(CommunityPost post) {
@@ -508,9 +505,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     }
 
     if (newContent.isEmpty && retainedImageUrls.isEmpty && newImagePaths.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post content or image is required.')),
-      );
+      AppSnackBar.info(context, 'Post content or image is required.');
       return;
     }
 
@@ -529,9 +524,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     }
 
     setState(() => _post = updated);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Post updated.')));
+    AppSnackBar.success(context, 'Post updated.');
   }
 
   Future<void> _deletePost(CommunityPost post) async {
@@ -645,9 +638,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       return;
     }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Report submitted.')));
+    AppSnackBar.success(context, 'Report submitted.');
   }
 
   Future<void> _showPostActions() async {
@@ -717,10 +708,9 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     }
 
     setState(() => _post = updated);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.'),
-      ),
+    AppSnackBar.info(
+      context,
+      updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.',
     );
   }
 
@@ -844,206 +834,34 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
           const Divider(height: 16, color: AppColors.border),
       itemBuilder: (context, index) {
         final comment = comments[index];
-        return _buildCommentItem(
-          comment: comment,
+        final handle = buildSchoolShortName(
+          universityName: comment.user?.university?.name,
+          universityDomain: comment.user?.university?.domain,
+          fallback: '',
+        );
+        return CommunityCommentItem(
+          avatarUrl: comment.user?.profileImage,
+          displayName: comment.user?.fullName ?? 'User',
+          handle: handle,
+          content: comment.content,
+          createdAt: comment.createdAt,
           canEdit: userId != null && userId == comment.userId,
+          onUserTap: () => _openUserProfile(comment.userId),
+          onEdit: () => _editComment(comment),
+          onDelete: () => _deleteComment(comment),
         );
       },
     );
   }
 
-  Widget _buildCommentItem({
-    required CommunityComment comment,
-    required bool canEdit,
-  }) {
-    final handle = buildSchoolShortName(
-      universityName: comment.user?.university?.name,
-      universityDomain: comment.user?.university?.domain,
-      fallback: '',
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: GestureDetector(
-            onTap: () => _openUserProfile(comment.userId),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.surface,
-              backgroundImage: (comment.user?.profileImage?.isNotEmpty ?? false)
-                  ? NetworkImage(comment.user!.profileImage!)
-                  : null,
-              child: (comment.user?.profileImage?.isNotEmpty ?? false)
-                  ? null
-                  : const Icon(
-                      Icons.person,
-                      color: AppColors.textSecondary,
-                      size: 18,
-                    ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => _openUserProfile(comment.userId),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              comment.user?.fullName ?? 'User',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          if (handle.isNotEmpty) ...[
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                '@$handle',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (canEdit)
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: PopupMenuButton<String>(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          Icons.more_horiz,
-                          size: 18,
-                          color: AppColors.textSecondary,
-                        ),
-                        onSelected: (value) {
-                          if (value == 'edit') {
-                            _editComment(comment);
-                          }
-                          if (value == 'delete') {
-                            _deleteComment(comment);
-                          }
-                        },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit, size: 18),
-                                SizedBox(width: 8),
-                                Text('Edit'),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, size: 18, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Delete', style: TextStyle(color: Colors.red)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                comment.content,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Timeago(
-                date: comment.createdAt,
-                builder: (context, value) => Text(
-                  value,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildCommentComposer() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _commentController,
-                focusNode: _commentFocusNode,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: 500,
-                decoration: const InputDecoration(
-                  hintText: 'Write a comment...',
-                  counterText: '',
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: _isSubmittingComment ? null : _submitComment,
-              icon: _isSubmittingComment
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send_rounded, color: AppColors.primary),
-            ),
-          ],
-        ),
-      ),
+    return AppCommentComposer(
+      controller: _commentController,
+      focusNode: _commentFocusNode,
+      onSend: _submitComment,
+      isSubmitting: _isSubmittingComment,
+      maxLength: 500,
+      pinnedToBottom: true,
     );
   }
 

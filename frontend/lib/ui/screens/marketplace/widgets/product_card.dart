@@ -9,6 +9,7 @@ import 'package:get_it/get_it.dart';
 import '../../../../logic/helpers/product_like_helpers.dart';
 import '../../../../logic/view_models/product_feed_view_model.dart';
 import '../../../../logic/view_models/saved_listings_view_model.dart';
+import '../../../../logic/view_models/chat_view_model.dart';
 
 import '../../../../logic/view_models/user_view_model.dart';
 import '../../../../domain/repository_interfaces/i_product_repository.dart';
@@ -110,6 +111,39 @@ class _ProductCardState extends State<ProductCard>
         productId: _product.id,
         focusComments: true,
         initialProduct: _product,
+      ),
+    );
+  }
+
+  Future<void> _handleChatTap() async {
+    final userId = context.read<UserViewModel>().userId;
+    if (userId == null) {
+      AppSnackBar.error(context, 'Please sign in to start chatting.');
+      return;
+    }
+    if (_product.userId == userId) {
+      AppSnackBar.show(context, 'You cannot message to yourself:)');
+      return;
+    }
+
+    final chatViewModel = context.read<ChatRoomViewModel>();
+    final conversation = await chatViewModel.createConversation(_product.id);
+    if (!mounted) return;
+
+    if (conversation == null) {
+      AppSnackBar.error(
+        context,
+        chatViewModel.currentConversationError ?? 'Unable to open chat.',
+      );
+      return;
+    }
+
+    await Navigator.pushNamed(
+      context,
+      AppRoutes.chatRoom,
+      arguments: ChatRoomRouteArgs(
+        conversationId: conversation.id,
+        attachProductOnCompose: true,
       ),
     );
   }
@@ -565,10 +599,7 @@ class _ProductCardState extends State<ProductCard>
               likeAnimationController: _likeAnimationController,
               onLikeTap: _handleLikeTap,
               onCommentTap: _handleCommentTap,
-              onProductUpdated: (updated) {
-                setState(() => _product = updated);
-                widget.onProductUpdated?.call(updated);
-              },
+              onChatTap: _handleChatTap,
             ),
             ProductCardInfo(product: _product),
           ],
@@ -585,7 +616,7 @@ class _ProductCardActionSection extends StatelessWidget {
   final AnimationController likeAnimationController;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
-  final Function(ProductEntity) onProductUpdated;
+  final VoidCallback onChatTap;
 
   const _ProductCardActionSection({
     required this.product,
@@ -593,7 +624,7 @@ class _ProductCardActionSection extends StatelessWidget {
     required this.likeAnimationController,
     required this.onLikeTap,
     required this.onCommentTap,
-    required this.onProductUpdated,
+    required this.onChatTap,
   });
 
   @override
@@ -604,7 +635,7 @@ class _ProductCardActionSection extends StatelessWidget {
       likeAnimationController: likeAnimationController,
       onLikeTap: onLikeTap,
       onCommentTap: onCommentTap,
-      onChatTap: () {},
+      onChatTap: onChatTap,
     );
   }
 }

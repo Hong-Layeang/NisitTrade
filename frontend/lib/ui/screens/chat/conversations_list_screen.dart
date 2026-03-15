@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../../logic/view_models/chat_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
 import '../../../data/models/conversation.dart';
-import '../../../ui/widgets/app_app_bar.dart';
-import '../../../ui/screens/chat/chat_room_screen.dart';
 
 class ConversationsListScreen extends StatefulWidget {
   static const routeName = '/conversations';
@@ -55,15 +56,23 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   void _handleConversationTap(Conversation conversation) {
     _viewModel.selectConversation(conversation);
     Navigator.of(context).pushNamed(
-      ChatRoomScreen.routeName,
-      arguments: conversation.id,
+      AppRoutes.chatRoom,
+      arguments: ChatRoomRouteArgs(conversationId: conversation.id),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(showFavorite: false),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: const Text('Chat'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
       body: Consumer<ChatRoomViewModel>(
         builder: (context, viewModel, child) {
           if (viewModel.conversationsError != null &&
@@ -144,7 +153,16 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   }
 
   Widget _buildConversationTile(Conversation conversation) {
+    final currentUserId = context.read<UserViewModel>().userId;
     final participant = conversation.participants?.firstWhere(
+      (p) => p.user != null && p.userId != currentUserId,
+      orElse: () => ConversationParticipant(
+        id: 0,
+        conversationId: conversation.id,
+        userId: 0,
+        joinedAt: DateTime.now(),
+      ),
+    ) ?? conversation.participants?.firstWhere(
       (p) => p.user != null,
       orElse: () => ConversationParticipant(
         id: 0,
@@ -156,7 +174,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
 
     final lastMessage = conversation.lastMessage;
     final userName = participant?.user?.name ?? 'Unknown User';
-    final userAvatar = participant?.user?.profileImage;
+    final userAvatar = participant?.user?.avatarUrl;
     final messagePreview =
         lastMessage?.messageText ?? 'Start a conversation';
 

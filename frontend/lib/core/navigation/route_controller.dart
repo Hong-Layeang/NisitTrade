@@ -144,6 +144,16 @@ Route<dynamic> controlRoute(RouteSettings settings) {
           ),
         );
       }
+      if (args is ChatRoomRouteArgs) {
+        return MaterialPageRoute(
+          builder: (_) => AuthGate(
+            child: ChatRoomScreen(
+              conversationId: args.conversationId,
+              attachProductOnCompose: args.attachProductOnCompose,
+            ),
+          ),
+        );
+      }
       return MaterialPageRoute(builder: (_) => const LoginPage());
 
     default:

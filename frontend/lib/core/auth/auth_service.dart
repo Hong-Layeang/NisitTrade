@@ -52,6 +52,7 @@ class AuthService {
   static const Set<String> _allowedMessages = {
     'Email and password are required',
     'Invalid credentials',
+    'Password login is only available after Microsoft sign-in and password setup.',
   };
 
   final AuthApi _authApi = AuthApi();

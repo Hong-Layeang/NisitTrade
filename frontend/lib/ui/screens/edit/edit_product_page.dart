@@ -258,65 +258,54 @@ class _EditProductPageState extends State<EditProductPage> {
     AppSnackBar.show(context, message);
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text('Edit Your Listing'),
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _categories.isEmpty) {
       return Scaffold(
+        appBar: _buildAppBar(),
         body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: EditHeaderRow(onBack: () => Navigator.of(context).pop()),
-              ),
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ],
-          ),
+          child: const Center(child: CircularProgressIndicator()),
         ),
       );
     }
 
     if (_error != null && _categories.isEmpty) {
       return Scaffold(
+        appBar: _buildAppBar(),
         body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: EditHeaderRow(onBack: () => Navigator.of(context).pop()),
-              ),
-              Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(AppErrorMessages.resolve(_error)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadCategories,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(AppErrorMessages.resolve(_error)),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _loadCategories,
+                  child: const Text('Retry'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
     }
 
     return Scaffold(
+      appBar: _buildAppBar(),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              EditHeaderRow(onBack: () => Navigator.of(context).pop()),
-              const SizedBox(height: 12),
               ProductFormFieldsSection(
                 titleController: _titleController,
                 descriptionController: _descriptionController,

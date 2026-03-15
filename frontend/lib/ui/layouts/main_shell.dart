@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../logic/view_models/user_view_model.dart';
+import '../../logic/view_models/chat_view_model.dart';
 import 'package:provider/provider.dart';
 import '../screens/community/community_page.dart';
 import '../screens/marketplace/marketplace_page.dart';
@@ -36,7 +37,11 @@ class _MainShellState extends State<MainShell> {
     _screens = [
       MarketplacePage(key: _marketplaceKey),
       const SearchPage(),
-      const SellPage(),
+      SellPage(
+        onProductUploaded: () {
+          _onTabSelected(0);
+        },
+      ),
       const CommunityPage(),
       ProfilePage(key: _profileKey),
     ];
@@ -45,6 +50,11 @@ class _MainShellState extends State<MainShell> {
       final userProvider = context.read<UserViewModel>();
       if (userProvider.profile == null && !userProvider.isLoading) {
         userProvider.load();
+      }
+
+      final chatProvider = context.read<ChatRoomViewModel>();
+      if (chatProvider.conversations.isEmpty && !chatProvider.isLoadingConversations) {
+        chatProvider.loadConversations(refresh: true);
       }
     });
   }
@@ -65,9 +75,9 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(int chatBadgeCount) {
     return AppAppBar(
-      chatBadgeCount: 6,
+      chatBadgeCount: chatBadgeCount,
       onFavoriteTap: () {
         Navigator.pushNamed(context, AppRoutes.saved);
       },
@@ -76,9 +86,13 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final chatBadgeCount = context.select<ChatRoomViewModel, int>(
+      (viewModel) => viewModel.totalUnreadCount,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(chatBadgeCount),
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,

@@ -95,12 +95,14 @@ class ChatApiService extends BaseApiService {
   Future<ApiResponse<Message>> sendMessage({
     required int conversationId,
     required String messageText,
+    int? attachedProductId,
   }) async {
     return executeApiCall(
       call: () => dio.post(
         '$_messagesRoute/conversation/$conversationId',
         data: {
           'message_text': messageText,
+          if (attachedProductId != null) 'attached_product_id': attachedProductId,
         },
       ),
       parser: (data) => Message.fromJson(data as Map<String, dynamic>),

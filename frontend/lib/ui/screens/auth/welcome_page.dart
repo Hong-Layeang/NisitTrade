@@ -25,8 +25,6 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   void initState() {
     super.initState();
-    // Clear all ViewModels when user reaches welcome page
-    // This ensures no data persists between user sessions
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<ProductFeedViewModel>().clear();

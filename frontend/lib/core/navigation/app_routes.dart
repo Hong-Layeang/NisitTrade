@@ -28,3 +28,13 @@ class MarketplaceRouteArgs {
     this.skipAuthCheck = false,
   });
 }
+
+class ChatRoomRouteArgs {
+  final int conversationId;
+  final bool attachProductOnCompose;
+
+  const ChatRoomRouteArgs({
+    required this.conversationId,
+    this.attachProductOnCompose = false,
+  });
+}
