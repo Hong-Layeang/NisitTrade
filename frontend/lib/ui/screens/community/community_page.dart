@@ -10,6 +10,7 @@ import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/school_short_name.dart';
 import '../../../logic/view_models/community_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../data/models/community_post.dart';
 import '../../widgets/app_action_sheet.dart';
 import '../../widgets/app_snack_bar.dart';
@@ -37,6 +38,7 @@ class _CommunityPageState extends State<CommunityPage>
 
   late final TabController _tabController;
   late final ScrollController _scrollController;
+  late final FocusNode _postFocusNode;
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _postController = TextEditingController();
   bool _isComposerOpen = true;
@@ -49,6 +51,7 @@ class _CommunityPageState extends State<CommunityPage>
     _tabController.addListener(_onTabChanged);
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
+    _postFocusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CommunityViewModel>().load(feed: 'community');
     });
@@ -57,6 +60,7 @@ class _CommunityPageState extends State<CommunityPage>
   void _onScroll() {
     if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
       if (_isComposerOpen) {
+        _postFocusNode.unfocus();
         setState(() => _isComposerOpen = false);
       }
     }
@@ -73,6 +77,7 @@ class _CommunityPageState extends State<CommunityPage>
   void dispose() {
     _tabController.removeListener(_onTabChanged);
     _scrollController.removeListener(_onScroll);
+    _postFocusNode.dispose();
     _postController.dispose();
     _tabController.dispose();
     _scrollController.dispose();
@@ -189,6 +194,7 @@ class _CommunityPageState extends State<CommunityPage>
   }
 
   Future<void> _editPost(CommunityPost post) async {
+    if (mounted) FocusScope.of(context).unfocus();
     final retainedImageUrls = List<String>.from(post.orderedImages);
     final newImagePaths = <String>[];
     final controller = TextEditingController(text: post.content);
@@ -395,6 +401,7 @@ class _CommunityPageState extends State<CommunityPage>
   }
 
   Future<void> _deletePost(CommunityPost post) async {
+    if (mounted) FocusScope.of(context).unfocus();
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -431,6 +438,7 @@ class _CommunityPageState extends State<CommunityPage>
   }
 
   Future<void> _reportPost(CommunityPost post) async {
+    if (mounted) FocusScope.of(context).unfocus();
     var selectedReason = _reportReasonOptions.first;
     final detailsController = TextEditingController();
 
@@ -509,12 +517,22 @@ class _CommunityPageState extends State<CommunityPage>
 
   Future<void> _toggleSavePost(CommunityPost post) async {
     final vm = context.read<CommunityViewModel>();
-    final updated = await vm.toggleSave(post.id, shouldSave: !post.isSavedByMe);
+    final savedListingsVm = context.read<SavedListingsViewModel>();
+    final isSaved = post.isSavedByMe;
+    
+    final updated = await vm.toggleSave(post.id, shouldSave: !isSaved);
     if (!mounted) return;
 
     if (updated == null) {
       AppSnackBar.error(context, vm.error ?? 'Failed to update saved status.');
       return;
+    }
+
+    // Update SavedListingsViewModel
+    if (updated.isSavedByMe) {
+      savedListingsVm.addSavedPostLocally(updated);
+    } else {
+      savedListingsVm.removeSavedPostLocally(postId: post.id);
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -526,6 +544,7 @@ class _CommunityPageState extends State<CommunityPage>
 
   Future<void> _showPostActions(CommunityPost post) async {
     if (!mounted) return;
+    FocusScope.of(context).unfocus();
     final effectivePost = post;
     final isOwner = _isOwner(effectivePost);
 
@@ -589,6 +608,7 @@ class _CommunityPageState extends State<CommunityPage>
               builder: (_, isPosting, _) => PostComposer(
                 isOpen: _isComposerOpen,
                 isPosting: isPosting,
+                focusNode: _postFocusNode,
                 controller: _postController,
                 selectedImagePaths: _selectedImagePaths,
                 onPickImage: _pickImage,

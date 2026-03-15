@@ -29,6 +29,7 @@ import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
 import '../community/community_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../app.dart';
 
 final getIt = GetIt.instance;
 
@@ -40,7 +41,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class ProfilePageState extends State<ProfilePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware {
   late final TabController _tabController;
   late final IUserRepository _userRepository;
   late final CommunityRepository _communityRepository;
@@ -508,6 +509,12 @@ class ProfilePageState extends State<ProfilePage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Register with RouteObserver to detect when returning from other routes
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route as PageRoute);
+    }
+    
     if (!_productsLoaded) {
       final userId = context.read<UserViewModel>().userId;
       if (userId != null) {
@@ -522,7 +529,17 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   @override
+  void didPopNext() {
+    _productsLoaded = false;
+    if (mounted) {
+      refresh();  
+    }
+    super.didPopNext();
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _tabController.dispose();
     super.dispose();
   }

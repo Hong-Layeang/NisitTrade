@@ -4,6 +4,7 @@ import '../../../../core/constants/colors.dart';
 
 class PostComposer extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool isOpen;
   final bool isPosting;
   final List<String> selectedImagePaths;
@@ -15,6 +16,7 @@ class PostComposer extends StatelessWidget {
   const PostComposer({
     super.key,
     required this.controller,
+    required this.focusNode,
     required this.isOpen,
     this.isPosting = false,
     this.selectedImagePaths = const [],
@@ -124,6 +126,7 @@ class PostComposer extends StatelessWidget {
                         const SizedBox(height: 8),
                         TextField(
                           controller: controller,
+                          focusNode: focusNode,
                           minLines: 2,
                           maxLines: 3,
                           maxLength: 1000,

@@ -122,6 +122,7 @@ class UserViewModel extends ChangeNotifier {
           _profile = _profile!.copyWith(profileImage: nextAvatarUrl);
           notifyListeners();
         }
+        await refresh();
         return nextAvatarUrl;
       }
       return null;
@@ -151,6 +152,7 @@ class UserViewModel extends ChangeNotifier {
           _profile = _profile!.copyWith(coverImage: nextCoverUrl);
           notifyListeners();
         }
+        await refresh();
         return nextCoverUrl;
       }
       return null;

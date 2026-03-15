@@ -90,10 +90,15 @@ class UserApiService {
 
       final data = response.data as Map<String, dynamic>;
       final items = (data['items'] as List)
-          .map((json) => (json as Map<String, dynamic>)['Product'])
-          .where((productJson) => productJson != null)
-          .map((productJson) =>
-              Product.fromJson(productJson as Map<String, dynamic>))
+          .map((json) {
+            final item = json as Map<String, dynamic>;
+            final nestedProduct = item['Product'];
+            if (nestedProduct is Map<String, dynamic>) {
+              return nestedProduct;
+            }
+            return item;
+          })
+          .map((productJson) => Product.fromJson(productJson))
           .toList();
 
       return ApiResponse.success(items);

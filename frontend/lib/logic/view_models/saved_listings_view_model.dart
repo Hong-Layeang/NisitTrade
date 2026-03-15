@@ -98,9 +98,11 @@ class SavedListingsViewModel extends ChangeNotifier {
         throw postsResponse.error!;
       }
 
-      // Preserve stable image URLs across refreshes so saved cards do not flicker.
-      _savedProducts = _mergeSavedProducts(listingsResponse.data ?? []);
-      _savedPosts = postsResponse.data ?? [];
+      final newProducts = _mergeSavedProducts(listingsResponse.data ?? []);
+      final newPosts = postsResponse.data ?? [];
+
+      _savedProducts = newProducts;
+      _savedPosts = newPosts;
       _hasLoadedForCurrentUser = true;
     } on ApiException catch (e) {
       _loadError = e.message;
@@ -205,6 +207,20 @@ class SavedListingsViewModel extends ChangeNotifier {
 
   void removeSavedProductLocally({required int productId}) {
     _savedProducts = _savedProducts.where((item) => item.id != productId).toList();
+    notifyListeners();
+  }
+
+  void addSavedPostLocally(CommunityPost post) {
+    if (_savedPosts.any((item) => item.id == post.id)) {
+      return;
+    }
+
+    _savedPosts = [post, ..._savedPosts];
+    notifyListeners();
+  }
+
+  void removeSavedPostLocally({required int postId}) {
+    _savedPosts = _savedPosts.where((item) => item.id != postId).toList();
     notifyListeners();
   }
 

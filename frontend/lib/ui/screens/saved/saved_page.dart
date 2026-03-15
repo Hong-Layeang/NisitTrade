@@ -21,6 +21,7 @@ import '../../widgets/app_snack_bar.dart';
 import '../community/community_detail_page.dart';
 import '../edit/edit_product_page.dart';
 import '../marketplace/product_detail_page.dart';
+import '../../../app.dart';
 
 class SavedListingsPage extends StatefulWidget {
   const SavedListingsPage({super.key});
@@ -30,7 +31,7 @@ class SavedListingsPage extends StatefulWidget {
 }
 
 class _SavedListingsPageState extends State<SavedListingsPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware {
   bool _didInitialLoad = false;
   late final TabController _tabController;
 
@@ -45,7 +46,11 @@ class _SavedListingsPageState extends State<SavedListingsPage>
           .hasLoadedForUser(userId: userId);
 
       if (!_didInitialLoad) {
-        _loadSavedListings();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _loadSavedListings();
+          }
+        });
       }
     }
   }
@@ -53,7 +58,27 @@ class _SavedListingsPageState extends State<SavedListingsPage>
   @override
   void dispose() {
     _tabController.dispose();
+    routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Register with RouteObserver to detect when returning from other routes
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route as PageRoute);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    // Called when returning to this route from another route
+    if (mounted) {
+      _refreshSavedListings();
+    }
+    super.didPopNext();
   }
 
   Future<void> _loadSavedListings() async {

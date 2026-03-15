@@ -14,6 +14,9 @@ import 'core/navigation/app_navigator.dart';
 import 'core/navigation/app_routes.dart';
 import 'core/navigation/route_controller.dart';
 
+// Global RouteObserver for tracking route changes
+final routeObserver = RouteObserver<PageRoute>();
+
 class NisitTradeApp extends StatelessWidget {
   const NisitTradeApp({super.key});
 
@@ -47,6 +50,7 @@ class NisitTradeApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         navigatorKey: appNavigatorKey,
+        navigatorObservers: [routeObserver],
         theme: AppTheme.lightTheme,
         initialRoute: AppRoutes.splash,
         onGenerateRoute: controlRoute,

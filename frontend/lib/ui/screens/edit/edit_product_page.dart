@@ -17,6 +17,7 @@ import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/app_limits.dart';
 import '../../../core/constants/colors.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/user_view_model.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../sell/product_form_image_picker.dart';
 import '../sell/product_form_orchestrator.dart';
@@ -235,6 +236,11 @@ class _EditProductPageState extends State<EditProductPage> {
 
       if (result.success) {
         context.read<ProductFeedViewModel>().refresh();
+        // Refresh user products in ProfilePage
+        final userViewModel = context.read<UserViewModel>();
+        if (userViewModel.userId != null) {
+          userViewModel.refresh(); // Fire and forget - refresh in background
+        }
         _showSnack(result.message);
         Navigator.of(context).pop(true);
       } else {

@@ -50,11 +50,17 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _onTabSelected(int index) {
-    final shouldSwitch = _currentIndex != index;
+    if (_currentIndex == index) return;
 
-    if (shouldSwitch) {
-      setState(() {
-        _currentIndex = index;
+    final fromIndex = _currentIndex;
+    setState(() {
+      _currentIndex = index;
+    });
+
+    const contentTabs = {2, 3};
+    if (index == 4 && contentTabs.contains(fromIndex)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _profileKey.currentState?.refresh();
       });
     }
   }

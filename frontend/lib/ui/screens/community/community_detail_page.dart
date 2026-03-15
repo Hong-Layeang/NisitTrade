@@ -13,6 +13,7 @@ import '../../../data/models/community_comment.dart';
 import '../../../data/models/community_post.dart';
 import '../../../logic/view_models/community_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../profile/other_profile_page.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_action_sheet.dart';
@@ -697,12 +698,22 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
 
   Future<void> _toggleSavePost(CommunityPost post) async {
     final vm = context.read<CommunityViewModel>();
-    final updated = await vm.toggleSave(post.id, shouldSave: !post.isSavedByMe);
+    final savedListingsVm = context.read<SavedListingsViewModel>();
+    final isSaved = post.isSavedByMe;
+    
+    final updated = await vm.toggleSave(post.id, shouldSave: !isSaved);
     if (!mounted) return;
 
     if (updated == null) {
       AppSnackBar.error(context, vm.error ?? 'Failed to update saved status.');
       return;
+    }
+
+    // Update SavedListingsViewModel
+    if (updated.isSavedByMe) {
+      savedListingsVm.addSavedPostLocally(updated);
+    } else {
+      savedListingsVm.removeSavedPostLocally(postId: post.id);
     }
 
     setState(() => _post = updated);
