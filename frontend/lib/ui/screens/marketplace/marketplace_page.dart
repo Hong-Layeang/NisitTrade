@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_durations.dart';
@@ -13,6 +15,26 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/loading_error_builder.dart';
 import 'widgets/product_card.dart';
 import 'product_detail_page.dart';
+
+class _SnappyVerticalPagePhysics extends PageScrollPhysics {
+  const _SnappyVerticalPagePhysics({super.parent});
+
+  @override
+  _SnappyVerticalPagePhysics applyTo(ScrollPhysics? ancestor) {
+    return _SnappyVerticalPagePhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  double get minFlingDistance => 4.0;
+
+  @override
+  double get minFlingVelocity => 180.0;
+
+  @override
+  double carriedMomentum(double existingVelocity) {
+    return super.carriedMomentum(existingVelocity) * 1.2;
+  }
+}
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
@@ -47,6 +69,10 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
 
       if (!provider.isLoading) {
         await provider.load();
+        // Warm the next page so continuous swiping feels instant.
+        if (provider.hasMore && !provider.isLoadingMore) {
+          provider.loadNextPage();
+        }
       }
     } finally {
       if (mounted) {
@@ -67,8 +93,8 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
   void _checkAndLoadMore(int currentIndex, int totalItems) {
     final productProvider = context.read<ProductFeedViewModel>();
     
-    // Load more when user is within 3 items of the end
-    if (currentIndex >= totalItems - 3 && productProvider.hasMore && !productProvider.isLoadingMore) {
+    // Load more earlier to avoid visible pause near the end.
+    if (currentIndex >= totalItems - 5 && productProvider.hasMore && !productProvider.isLoadingMore) {
       productProvider.loadNextPage();
     }
   }
@@ -80,6 +106,26 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
     if (viewModel.categories.isEmpty && !viewModel.isLoading) {
       await viewModel.loadCategories();
     }
+  }
+
+  Future<void> scrollToTopAndRefresh() async {
+    if (!mounted) return;
+
+    if (_pageController.hasClients && (_pageController.page ?? 0) > 0) {
+      await _pageController.animateToPage(
+        0,
+        duration: AppDurations.standard,
+        curve: Curves.easeOut,
+      );
+    }
+
+    if (!mounted) return;
+    await context.read<ProductFeedViewModel>().refresh();
+  }
+
+  Future<void> _refreshFromPull() async {
+    if (!mounted) return;
+    await context.read<ProductFeedViewModel>().refresh();
   }
 
   @override
@@ -168,23 +214,23 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
                 context.read<MarketplaceViewModel>().toggleCategoryFilter(),
           ),
           Expanded(
-            child: AppRefreshIndicator(
-              onRefresh: () async {
-                final marketplaceVm = context.read<MarketplaceViewModel>();
-                final productVm = context.read<ProductFeedViewModel>();
-                marketplaceVm.clearSelection();
-                if (_pageController.hasClients) {
-                  await _pageController.animateToPage(
-                    0,
-                    duration: AppDurations.standard,
-                    curve: Curves.easeOut,
-                  );
-                }
-                await marketplaceVm.loadCategories();
-                await productVm.refresh();
-              },
-              child: filteredProducts.isEmpty
-                  ? ListView(
+            child: filteredProducts.isEmpty
+                ? AppRefreshIndicator(
+                    onRefresh: () async {
+                      final marketplaceVm = context.read<MarketplaceViewModel>();
+                      final productVm = context.read<ProductFeedViewModel>();
+                      marketplaceVm.clearSelection();
+                      if (_pageController.hasClients) {
+                        await _pageController.animateToPage(
+                          0,
+                          duration: AppDurations.standard,
+                          curve: Curves.easeOut,
+                        );
+                      }
+                      await marketplaceVm.loadCategories();
+                      await productVm.refresh();
+                    },
+                    child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: const [
                         SizedBox(height: 24),
@@ -194,12 +240,21 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
                           subtitle: 'Try selecting a different category',
                         ),
                       ],
-                    )
-                  : PageView.builder(
+                    ),
+                  )
+                : AppRefreshIndicator(
+                    onRefresh: _refreshFromPull,
+                    child: PageView.builder(
                       controller: _pageController,
                       scrollDirection: Axis.vertical,
+                      physics: const _SnappyVerticalPagePhysics(
+                        parent: ClampingScrollPhysics(),
+                      ),
+                      dragStartBehavior: DragStartBehavior.down,
+                      allowImplicitScrolling: true,
+                      hitTestBehavior: HitTestBehavior.translucent,
                       onPageChanged: (index) {
-                        // Load more products when user is near the end
+                        HapticFeedback.selectionClick();
                         _checkAndLoadMore(index, filteredProducts.length);
                       },
                       itemCount: filteredProducts.length,
@@ -221,7 +276,7 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
                         );
                       },
                     ),
-            ),
+                  ),
           ),
         ],
       ),

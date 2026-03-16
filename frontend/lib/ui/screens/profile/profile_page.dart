@@ -25,6 +25,7 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/full_screen_image_viewer.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_refresh_indicator.dart';
+import '../../../core/utils/school_short_name.dart';
 import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
 import '../community/community_detail_page.dart';
@@ -104,7 +105,15 @@ class ProfilePageState extends State<ProfilePage>
                       followerCount: profile.followerCount,
                       followingCount: profile.followingCount,
                       major: profile.major,
-                      schoolShortName: ProfileUtils.getSchoolShortName(profile.university),
+                      schoolShortName: () {
+                          final h = buildSchoolShortName(
+                            universityName: profile.university?.name,
+                              universityDomain: profile.university?.domain ?? profile.emailDomain,
+                            email: profile.email,
+                            fallback: '',
+                          );
+                          return h.isNotEmpty ? h.toUpperCase() : 'N/A';
+                        }(),
                     ),
                     coverHeight: AppDimensions.profileCoverHeight,
                     avatarRadius: AppDimensions.profileAvatarRadius,

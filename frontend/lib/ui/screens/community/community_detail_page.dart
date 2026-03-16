@@ -691,7 +691,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     final vm = context.read<CommunityViewModel>();
     final savedListingsVm = context.read<SavedListingsViewModel>();
     final isSaved = post.isSavedByMe;
-    
+
     final updated = await vm.toggleSave(post.id, shouldSave: !isSaved);
     if (!mounted) return;
 
@@ -708,9 +708,29 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     }
 
     setState(() => _post = updated);
-    AppSnackBar.info(
+    AppSnackBar.showUndo(
       context,
       updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.',
+      onUndo: () async {
+        final undoUpdated = await vm.toggleSave(post.id, shouldSave: isSaved);
+        if (!mounted) return;
+
+        if (undoUpdated == null) {
+          AppSnackBar.error(
+            context,
+            vm.error ?? 'Failed to undo saved status update.',
+          );
+          return;
+        }
+
+        if (undoUpdated.isSavedByMe) {
+          savedListingsVm.addSavedPostLocally(undoUpdated);
+        } else {
+          savedListingsVm.removeSavedPostLocally(postId: post.id);
+        }
+
+        setState(() => _post = undoUpdated);
+      },
     );
   }
 
@@ -837,6 +857,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         final handle = buildSchoolShortName(
           universityName: comment.user?.university?.name,
           universityDomain: comment.user?.university?.domain,
+          email: comment.user?.email,
           fallback: '',
         );
         return CommunityCommentItem(

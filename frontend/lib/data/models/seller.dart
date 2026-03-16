@@ -103,6 +103,7 @@ class Seller {
       email: email,
       profileImage: profileImage,
       major: major,
+      university: university?.toEntity(),
     );
   }
 
@@ -114,7 +115,9 @@ class Seller {
       email: entity.email,
       profileImage: entity.profileImage,
       role: 'user', // Default
-      university: null,
+      university: entity.university != null
+          ? University.fromEntity(entity.university!)
+          : null,
       major: entity.major,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),

@@ -1,4 +1,4 @@
-import 'university.dart';
+﻿import 'university.dart';
 import '../../domain/entities/user_entity.dart';
 
 class UserProfile {
@@ -18,6 +18,7 @@ class UserProfile {
   final int followerCount;
   final int followingCount;
   final bool isFollowing;
+  final String? emailDomain;
 
   const UserProfile({
     required this.id,
@@ -36,9 +37,12 @@ class UserProfile {
     this.followerCount = 0,
     this.followingCount = 0,
     this.isFollowing = false,
+    this.emailDomain,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final universityJson = json['University'] ?? json['university'];
+
     return UserProfile(
       id: json['id'] as int? ?? 0,
       fullName: (json['full_name'] ?? '') as String,
@@ -56,12 +60,13 @@ class UserProfile {
       updatedAt: (json['updatedAt'] ?? json['updated_at']) != null
           ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
           : DateTime.now(),
-      university: json['University'] != null
-          ? University.fromJson(json['University'] as Map<String, dynamic>)
+      university: universityJson is Map<String, dynamic>
+          ? University.fromJson(universityJson)
           : null,
       followerCount: json['follower_count'] as int? ?? 0,
       followingCount: json['following_count'] as int? ?? 0,
       isFollowing: json['is_following'] as bool? ?? false,
+      emailDomain: json['email_domain'] as String?,
     );
   }
 
@@ -89,6 +94,7 @@ class UserProfile {
       followerCount: followerCount ?? this.followerCount,
       followingCount: followingCount ?? this.followingCount,
       isFollowing: isFollowing ?? this.isFollowing,
+      emailDomain: emailDomain,
     );
   }
 
@@ -111,6 +117,7 @@ class UserProfile {
       followerCount: followerCount,
       followingCount: followingCount,
       isFollowing: isFollowing,
+      emailDomain: emailDomain,
     );
   }
 
@@ -129,12 +136,13 @@ class UserProfile {
       universityId: entity.universityId,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
-      university: entity.university != null 
-          ? University.fromEntity(entity.university!) 
+      university: entity.university != null
+          ? University.fromEntity(entity.university!)
           : null,
       followerCount: entity.followerCount,
       followingCount: entity.followingCount,
       isFollowing: entity.isFollowing,
+      emailDomain: entity.emailDomain,
     );
   }
 }

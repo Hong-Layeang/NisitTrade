@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_session.dart';
 import 'app_routes.dart';
+import '../../ui/widgets/app_loading.dart';
 
 class AuthGate extends StatefulWidget {
   final Widget child;
@@ -32,9 +33,7 @@ class _AuthGateState extends State<AuthGate> {
       future: _authFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const AppPageLoading();
         }
 
         final isAuthenticated = snapshot.data == true;

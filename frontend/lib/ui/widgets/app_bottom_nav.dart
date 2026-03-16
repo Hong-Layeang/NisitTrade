@@ -78,13 +78,6 @@ class AppBottomNav extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        if (isSelected) {
-          if (index == 0) {
-            onTabSelected?.call(index);
-          }
-          return;
-        }
-
         onTabSelected?.call(index);
       },
       borderRadius: BorderRadius.circular(12),

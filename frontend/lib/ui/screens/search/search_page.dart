@@ -25,10 +25,10 @@ class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
 
   @override
-  State<SearchPage> createState() => _SearchPageState();
+  State<SearchPage> createState() => SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage>
+class SearchPageState extends State<SearchPage>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
   bool _isBootstrapping = true;
@@ -37,7 +37,8 @@ class _SearchPageState extends State<SearchPage>
       <int, ValueNotifier<int>>{};
 
   late final TabController _tabController;
-  late final ScrollController _scrollController;
+  late final ScrollController _productsScrollController;
+  late final ScrollController _studentsScrollController;
 
   // Optimistic like state for instant UI feedback
   final Set<int> _optimisticallyLikedIds = {};
@@ -59,8 +60,9 @@ class _SearchPageState extends State<SearchPage>
     _tabController.addListener(_onTabChanged);
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode = FocusNode();
-    _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
+    _productsScrollController = ScrollController();
+    _productsScrollController.addListener(_onScroll);
+    _studentsScrollController = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadInitialData();
@@ -69,13 +71,45 @@ class _SearchPageState extends State<SearchPage>
 
   void _onScroll() {
     // Load more products when user scrolls near the bottom
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 500) {
+    if (!_productsScrollController.hasClients) return;
+
+    if (_productsScrollController.position.pixels >=
+        _productsScrollController.position.maxScrollExtent - 500) {
       final productFeedVm = context.read<ProductFeedViewModel>();
       if (productFeedVm.hasMore && !productFeedVm.isLoadingMore) {
         productFeedVm.loadNextPage();
       }
     }
+  }
+
+  Future<void> scrollToTopAndRefresh() async {
+    if (!mounted) return;
+
+    if (_tabController.index == 0) {
+      if (_productsScrollController.hasClients &&
+          _productsScrollController.offset > 0) {
+        await _productsScrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        );
+      }
+
+      if (!mounted) return;
+      await context.read<ProductFeedViewModel>().refresh();
+      return;
+    }
+
+    if (_studentsScrollController.hasClients && _studentsScrollController.offset > 0) {
+      await _studentsScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    }
+
+    if (!mounted) return;
+    await context.read<SearchViewModel>().loadUsers();
   }
 
   @override
@@ -84,8 +118,9 @@ class _SearchPageState extends State<SearchPage>
     _tabController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
+    _productsScrollController.removeListener(_onScroll);
+    _productsScrollController.dispose();
+    _studentsScrollController.dispose();
     for (final notifier in _optimisticLikeNotifiers.values) {
       notifier.dispose();
     }
@@ -409,11 +444,9 @@ class _SearchPageState extends State<SearchPage>
 
   // Products tab
   Widget _buildProductsTab() {
-    final searchViewModel = context.read<SearchViewModel>();
     final productFeedViewModel = context.read<ProductFeedViewModel>();
     return AppRefreshIndicator(
       onRefresh: () async {
-        await searchViewModel.refresh();
         await productFeedViewModel.refresh();
       },
       child: Selector2<
@@ -488,7 +521,7 @@ class _SearchPageState extends State<SearchPage>
 
     return GridView.builder(
       key: _productsGridStorageKey,
-      controller: _scrollController,
+      controller: _productsScrollController,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -632,7 +665,9 @@ class _SearchPageState extends State<SearchPage>
 
     return ListView.builder(
       key: _studentsListStorageKey,
+      controller: _studentsScrollController,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final user = filtered[index];

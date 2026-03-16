@@ -1,6 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/colors.dart';
+
+class _SnappyHorizontalPagePhysics extends PageScrollPhysics {
+  const _SnappyHorizontalPagePhysics({super.parent});
+
+  @override
+  _SnappyHorizontalPagePhysics applyTo(ScrollPhysics? ancestor) {
+    return _SnappyHorizontalPagePhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  double get minFlingDistance => 6.0;
+
+  @override
+  double get minFlingVelocity => 180.0;
+
+  @override
+  double carriedMomentum(double existingVelocity) {
+    return super.carriedMomentum(existingVelocity) * 1.08;
+  }
+}
 
 class ProductCardImageCarousel extends StatelessWidget {
   final List<String> images;
@@ -48,6 +69,14 @@ class ProductCardImageCarousel extends StatelessWidget {
         PageView.builder(
           key: pageViewKey,
           controller: pageController,
+          physics: images.length > 1
+              ? const _SnappyHorizontalPagePhysics(
+                  parent: ClampingScrollPhysics(),
+                )
+              : const NeverScrollableScrollPhysics(),
+          dragStartBehavior: DragStartBehavior.down,
+          allowImplicitScrolling: true,
+          hitTestBehavior: HitTestBehavior.translucent,
           itemCount: images.length,
           onPageChanged: onPageChanged,
           itemBuilder: (context, index) {

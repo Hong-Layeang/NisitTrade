@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/colors.dart';
 import '../../../data/models/student.dart';
 import '../../../domain/entities/user_entity.dart';
+import 'app_loading.dart';
 
 class StudentListTile extends StatelessWidget {
   final Student student;
@@ -120,12 +121,11 @@ class UserAvatar extends StatelessWidget {
                 height: radius * 2,
                 color: AppColors.surface,
                 child: Center(
-                  child: CircularProgressIndicator(
+                  child: AppLoadingIndicator(
+                    size: radius,
                     strokeWidth: 2,
                     value: progress.progress,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.textSecondary,
-                    ),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               );
@@ -166,10 +166,7 @@ class FollowButton extends StatelessWidget {
           width: 24,
           height: 24,
           child: isLoading
-              ? const CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                )
+              ? const AppLoadingIndicator(size: 24, strokeWidth: 2)
               : Icon(
                   isFollowing ? Icons.person : Icons.person_add_outlined,
                   color: isFollowing ? AppColors.primary : AppColors.textSecondary,

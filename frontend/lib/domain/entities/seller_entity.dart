@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'university_entity.dart';
 
 /// Domain entity representing a seller/user
 class SellerEntity extends Equatable {
@@ -7,6 +8,7 @@ class SellerEntity extends Equatable {
   final String email;
   final String? profileImage;
   final String? major;
+  final UniversityEntity? university;
 
   const SellerEntity({
     required this.id,
@@ -14,6 +16,7 @@ class SellerEntity extends Equatable {
     required this.email,
     this.profileImage,
     this.major,
+    this.university,
   });
 
   /// Returns true if the seller has a profile image
@@ -23,5 +26,5 @@ class SellerEntity extends Equatable {
   String get displayName => fullName;
 
   @override
-  List<Object?> get props => [id, fullName, email, profileImage, major];
+  List<Object?> get props => [id, fullName, email, profileImage, major, university];
 }

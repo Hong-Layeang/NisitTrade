@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 
+import '../../../data/models/community_post.dart';
 import '../../../data/models/product.dart';
 import '../../../domain/entities/product_entity.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
@@ -300,37 +301,77 @@ class _SavedListingsPageState extends State<SavedListingsPage>
     );
   }
 
-  Future<void> _removeSaved(ProductEntity product) async {
-    final ok = await context
-        .read<SavedListingsViewModel>()
-        .removeSavedListing(productId: product.id);
+  Future<void> _removeSaved(
+    ProductEntity product, {
+    int? insertIndex,
+  }) async {
+    final vm = context.read<SavedListingsViewModel>();
+    final ok = await vm.removeSavedListing(productId: product.id);
 
     if (!mounted) return;
     if (!ok) {
       AppSnackBar.error(
         context,
-        context.read<SavedListingsViewModel>().actionError ??
-            'Failed to remove saved listing.',
-      );
-    }
-  }
-
-  Future<void> _removeSavedPost(int postId) async {
-    final ok = await context
-        .read<SavedListingsViewModel>()
-        .removeSavedPost(postId: postId);
-
-    if (!mounted) return;
-    if (!ok) {
-      AppSnackBar.error(
-        context,
-        context.read<SavedListingsViewModel>().actionError ??
-            'Failed to remove saved post.',
+        vm.actionError ?? 'Failed to remove saved listing.',
       );
       return;
     }
 
-    AppSnackBar.show(context, 'Post removed from saved.');
+    AppSnackBar.showUndo(
+      context,
+      'Removed from saved.',
+      onUndo: () async {
+        final restored = await vm.restoreSavedListing(
+          product: product,
+          insertIndex: insertIndex,
+        );
+
+        if (!mounted) return;
+        if (!restored) {
+          AppSnackBar.error(
+            context,
+            vm.actionError ?? 'Failed to undo remove saved listing.',
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _removeSavedPost(
+    int postId, {
+    required CommunityPost post,
+    int? insertIndex,
+  }) async {
+    final vm = context.read<SavedListingsViewModel>();
+    final ok = await vm.removeSavedPost(postId: postId);
+
+    if (!mounted) return;
+    if (!ok) {
+      AppSnackBar.error(
+        context,
+        vm.actionError ?? 'Failed to remove saved post.',
+      );
+      return;
+    }
+
+    AppSnackBar.showUndo(
+      context,
+      'Post removed from saved.',
+      onUndo: () async {
+        final restored = await vm.restoreSavedPost(
+          post: post,
+          insertIndex: insertIndex,
+        );
+
+        if (!mounted) return;
+        if (!restored) {
+          AppSnackBar.error(
+            context,
+            vm.actionError ?? 'Failed to undo remove saved post.',
+          );
+        }
+      },
+    );
   }
 
   bool _isOwner(ProductEntity product) {
@@ -457,7 +498,7 @@ class _SavedListingsPageState extends State<SavedListingsPage>
               ),
             );
           },
-          onLikeTap: () => _removeSaved(product),
+          onLikeTap: () => _removeSaved(product, insertIndex: index),
           onLongPress: () => _showOwnerActions(product),
         );
       },
@@ -494,6 +535,7 @@ class _SavedListingsPageState extends State<SavedListingsPage>
         final authorHandle = buildSchoolShortName(
           universityName: post.author.university?.name,
           universityDomain: post.author.university?.domain,
+          email: post.author.email,
           fallback: '',
         );
 
@@ -574,7 +616,11 @@ class _SavedListingsPageState extends State<SavedListingsPage>
                         ),
                       ),
                       InkWell(
-                        onTap: () => _removeSavedPost(post.id),
+                        onTap: () => _removeSavedPost(
+                          post.id,
+                          post: post,
+                          insertIndex: index,
+                        ),
                         borderRadius: BorderRadius.circular(999),
                         child: Container(
                           padding: const EdgeInsets.all(8),

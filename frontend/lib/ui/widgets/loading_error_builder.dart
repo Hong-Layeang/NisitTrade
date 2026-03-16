@@ -3,6 +3,7 @@ import '../../core/errors/app_error_messages.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/app_dimensions.dart';
 import '../../core/constants/app_values.dart';
+import 'app_loading.dart';
 
 /// A reusable widget that handles loading, error, and success states.
 /// Reduces boilerplate across screens for common state management patterns.
@@ -77,17 +78,15 @@ class LoadingErrorBuilder extends StatelessWidget {
   }
 
   Widget _buildDefaultLoading() {
-    return const Center(
-      child: CircularProgressIndicator(),
-    );
+    return const Center(child: AppLoadingIndicator());
   }
 
   Widget _buildLoadingOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black.withValues(alpha: AppValues.opacitySurface),
-        child: const Center(
-          child: CircularProgressIndicator(),
+    return const Positioned.fill(
+      child: ColoredBox(
+        color: Color(0x0D000000),
+        child: Center(
+          child: AppLoadingIndicator(),
         ),
       ),
     );

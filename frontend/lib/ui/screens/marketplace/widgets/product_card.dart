@@ -177,23 +177,64 @@ class _ProductCardState extends State<ProductCard>
   }
 
   Future<void> _handleToggleSaveProduct() async {
+    if (_isActionLoading) return;
+
     final savedListingsVm = context.read<SavedListingsViewModel>();
     final isSaved = _isSavedProduct();
 
-    await executeAction(
-      () async {
-        if (isSaved) {
-          await context.read<ProductFeedViewModel>().unsaveListing(_product.id);
-          savedListingsVm.removeSavedProductLocally(productId: _product.id);
-        } else {
-          await context.read<ProductFeedViewModel>().saveListing(_product.id);
-          savedListingsVm.addSavedProductLocally(_product);
+    setState(() => _isActionLoading = true);
+    try {
+      if (isSaved) {
+        await context.read<ProductFeedViewModel>().unsaveListing(_product.id);
+        savedListingsVm.removeSavedProductLocally(productId: _product.id);
+
+        if (mounted) {
+          AppSnackBar.showUndo(
+            context,
+            'Removed from saved.',
+            onUndo: () async {
+              try {
+                await context.read<ProductFeedViewModel>().saveListing(_product.id);
+                savedListingsVm.addSavedProductLocally(_product);
+              } catch (_) {
+                if (!mounted) return;
+                AppSnackBar.error(context, 'Failed to undo unsave product.');
+              }
+            },
+          );
         }
-      },
-      onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
-      successMessage: isSaved ? 'Removed from saved.' : 'Saved to your list.',
-      errorMessage: isSaved ? 'Failed to unsave product.' : 'Failed to save product.',
-    );
+      } else {
+        await context.read<ProductFeedViewModel>().saveListing(_product.id);
+        savedListingsVm.addSavedProductLocally(_product);
+
+        if (mounted) {
+          AppSnackBar.showUndo(
+            context,
+            'Saved to your list.',
+            onUndo: () async {
+              try {
+                await context.read<ProductFeedViewModel>().unsaveListing(_product.id);
+                savedListingsVm.removeSavedProductLocally(productId: _product.id);
+              } catch (_) {
+                if (!mounted) return;
+                AppSnackBar.error(context, 'Failed to undo save product.');
+              }
+            },
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.error(
+          context,
+          isSaved ? 'Failed to unsave product.' : 'Failed to save product.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
   }
 
   Future<void> _handleEditListing() async {
@@ -383,6 +424,7 @@ class _ProductCardState extends State<ProductCard>
 
   Future<void> _showProductActions() async {
     await _ensureSavedProductsLoaded();
+    if (!mounted) return;
 
     final handler = ProductCardActionHandler(
       context: context,

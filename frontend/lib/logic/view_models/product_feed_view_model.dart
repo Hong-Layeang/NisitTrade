@@ -59,15 +59,19 @@ class ProductFeedViewModel extends ChangeNotifier {
   }
 
   /// Load the first page of products
-  Future<void> loadFirstPage() async {
+  Future<void> loadFirstPage({bool preserveExisting = false}) async {
     if (_isLoading) return;
+
+    final keepCurrentProducts = preserveExisting && _products.isNotEmpty;
 
     _isLoading = true;
     _isLoadingMore = false;
     _error = null;
     _currentPage = 0;
     _hasMore = true;
-    _products = [];
+    if (!keepCurrentProducts) {
+      _products = [];
+    }
     notifyListeners();
 
     try {
@@ -131,8 +135,8 @@ class ProductFeedViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh() async {
-    await loadFirstPage();
+  Future<void> refresh({bool preserveExisting = true}) async {
+    await loadFirstPage(preserveExisting: preserveExisting);
   }
 
   Future<ProductEntity?> refreshProduct(int productId) async {

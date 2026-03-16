@@ -23,10 +23,10 @@ class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
 
   @override
-  State<CommunityPage> createState() => _CommunityPageState();
+  State<CommunityPage> createState() => CommunityPageState();
 }
 
-class _CommunityPageState extends State<CommunityPage>
+class CommunityPageState extends State<CommunityPage>
     with SingleTickerProviderStateMixin {
   static const List<String> _reportReasonOptions = [
     'Spam or scam',
@@ -37,7 +37,8 @@ class _CommunityPageState extends State<CommunityPage>
   ];
 
   late final TabController _tabController;
-  late final ScrollController _scrollController;
+  late final ScrollController _communityScrollController;
+  late final ScrollController _followingScrollController;
   late final FocusNode _postFocusNode;
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _postController = TextEditingController();
@@ -49,8 +50,9 @@ class _CommunityPageState extends State<CommunityPage>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
-    _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
+    _communityScrollController = ScrollController();
+    _communityScrollController.addListener(_onScroll);
+    _followingScrollController = ScrollController();
     _postFocusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CommunityViewModel>().load(feed: 'community');
@@ -58,7 +60,8 @@ class _CommunityPageState extends State<CommunityPage>
   }
 
   void _onScroll() {
-    if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+    if (!_communityScrollController.hasClients) return;
+    if (_communityScrollController.position.userScrollDirection == ScrollDirection.reverse) {
       if (_isComposerOpen) {
         _postFocusNode.unfocus();
         setState(() => _isComposerOpen = false);
@@ -73,14 +76,33 @@ class _CommunityPageState extends State<CommunityPage>
     }
   }
 
+  Future<void> scrollToTopAndRefresh() async {
+    if (!mounted) return;
+
+    final activeController =
+        _tabController.index == 0 ? _communityScrollController : _followingScrollController;
+
+    if (activeController.hasClients && activeController.offset > 0) {
+      await activeController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    }
+
+    if (!mounted) return;
+    await context.read<CommunityViewModel>().refresh();
+  }
+
   @override
   void dispose() {
     _tabController.removeListener(_onTabChanged);
-    _scrollController.removeListener(_onScroll);
+    _communityScrollController.removeListener(_onScroll);
     _postFocusNode.dispose();
     _postController.dispose();
     _tabController.dispose();
-    _scrollController.dispose();
+    _communityScrollController.dispose();
+    _followingScrollController.dispose();
     super.dispose();
   }
 
@@ -501,7 +523,7 @@ class _CommunityPageState extends State<CommunityPage>
     final vm = context.read<CommunityViewModel>();
     final savedListingsVm = context.read<SavedListingsViewModel>();
     final isSaved = post.isSavedByMe;
-    
+
     final updated = await vm.toggleSave(post.id, shouldSave: !isSaved);
     if (!mounted) return;
 
@@ -517,9 +539,27 @@ class _CommunityPageState extends State<CommunityPage>
       savedListingsVm.removeSavedPostLocally(postId: post.id);
     }
 
-    AppSnackBar.info(
+    AppSnackBar.showUndo(
       context,
       updated.isSavedByMe ? 'Post saved.' : 'Post removed from saved.',
+      onUndo: () async {
+        final undoUpdated = await vm.toggleSave(post.id, shouldSave: isSaved);
+        if (!mounted) return;
+
+        if (undoUpdated == null) {
+          AppSnackBar.error(
+            context,
+            vm.error ?? 'Failed to undo saved status update.',
+          );
+          return;
+        }
+
+        if (undoUpdated.isSavedByMe) {
+          savedListingsVm.addSavedPostLocally(undoUpdated);
+        } else {
+          savedListingsVm.removeSavedPostLocally(postId: post.id);
+        }
+      },
     );
   }
 
@@ -575,6 +615,7 @@ class _CommunityPageState extends State<CommunityPage>
     final handle = buildSchoolShortName(
       universityName: currentUser?.university?.name,
       universityDomain: currentUser?.university?.domain,
+      email: currentUser?.email,
       fallback: 'campus',
     );
     return Column(
@@ -680,6 +721,10 @@ class _CommunityPageState extends State<CommunityPage>
     required String feed,
     required String emptyMessage,
   }) {
+    final isCommunityFeed = feed == 'community';
+    final scrollController =
+        isCommunityFeed ? _communityScrollController : _followingScrollController;
+
     return Consumer<CommunityViewModel>(
       builder: (context, vm, _) {
         final isCurrentFeed = vm.activeFeed == feed;
@@ -717,7 +762,7 @@ class _CommunityPageState extends State<CommunityPage>
                     ? const SizedBox.shrink()
                     : vm.posts.isEmpty
                     ? ListView(
-                        controller: _scrollController,
+                        controller: scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
                           const SizedBox(height: 80),
@@ -732,7 +777,8 @@ class _CommunityPageState extends State<CommunityPage>
                         ],
                       )
                     : ListView.builder(
-                        controller: _scrollController,
+                      controller: scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
                         itemCount: vm.posts.length,
                         itemBuilder: (context, index) {

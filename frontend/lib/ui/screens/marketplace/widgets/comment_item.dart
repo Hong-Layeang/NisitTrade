@@ -31,6 +31,7 @@ class CommentItem extends StatelessWidget {
         String? profileImage,
         String? fullName,
         UniversityEntity? university,
+        String? email,
       })
     >(
       selector: (_, vm) => (
@@ -38,6 +39,7 @@ class CommentItem extends StatelessWidget {
         profileImage: vm.profile?.profileImage,
         fullName: vm.profile?.fullName,
         university: vm.profile?.university,
+        email: vm.profile?.email,
       ),
       builder: (context, userData, _) {
         final isCurrentUser =
@@ -54,6 +56,7 @@ class CommentItem extends StatelessWidget {
         final handle = buildSchoolShortName(
           universityName: university?.name,
           universityDomain: university?.domain,
+          email: isCurrentUser ? userData.email : comment.user?.email,
           fallback: '',
         );
 

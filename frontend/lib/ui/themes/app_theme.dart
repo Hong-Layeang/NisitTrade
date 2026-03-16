@@ -98,5 +98,10 @@ class AppTheme {
             ),
           ),
         ),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: AppColors.primary,
+          circularTrackColor: AppColors.surface,
+          linearTrackColor: AppColors.surface,
+        ),
       );
 }

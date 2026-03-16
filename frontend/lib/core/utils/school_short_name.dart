@@ -1,6 +1,7 @@
 String buildSchoolShortName({
   String? universityName,
   String? universityDomain,
+  String? email,
   String fallback = '',
 }) {
   final fromName = _fromUniversityName(universityName);
@@ -9,7 +10,17 @@ String buildSchoolShortName({
   final fromDomain = _fromDomain(universityDomain);
   if (fromDomain.isNotEmpty) return fromDomain;
 
+  final fromEmailDomain = _fromEmail(email);
+  if (fromEmailDomain.isNotEmpty) return fromEmailDomain;
+
   return fallback;
+}
+
+String _fromEmail(String? email) {
+  if (email == null || email.trim().isEmpty) return '';
+  final parts = email.split('@');
+  if (parts.length < 2) return '';
+  return _fromDomain(parts[1]);
 }
 
 String _fromUniversityName(String? universityName) {

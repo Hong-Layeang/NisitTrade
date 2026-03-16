@@ -45,6 +45,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     return buildSchoolShortName(
       universityName: widget.post.author.university?.name,
       universityDomain: widget.post.author.university?.domain,
+      email: widget.post.author.email,
       fallback: '',
     );
   }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../../domain/entities/product_entity.dart';
 import '../../../../logic/view_models/user_view_model.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/school_short_name.dart';
 import '../../../widgets/user_widgets.dart';
 
 /// Displays the seller information in a product card.
@@ -18,15 +19,19 @@ class ProductCardSellerHeader extends StatelessWidget {
     this.onSellerTap,
   });
 
-  String _extractUniversity(String email) {
-    final parts = email.split('@');
-    if (parts.length < 2) return email;
-    
-    final domainParts = parts[1].split('.');
-    if (domainParts.length >= 2) {
-      return '@${domainParts[1]}';
-    }
-    return email;
+  String _sellerHandle() {
+    final fromUniversity = buildSchoolShortName(
+      universityName: product.seller?.university?.name,
+      universityDomain: product.seller?.university?.domain,
+      fallback: '',
+    );
+    if (fromUniversity.isNotEmpty) return '@$fromUniversity';
+
+    final email = product.seller?.email ?? '';
+    final domainParts = email.split('@');
+    final universityDomain = domainParts.length > 1 ? domainParts[1] : null;
+    final handle = buildSchoolShortName(universityDomain: universityDomain, fallback: '');
+    return handle.isNotEmpty ? '@$handle' : '';
   }
 
   @override
@@ -73,7 +78,7 @@ class ProductCardSellerHeader extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          _extractUniversity(product.seller?.email ?? 'Unknown'),
+                          _sellerHandle(),
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 13,

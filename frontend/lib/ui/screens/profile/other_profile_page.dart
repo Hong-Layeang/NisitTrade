@@ -18,6 +18,7 @@ import '../../../logic/view_models/user_view_model.dart';
 import '../../widgets/empty_state.dart';
 import '../community/community_detail_page.dart';
 import '../marketplace/product_detail_page.dart';
+import '../../../core/utils/school_short_name.dart';
 import 'widgets/profile_widgets.dart';
 
 final getIt = GetIt.instance;
@@ -207,9 +208,15 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                         followerCount: profile.followerCount,
                         followingCount: profile.followingCount,
                         major: profile.major,
-                        schoolShortName: ProfileUtils.getSchoolShortName(
-                          profile.university?.toEntity(),
-                        ),
+                        schoolShortName: () {
+                            final h = buildSchoolShortName(
+                              universityName: profile.university?.name,
+                                universityDomain: profile.university?.domain ?? profile.emailDomain,
+                              email: profile.email,
+                              fallback: '',
+                            );
+                            return h.isNotEmpty ? h.toUpperCase() : 'N/A';
+                          }(),
                       ),
                       coverHeight: AppDimensions.profileCoverHeight,
                       avatarRadius: AppDimensions.profileAvatarRadius,

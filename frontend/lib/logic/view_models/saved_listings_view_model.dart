@@ -167,6 +167,76 @@ class SavedListingsViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> restoreSavedListing({
+    required ProductEntity product,
+    int? insertIndex,
+  }) async {
+    if (_isActionLoading) return false;
+
+    _isActionLoading = true;
+    _actionError = null;
+    notifyListeners();
+
+    try {
+      final response = await _productSaveRepository.saveListing(product.id);
+      if (!response.isSuccess) {
+        throw response.error!;
+      }
+
+      if (_savedProducts.any((item) => item.id == product.id)) {
+        return true;
+      }
+
+      final next = [..._savedProducts];
+      final safeIndex =
+          (insertIndex == null) ? 0 : insertIndex.clamp(0, next.length);
+      next.insert(safeIndex, product);
+      _savedProducts = next;
+      return true;
+    } on ApiException catch (e) {
+      _actionError = e.message;
+      return false;
+    } finally {
+      _isActionLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> restoreSavedPost({
+    required CommunityPost post,
+    int? insertIndex,
+  }) async {
+    if (_isActionLoading) return false;
+
+    _isActionLoading = true;
+    _actionError = null;
+    notifyListeners();
+
+    try {
+      final response = await _communityRepository.savePost(post.id);
+      if (!response.isSuccess) {
+        throw response.error!;
+      }
+
+      if (_savedPosts.any((item) => item.id == post.id)) {
+        return true;
+      }
+
+      final next = [..._savedPosts];
+      final safeIndex =
+          (insertIndex == null) ? 0 : insertIndex.clamp(0, next.length);
+      next.insert(safeIndex, post);
+      _savedPosts = next;
+      return true;
+    } on ApiException catch (e) {
+      _actionError = e.message;
+      return false;
+    } finally {
+      _isActionLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> deleteListing({required int productId}) async {
     if (_isActionLoading) return false;
 

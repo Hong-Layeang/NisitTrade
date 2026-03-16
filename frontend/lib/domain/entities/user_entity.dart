@@ -19,6 +19,7 @@ class UserEntity extends Equatable {
   final int followerCount;
   final int followingCount;
   final bool isFollowing;
+  final String? emailDomain;
 
   const UserEntity({
     required this.id,
@@ -37,6 +38,7 @@ class UserEntity extends Equatable {
     this.followerCount = 0,
     this.followingCount = 0,
     this.isFollowing = false,
+    this.emailDomain,
   });
 
   /// Returns true if the user has a profile image
@@ -75,6 +77,7 @@ class UserEntity extends Equatable {
     int? followerCount,
     int? followingCount,
     bool? isFollowing,
+    String? emailDomain,
   }) {
     return UserEntity(
       id: id ?? this.id,
@@ -93,6 +96,7 @@ class UserEntity extends Equatable {
       followerCount: followerCount ?? this.followerCount,
       followingCount: followingCount ?? this.followingCount,
       isFollowing: isFollowing ?? this.isFollowing,
+      emailDomain: emailDomain ?? this.emailDomain,
     );
   }
 
@@ -100,7 +104,7 @@ class UserEntity extends Equatable {
   List<Object?> get props => [
     id, fullName, email, profileImage, coverImage, bio, major,
     provider, role, universityId, createdAt, updatedAt, university,
-    followerCount, followingCount, isFollowing
+    followerCount, followingCount, isFollowing, emailDomain
   ];
 }
 

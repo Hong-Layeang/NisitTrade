@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import '../../core/errors/app_error_messages.dart';
 
@@ -33,6 +34,38 @@ class AppSnackBar {
           content: Text(
             message,
             style: _messageStyle,
+          ),
+          duration: duration,
+        ),
+      );
+  }
+
+  static void showUndo(
+    BuildContext context,
+    String message, {
+    required Future<void> Function() onUndo,
+    String actionLabel = 'UNDO',
+    Duration duration = const Duration(seconds: 4),
+    SnackBarBehavior behavior = SnackBarBehavior.fixed,
+    Color? backgroundColor,
+  }) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: behavior,
+          backgroundColor: backgroundColor ?? _defaultBackground,
+          content: Text(
+            message,
+            style: _messageStyle,
+          ),
+          action: SnackBarAction(
+            label: actionLabel,
+            textColor: Colors.white,
+            onPressed: () {
+              unawaited(onUndo());
+            },
           ),
           duration: duration,
         ),

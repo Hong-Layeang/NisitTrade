@@ -26,6 +26,10 @@ class _MainShellState extends State<MainShell> {
   late int _currentIndex;
   final GlobalKey<MarketplacePageState> _marketplaceKey =
       GlobalKey<MarketplacePageState>();
+  final GlobalKey<SearchPageState> _searchKey =
+      GlobalKey<SearchPageState>();
+  final GlobalKey<CommunityPageState> _communityKey =
+    GlobalKey<CommunityPageState>();
   final GlobalKey<ProfilePageState> _profileKey =
       GlobalKey<ProfilePageState>();
   late final List<Widget> _screens;
@@ -36,13 +40,13 @@ class _MainShellState extends State<MainShell> {
     _currentIndex = widget.initialIndex;
     _screens = [
       MarketplacePage(key: _marketplaceKey),
-      const SearchPage(),
+      SearchPage(key: _searchKey),
       SellPage(
         onProductUploaded: () {
           _onTabSelected(0);
         },
       ),
-      const CommunityPage(),
+      CommunityPage(key: _communityKey),
       ProfilePage(key: _profileKey),
     ];
     // Ensure user info is loaded when the main shell first mounts
@@ -60,7 +64,10 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _onTabSelected(int index) {
-    if (_currentIndex == index) return;
+    if (_currentIndex == index) {
+      _handleTabReselected(index);
+      return;
+    }
 
     final fromIndex = _currentIndex;
     setState(() {
@@ -72,6 +79,23 @@ class _MainShellState extends State<MainShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _profileKey.currentState?.refresh();
       });
+    }
+  }
+
+  void _handleTabReselected(int index) {
+    switch (index) {
+      case 0:
+        _marketplaceKey.currentState?.scrollToTopAndRefresh();
+        break;
+      case 1:
+        _searchKey.currentState?.scrollToTopAndRefresh();
+        break;
+      case 3:
+        _communityKey.currentState?.scrollToTopAndRefresh();
+        break;
+      case 4:
+        _profileKey.currentState?.refresh();
+        break;
     }
   }
 

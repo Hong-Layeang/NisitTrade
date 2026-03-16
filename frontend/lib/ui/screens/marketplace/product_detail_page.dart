@@ -17,6 +17,7 @@ import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_durations.dart';
+import '../../../core/utils/school_short_name.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../widgets/app_action_chip.dart';
 import '../../widgets/app_comment_composer.dart';
@@ -421,24 +422,64 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   Future<void> _handleToggleSaveProduct() async {
     final product = _product;
     if (product == null) return;
+    if (_isActionLoading) return;
 
     final savedListingsVm = context.read<SavedListingsViewModel>();
     final isSaved = _isSavedProduct();
 
-    await executeAction(
-      () async {
-        if (isSaved) {
-          await context.read<ProductFeedViewModel>().unsaveListing(widget.productId);
-          savedListingsVm.removeSavedProductLocally(productId: widget.productId);
-        } else {
-          await context.read<ProductFeedViewModel>().saveListing(widget.productId);
-          savedListingsVm.addSavedProductLocally(product.toEntity());
+    setState(() => _isActionLoading = true);
+    try {
+      if (isSaved) {
+        await context.read<ProductFeedViewModel>().unsaveListing(widget.productId);
+        savedListingsVm.removeSavedProductLocally(productId: widget.productId);
+
+        if (mounted) {
+          AppSnackBar.showUndo(
+            context,
+            'Removed from saved.',
+            onUndo: () async {
+              try {
+                await context.read<ProductFeedViewModel>().saveListing(widget.productId);
+                savedListingsVm.addSavedProductLocally(product.toEntity());
+              } catch (_) {
+                if (!mounted) return;
+                AppSnackBar.error(context, 'Failed to undo unsave product.');
+              }
+            },
+          );
         }
-      },
-      onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
-      successMessage: isSaved ? 'Removed from saved.' : 'Saved to your list.',
-      errorMessage: isSaved ? 'Failed to unsave product.' : 'Failed to save product.',
-    );
+      } else {
+        await context.read<ProductFeedViewModel>().saveListing(widget.productId);
+        savedListingsVm.addSavedProductLocally(product.toEntity());
+
+        if (mounted) {
+          AppSnackBar.showUndo(
+            context,
+            'Saved to your list.',
+            onUndo: () async {
+              try {
+                await context.read<ProductFeedViewModel>().unsaveListing(widget.productId);
+                savedListingsVm.removeSavedProductLocally(productId: widget.productId);
+              } catch (_) {
+                if (!mounted) return;
+                AppSnackBar.error(context, 'Failed to undo save product.');
+              }
+            },
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        AppSnackBar.error(
+          context,
+          isSaved ? 'Failed to unsave product.' : 'Failed to save product.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
   }
 
   Future<void> _handleEditProduct() async {
@@ -613,6 +654,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     final reason = selectedReason.trim();
     final details = detailsController.text.trim();
     detailsController.dispose();
+    if (!mounted) return;
 
     if (_isActionLoading) return;
     setState(() => _isActionLoading = true);
@@ -642,6 +684,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     if (product == null) return;
 
     await _ensureSavedProductsLoaded();
+    if (!mounted) return;
     FocusScope.of(context).unfocus();
 
     final handler = ProductCardActionHandler(
@@ -904,6 +947,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     bool isCurrentUser,
     String? avatarUrl,
   ) {
+    final handle = buildSchoolShortName(
+      universityName: product.user?.university?.name,
+      universityDomain: product.user?.university?.domain,
+      email: product.user?.email,
+      fallback: '',
+    );
+
     return Row(
       children: [
         GestureDetector(
@@ -934,7 +984,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
                     ),
                   ),
                   Text(
-                    _extractUniversity(product.user?.email ?? ''),
+                    handle.isNotEmpty ? '@$handle' : '',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
@@ -1091,15 +1141,5 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
-  String _extractUniversity(String email) {
-    final parts = email.split('@');
-    if (parts.length < 2) return email;
-    
-    final domainParts = parts[1].split('.');
-    if (domainParts.length >= 2) {
-      return '@${domainParts[1]}';
-    }
-    return email;
-  }
 }
 
