@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/image_url_helper.dart';
 import '../../../domain/entities/product_entity.dart';
+import 's3_cached_network_image.dart';
 
 /// Grid card for displaying products in a grid layout
 class ProductGridCard extends StatelessWidget {
@@ -26,9 +27,15 @@ class ProductGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firstImageUrl = product.firstImageUrl;
-    final isNetworkImage = (firstImageUrl?.startsWith('http://') ?? false) ||
-        (firstImageUrl?.startsWith('https://') ?? false);
+    final firstImageUrl = product.firstImageUrl?.trim();
+    final resolvedImageUrl = firstImageUrl == null || firstImageUrl.isEmpty
+        ? null
+        : ImageUrlHelper.getFullImageUrl(firstImageUrl);
+    final s3Key = firstImageUrl == null || firstImageUrl.isEmpty
+        ? null
+        : ImageUrlHelper.extractS3KeyFromUrl(firstImageUrl) ?? firstImageUrl;
+    final isNetworkImage = resolvedImageUrl != null &&
+        ImageUrlHelper.isValidUrl(resolvedImageUrl);
 
     return Material(
       color: Colors.transparent,
@@ -57,7 +64,7 @@ class ProductGridCard extends StatelessWidget {
                         child: Container(
                           width: double.infinity,
                           color: AppColors.surface,
-                          child: firstImageUrl == null
+                          child: resolvedImageUrl == null
                               ? Container(
                                   color: AppColors.surface,
                                   child: const Icon(
@@ -67,16 +74,17 @@ class ProductGridCard extends StatelessWidget {
                                   ),
                                 )
                               : isNetworkImage
-                                  ? CachedNetworkImage(
-                                  key: ValueKey('grid_image_${product.id}_$firstImageUrl'),
-                                  imageUrl: firstImageUrl,
+                                  ? S3CachedNetworkImage(
+                                  key: ValueKey('grid_image_${product.id}_$resolvedImageUrl'),
+                                  imageUrl: resolvedImageUrl,
+                                  s3Key: s3Key,
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   height: double.infinity,
                                   useOldImageOnUrlChange: true,
                                   fadeInDuration: Duration.zero,
                                   fadeOutDuration: Duration.zero,
-                                  placeholder: (context, url) => Container(
+                                  progressIndicatorBuilder: (context, url, progress) => Container(
                                     color: AppColors.surface,
                                     child: const Icon(
                                       Icons.image,
@@ -94,7 +102,7 @@ class ProductGridCard extends StatelessWidget {
                                   ),
                                 )
                                   : Image.asset(
-                                      firstImageUrl,
+                                      resolvedImageUrl,
                                       fit: BoxFit.cover,
                                       width: double.infinity,
                                       height: double.infinity,

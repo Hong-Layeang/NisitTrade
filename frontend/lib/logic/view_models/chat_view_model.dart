@@ -63,10 +63,11 @@ class ChatRoomViewModel extends ChangeNotifier {
   Future<void> loadConversations({bool refresh = false}) async {
     if (_isLoadingConversations) return;
 
+    final previousConversations = List<Conversation>.from(_conversations);
+    final nextPage = refresh ? 1 : _conversationPage;
+
     if (refresh) {
-      _conversationPage = 1;
       _hasMoreConversations = true;
-      _conversations = [];
     }
 
     _isLoadingConversations = true;
@@ -75,24 +76,31 @@ class ChatRoomViewModel extends ChangeNotifier {
 
     try {
       final response = await _chatRepository.getConversations(
-        page: _conversationPage,
+        page: nextPage,
         limit: _conversationPageSize,
       );
 
       if (response.isSuccess) {
+        final fetchedConversations = response.data ?? [];
         if (refresh) {
-          _conversations = response.data ?? [];
+          _conversations = fetchedConversations;
         } else {
-          _conversations.addAll(response.data ?? []);
+          _conversations.addAll(fetchedConversations);
         }
-        _conversationPage++;
-        if ((response.data ?? []).length < _conversationPageSize) {
+        _conversationPage = nextPage + 1;
+        if (fetchedConversations.length < _conversationPageSize) {
           _hasMoreConversations = false;
         }
       } else {
+        if (refresh) {
+          _conversations = previousConversations;
+        }
         _conversationsError = response.error?.message ?? 'Failed to load conversations';
       }
     } catch (e) {
+      if (refresh) {
+        _conversations = previousConversations;
+      }
       _conversationsError = 'Error: ${e.toString()}';
     } finally {
       _isLoadingConversations = false;
@@ -138,6 +146,34 @@ class ChatRoomViewModel extends ChangeNotifier {
 
     try {
       final response = await _chatRepository.createConversation(productId);
+      if (response.isSuccess) {
+        _currentConversation = response.data;
+        // Add to conversations list
+        if (response.data != null) {
+          _conversations.insert(0, response.data!);
+        }
+        return response.data;
+      } else {
+        _currentConversationError = response.error?.message ?? 'Failed to create conversation';
+        return null;
+      }
+    } catch (e) {
+      _currentConversationError = 'Error: ${e.toString()}';
+      return null;
+    } finally {
+      _isLoadingCurrentConversation = false;
+      notifyListeners();
+    }
+  }
+
+  // Create a conversation with a user
+  Future<Conversation?> createConversationWithUser(int userId) async {
+    _isLoadingCurrentConversation = true;
+    _currentConversationError = null;
+    notifyListeners();
+
+    try {
+      final response = await _chatRepository.createConversationWithUser(userId);
       if (response.isSuccess) {
         _currentConversation = response.data;
         // Add to conversations list

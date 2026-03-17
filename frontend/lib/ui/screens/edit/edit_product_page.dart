@@ -271,8 +271,8 @@ class _EditProductPageState extends State<EditProductPage> {
     if (_isLoading && _categories.isEmpty) {
       return Scaffold(
         appBar: _buildAppBar(),
-        body: SafeArea(
-          child: const Center(child: CircularProgressIndicator()),
+        body: const SafeArea(
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }

@@ -4,7 +4,30 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="39e2f8af-69ca-40d5-b944-f9203e520944" name="Changes" comment="" />
+    <list default="true" id="39e2f8af-69ca-40d5-b944-f9203e520944" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/app.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/app.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/core/di/service_locator.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/core/di/service_locator.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/data/models/student.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/data/models/student.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/data/providers/chat_api_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/data/providers/chat_api_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/data/repositories/chat_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/data/repositories/chat_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/logic/view_models/chat_view_model.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/logic/view_models/chat_view_model.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/chat/chat_room_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/chat/chat_room_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/chat/conversations_list_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/chat/conversations_list_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/community/community_detail_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/community/community_detail_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/community/community_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/community/community_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/edit/edit_product_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/edit/edit_product_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/marketplace/product_detail_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/marketplace/product_detail_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/marketplace/widgets/product_card.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/marketplace/widgets/product_card.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/marketplace/widgets/product_card_image_carousel.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/marketplace/widgets/product_card_image_carousel.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/screens/profile/profile_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/screens/profile/profile_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/ui/widgets/user_widgets.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/ui/widgets/user_widgets.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/macos/Flutter/GeneratedPluginRegistrant.swift" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/macos/Flutter/GeneratedPluginRegistrant.swift" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/pubspec.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/pubspec.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/windows/flutter/generated_plugin_registrant.cc" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/windows/flutter/generated_plugin_registrant.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/windows/flutter/generated_plugins.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/windows/flutter/generated_plugins.cmake" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -13,13 +36,20 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="465" />
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 2
-}]]></component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 2
+}</component>
   <component name="ProjectId" id="3An36jrKiwJPMCaFVAB3y3d2u9Z" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -28,16 +58,39 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "main",
-    "kotlin-language-version-configured": "true"
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/NeZha/Documents/NisitTrade-User",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "dart.settings",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.31033.145" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.31033.145" />
+      </set>
+    </attachedChunks>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="39e2f8af-69ca-40d5-b944-f9203e520944" name="Changes" comment="" />
@@ -45,7 +98,15 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1773214336941</updated>
+      <workItem from="1773759760408" duration="5403000" />
     </task>
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

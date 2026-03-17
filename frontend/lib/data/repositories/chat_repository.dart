@@ -27,6 +27,11 @@ class ChatRepository {
     return _apiService.createConversation(productId);
   }
 
+  /// Create a new conversation with a user
+  Future<ApiResponse<Conversation>> createConversationWithUser(int userId) async {
+    return _apiService.createConversationWithUser(userId);
+  }
+
   /// Get messages for a conversation
   Future<ApiResponse<List<Message>>> getMessages({
     required int conversationId,

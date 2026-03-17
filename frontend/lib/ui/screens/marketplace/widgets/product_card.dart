@@ -23,6 +23,7 @@ import 'product_card_image_carousel.dart';
 import 'product_card_info.dart';
 import 'product_card_seller_header.dart';
 import 'product_card_action_handler.dart';
+import '../../../../logic/services/share_service.dart';
 
 final getIt = GetIt.instance;
 
@@ -330,11 +331,15 @@ class _ProductCardState extends State<ProductCard>
         if (shareUrl == null || shareUrl.isEmpty) {
           throw Exception('Failed to get share link');
         }
-        await Clipboard.setData(ClipboardData(text: shareUrl));
+        await ShareService.shareProduct(
+          title: _product.title,
+          url: shareUrl,
+          text: '${_product.title} - ${_product.price} on NisitTrade',
+        );
       },
       onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
-      successMessage: 'Share link copied to clipboard.',
-      errorMessage: 'Failed to get share link.',
+      successMessage: 'Shared successfully!',
+      errorMessage: 'Failed to share product.',
     );
   }
 

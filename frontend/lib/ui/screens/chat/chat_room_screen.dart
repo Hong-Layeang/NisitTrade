@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../logic/view_models/chat_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../data/models/conversation.dart';
-import '../../../ui/widgets/app_app_bar.dart';
 import '../../../ui/widgets/app_snack_bar.dart';
+import '../../../ui/widgets/user_widgets.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input.dart';
 
@@ -44,7 +45,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     super.didChangeDependencies();
     if (!_hasInitialized) {
       _viewModel = Provider.of<ChatRoomViewModel>(context, listen: false);
-      _loadConversation();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadConversation();
+      });
       _hasInitialized = true;
     }
   }
@@ -105,19 +108,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chatBadgeCount = context.select<ChatRoomViewModel, int>(
-      (viewModel) => viewModel.totalUnreadCount,
-    );
-
     return Scaffold(
-      appBar: AppAppBar(
-        chatBadgeCount: chatBadgeCount,
-        onFavoriteTap: () {
-          Navigator.pushNamed(context, AppRoutes.saved);
-        },
-        onChatTap: () {
-          Navigator.pushReplacementNamed(context, AppRoutes.chat);
-        },
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Messages',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
       body: Consumer<ChatRoomViewModel>(
         builder: (context, viewModel, child) {
@@ -198,54 +204,68 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final productTitle = conversation.product?.title ?? '';
     final displayName = participant?.user?.name ?? 'User';
     final avatarUrl = participant?.user?.avatarUrl;
+    final participantUserId = participant?.userId;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border, width: 1),
+        ),
+      ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          ),
-          CircleAvatar(
-            radius: 18,
-            backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-              ? NetworkImage(avatarUrl)
+          GestureDetector(
+            onTap: participantUserId != null && participantUserId > 0
+                ? () => Navigator.of(context).pushNamed(
+                      AppRoutes.userProfile,
+                      arguments: participantUserId,
+                    )
                 : null,
-            child: avatarUrl == null || avatarUrl.isEmpty
-                ? const Icon(Icons.person)
-                : null,
+            child: UserAvatar(
+              imageUrl: avatarUrl ?? '',
+              radius: 24,
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (productTitle.isNotEmpty)
+            child: GestureDetector(
+              onTap: participantUserId != null && participantUserId > 0
+                  ? () => Navigator.of(context).pushNamed(
+                        AppRoutes.userProfile,
+                        arguments: participantUserId,
+                      )
+                  : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    productTitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
+                    displayName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-              ],
+                  if (productTitle.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      productTitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert),
           ),
         ],
       ),

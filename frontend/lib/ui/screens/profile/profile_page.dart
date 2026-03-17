@@ -29,7 +29,7 @@ import '../../../core/utils/school_short_name.dart';
 import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
 import '../community/community_detail_page.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/s3_cached_network_image.dart';
 import '../../../app.dart';
 
 final getIt = GetIt.instance;
@@ -384,14 +384,14 @@ class ProfilePageState extends State<ProfilePage>
         return GestureDetector(
           onTap: () => _openPost(post),
           child: RepaintBoundary(
-            child: CachedNetworkImage(
+            child: S3CachedNetworkImage(
               key: ValueKey('profile_post_${post.id}_$imageUrl'),
               imageUrl: imageUrl,
               fit: BoxFit.cover,
               useOldImageOnUrlChange: true,
               fadeInDuration: Duration.zero,
               fadeOutDuration: Duration.zero,
-              placeholder: (context, url) => Container(
+              progressIndicatorBuilder: (context, url, progress) => Container(
                 color: AppColors.surface,
                 child: const Center(
                   child: CircularProgressIndicator(
@@ -458,22 +458,22 @@ class ProfilePageState extends State<ProfilePage>
         return GestureDetector(
           onTap: () => _openProduct(product),
           child: RepaintBoundary(
-            child: CachedNetworkImage(
+            child: S3CachedNetworkImage(
               key: ValueKey('profile_product_${product.id}_$imageUrl'),
               imageUrl: imageUrl,
               fit: BoxFit.cover,
               useOldImageOnUrlChange: true,
               fadeInDuration: Duration.zero,
               fadeOutDuration: Duration.zero,
-                        placeholder: (context, url) => Container(
-                          color: AppColors.surface,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
+              progressIndicatorBuilder: (context, url, progress) => Container(
+                color: AppColors.surface,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
               errorWidget: (context, url, error) => Container(
                 color: AppColors.surface,
                 child: const Icon(Icons.image, color: AppColors.textSecondary),

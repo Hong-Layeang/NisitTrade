@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
@@ -20,6 +19,7 @@ import '../../widgets/app_comment_composer.dart';
 import '../../widgets/full_screen_image_viewer.dart';
 import 'widgets/community_comment_item.dart';
 import 'widgets/community_post_card.dart';
+import '../../../logic/services/share_service.dart';
 
 class CommunityDetailArgs {
   final int postId;
@@ -312,11 +312,10 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   }
 
   Future<void> _sharePost() async {
-    await Clipboard.setData(
-      ClipboardData(text: 'https://nisittrade.app/community/${widget.postId}'),
+    await ShareService.sharePost(
+      url: 'https://nisittrade.app/community/${widget.postId}',
+      text: 'Check out this post on NisitTrade',
     );
-    if (!mounted) return;
-    AppSnackBar.info(context, 'Post link copied to clipboard.');
   }
 
   bool _isOwner(CommunityPost post) {

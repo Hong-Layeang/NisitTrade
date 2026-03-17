@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/di/service_locator.dart';
+import 'data/providers/s3_presigned_url_service.dart';
 import 'logic/view_models/chat_view_model.dart';
 import 'logic/view_models/community_view_model.dart';
 import 'logic/view_models/marketplace_view_model.dart';
@@ -24,6 +25,10 @@ class NisitTradeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // S3 Presigned URL Service
+        Provider<S3PresignedUrlService>(
+          create: (_) => getIt<S3PresignedUrlService>(),
+        ),
         // Get ViewModels from dependency injection container
         ChangeNotifierProvider<UserViewModel>(
           create: (_) => getIt<UserViewModel>(),

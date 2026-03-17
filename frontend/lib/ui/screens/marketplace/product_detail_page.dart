@@ -1,6 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 
@@ -19,16 +17,19 @@ import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_durations.dart';
 import '../../../core/utils/school_short_name.dart';
 import '../../../core/navigation/app_routes.dart';
+import '../../../core/utils/image_url_helper.dart';
 import '../../widgets/app_action_chip.dart';
 import '../../widgets/app_comment_composer.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/full_screen_image_viewer.dart';
+import '../../widgets/user_widgets.dart';
 import '../edit/edit_product_page.dart';
 import 'widgets/product_card_image_carousel.dart';
 import 'widgets/comment_item.dart';
 import 'widgets/edit_comment_dialog.dart';
 import 'widgets/product_card_action_handler.dart';
 import '../profile/other_profile_page.dart' hide getIt;
+import '../../../logic/services/share_service.dart';
 
 class ProductDetailArgs {
   final int productId;
@@ -85,11 +86,6 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   bool _isSubmittingComment = false;
   bool _isActionLoading = false;
 
-  bool _isValidNetworkUrl(String? url) {
-    if (url == null || url.trim().isEmpty) return false;
-    final uri = Uri.tryParse(url.trim());
-    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority;
-  }
   bool _isTogglingLike = false;
   int _currentImageIndex = 0;
 
@@ -581,11 +577,15 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         if (shareUrl == null || shareUrl.isEmpty) {
           throw Exception('Failed to get share link');
         }
-        await Clipboard.setData(ClipboardData(text: shareUrl));
+        await ShareService.shareProduct(
+          title: _product?.title ?? 'Product',
+          url: shareUrl,
+          text: '${_product?.title ?? 'Check this out'} - ${_product?.price ?? ''} on NisitTrade',
+        );
       },
       onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
-      successMessage: 'Share link copied to clipboard.',
-      errorMessage: 'Failed to get share link.',
+      successMessage: 'Shared successfully!',
+      errorMessage: 'Failed to share product.',
     );
   }
 
@@ -947,6 +947,11 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     bool isCurrentUser,
     String? avatarUrl,
   ) {
+    final trimmedAvatarUrl = avatarUrl?.trim();
+    final resolvedAvatarUrl = trimmedAvatarUrl != null &&
+            trimmedAvatarUrl.isNotEmpty
+        ? ImageUrlHelper.getFullImageUrl(trimmedAvatarUrl)
+        : '';
     final handle = buildSchoolShortName(
       universityName: product.user?.university?.name,
       universityDomain: product.user?.university?.domain,
@@ -961,15 +966,10 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           child: Row(
             children: [
               RepaintBoundary(
-                child: CircleAvatar(
+                child: UserAvatar(
+                  key: ValueKey('detail_seller_avatar_${product.userId}_$resolvedAvatarUrl'),
+                  imageUrl: resolvedAvatarUrl,
                   radius: 18,
-                  backgroundColor: AppColors.surface,
-                  backgroundImage: _isValidNetworkUrl(avatarUrl)
-                    ? CachedNetworkImageProvider(avatarUrl!.trim()) as ImageProvider
-                      : null,
-                  child: !_isValidNetworkUrl(avatarUrl)
-                      ? const Icon(Icons.person, color: AppColors.textSecondary)
-                      : null,
                 ),
               ),
               const SizedBox(width: 10),

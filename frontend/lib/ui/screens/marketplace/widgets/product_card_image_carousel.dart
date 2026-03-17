@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/image_url_helper.dart';
+import '../../../widgets/s3_cached_network_image.dart';
 
 class _SnappyHorizontalPagePhysics extends PageScrollPhysics {
   const _SnappyHorizontalPagePhysics({super.parent});
@@ -80,21 +81,23 @@ class ProductCardImageCarousel extends StatelessWidget {
           itemCount: images.length,
           onPageChanged: onPageChanged,
           itemBuilder: (context, index) {
-            final imageUrl = images[index];
-            final isNetwork =
-                imageUrl.startsWith('http://') ||
-                imageUrl.startsWith('https://');
+            final rawImage = images[index].trim();
+            final s3Key = ImageUrlHelper.extractS3KeyFromUrl(rawImage) ?? rawImage;
+            // Convert S3 key to full URL if needed
+            final imageUrl = ImageUrlHelper.getFullImageUrl(rawImage);
+            final isValidUrl = ImageUrlHelper.isValidUrl(imageUrl);
 
-            if (isNetwork) {
-              return CachedNetworkImage(
+            if (isValidUrl) {
+              return S3CachedNetworkImage(
                 imageUrl: imageUrl,
+                s3Key: s3Key,
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
                 useOldImageOnUrlChange: true,
                 fadeInDuration: Duration.zero,
                 fadeOutDuration: Duration.zero,
-                placeholder: (context, url) => Container(
+                progressIndicatorBuilder: (context, url, progress) => Container(
                   color: AppColors.surface,
                   child: const Center(
                     child: CircularProgressIndicator(

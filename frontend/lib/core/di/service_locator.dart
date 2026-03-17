@@ -5,6 +5,8 @@ import '../../data/providers/category_api_service.dart';
 import '../../data/providers/community_api_service.dart';
 import '../../data/providers/product_api_service.dart';
 import '../../data/providers/user_api_service.dart';
+import '../../data/providers/s3_presigned_url_service.dart';
+import '../../data/providers/api_client.dart';
 import '../../data/repositories/category_repository_impl.dart';
 import '../../data/repositories/chat_repository.dart';
 import '../../data/repositories/community_repository_impl.dart';
@@ -39,6 +41,11 @@ final getIt = GetIt.instance;
 
 /// Setup all dependency injection bindings
 Future<void> setupServiceLocator() async {
+  
+  // S3 Presigned URL Service
+  getIt.registerLazySingleton<S3PresignedUrlService>(
+    () => S3PresignedUrlService(ApiClient.instance.dio),
+  );
   
   // API services are already singletons, just register them
   getIt.registerLazySingleton<CategoryApiService>(

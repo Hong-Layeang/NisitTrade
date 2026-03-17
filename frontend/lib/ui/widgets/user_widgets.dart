@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/image_url_helper.dart';
 import '../../../data/models/student.dart';
 import '../../../domain/entities/user_entity.dart';
 import 'app_loading.dart';
+import 's3_cached_network_image.dart';
 
 class StudentListTile extends StatelessWidget {
   final Student student;
@@ -36,7 +37,7 @@ class StudentListTile extends StatelessWidget {
         child: Row(
           children: [
             UserAvatar(
-              imageUrl: student.avatarUrl,
+              imageUrl: student.avatarUrl ?? '',
               radius: 28,
             ),
             const SizedBox(width: 14),
@@ -89,14 +90,19 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trimmedImageUrl = imageUrl.trim();
+    final resolvedImageUrl = trimmedImageUrl.isEmpty
+        ? ''
+        : ImageUrlHelper.getFullImageUrl(trimmedImageUrl);
+
     return RepaintBoundary(
       child: CircleAvatar(
-        key: ValueKey('avatar_$imageUrl'),
+        key: ValueKey('avatar_$resolvedImageUrl'),
         radius: radius,
         backgroundColor: AppColors.surface,
         child: ClipOval(
-          child: CachedNetworkImage(
-            imageUrl: imageUrl,
+          child: S3CachedNetworkImage(
+            imageUrl: resolvedImageUrl,
             width: radius * 2,
             height: radius * 2,
             fit: BoxFit.cover,
@@ -116,6 +122,9 @@ class UserAvatar extends StatelessWidget {
               );
             },
             progressIndicatorBuilder: (context, url, progress) {
+              final total = progress.totalSize ?? 1;
+              final downloaded = progress.downloaded;
+              final progressValue = total > 0 ? (downloaded / total) : 0.0;
               return Container(
                 width: radius * 2,
                 height: radius * 2,
@@ -124,7 +133,7 @@ class UserAvatar extends StatelessWidget {
                   child: AppLoadingIndicator(
                     size: radius,
                     strokeWidth: 2,
-                    value: progress.progress,
+                    value: progressValue,
                     color: AppColors.textSecondary,
                   ),
                 ),

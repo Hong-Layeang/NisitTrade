@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 import 'package:frontend/data/models/conversation.dart';
 import 'package:frontend/data/models/product.dart';
+import 'package:frontend/core/utils/image_url_helper.dart';
+import 'package:frontend/ui/widgets/s3_cached_network_image.dart';
 
 class ChatBubble extends StatelessWidget {
   final Message message;
@@ -89,7 +91,13 @@ class ChatBubble extends StatelessWidget {
   }
 
   Widget _buildAttachedProduct(BuildContext context) {
-    final imageUrl = attachedProduct?.firstImageUrl;
+    final imageUrl = attachedProduct?.firstImageUrl?.trim();
+    final s3Key = imageUrl != null && imageUrl.isNotEmpty
+        ? ImageUrlHelper.extractS3KeyFromUrl(imageUrl) ?? imageUrl
+        : null;
+    final resolvedImageUrl = imageUrl != null && imageUrl.isNotEmpty
+        ? ImageUrlHelper.getFullImageUrl(imageUrl)
+        : null;
 
     return Container(
       decoration: BoxDecoration(
@@ -101,9 +109,10 @@ class ChatBubble extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: imageUrl != null
-                ? Image.network(
-                    imageUrl,
+            child: resolvedImageUrl != null
+                ? S3CachedNetworkImage(
+                    imageUrl: resolvedImageUrl,
+                    s3Key: s3Key,
                     width: 54,
                     height: 54,
                     fit: BoxFit.cover,

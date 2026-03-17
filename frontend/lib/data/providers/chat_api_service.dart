@@ -30,7 +30,7 @@ class ChatApiService extends BaseApiService {
         }
         final items = data['items'] as List?;
         if (items == null) {
-          throw FormatException('Expected "items" field in response');
+          throw const FormatException('Expected "items" field in response');
         }
         return items
             .map((item) => Conversation.fromJson(item as Map<String, dynamic>))
@@ -61,6 +61,18 @@ class ChatApiService extends BaseApiService {
     );
   }
 
+  /// Create a new conversation with a user (without product)
+  Future<ApiResponse<Conversation>> createConversationWithUser(int userId) async {
+    return executeApiCall(
+      call: () => dio.post(
+        _baseRoute,
+        data: {'participant_user_id': userId},
+      ),
+      parser: (data) => Conversation.fromJson(data as Map<String, dynamic>),
+      errorMessage: 'Failed to create conversation',
+    );
+  }
+
   /// Get messages for a conversation with pagination
   Future<ApiResponse<List<Message>>> getMessages({
     required int conversationId,
@@ -81,7 +93,7 @@ class ChatApiService extends BaseApiService {
         }
         final items = data['items'] as List?;
         if (items == null) {
-          throw FormatException('Expected "items" field in response');
+          throw const FormatException('Expected "items" field in response');
         }
         return items
             .map((item) => Message.fromJson(item as Map<String, dynamic>))

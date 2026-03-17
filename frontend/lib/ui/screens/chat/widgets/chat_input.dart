@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/product.dart';
+import '../../../../core/utils/image_url_helper.dart';
+import '../../../../ui/widgets/s3_cached_network_image.dart';
 
 class ChatInput extends StatefulWidget {
   final Future<void> Function(String, bool) onSendMessage;
@@ -168,7 +170,13 @@ class _ChatInputState extends State<ChatInput> {
   }
 
   Widget _buildProductAttachment(Product product) {
-    final imageUrl = product.firstImageUrl;
+    final imageUrl = product.firstImageUrl?.trim();
+    final s3Key = imageUrl != null && imageUrl.isNotEmpty
+        ? ImageUrlHelper.extractS3KeyFromUrl(imageUrl) ?? imageUrl
+        : null;
+    final resolvedImageUrl = imageUrl != null && imageUrl.isNotEmpty
+        ? ImageUrlHelper.getFullImageUrl(imageUrl)
+        : null;
 
     return Container(
       padding: const EdgeInsets.all(8),
@@ -181,9 +189,10 @@ class _ChatInputState extends State<ChatInput> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: imageUrl != null
-                ? Image.network(
-                    imageUrl,
+            child: resolvedImageUrl != null
+                ? S3CachedNetworkImage(
+                    imageUrl: resolvedImageUrl,
+                    s3Key: s3Key,
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
