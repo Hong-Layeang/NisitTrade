@@ -1,22 +1,21 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import '../../../../data/models/product.dart';
-import '../../../../core/utils/image_url_helper.dart';
-import '../../../../ui/widgets/s3_cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../../core/constants/colors.dart';
+import '../../../../ui/widgets/full_screen_image_viewer.dart';
 
 class ChatInput extends StatefulWidget {
-  final Future<void> Function(String, bool) onSendMessage;
+  final Future<void> Function(String, List<String>) onSendMessage;
   final bool isLoading;
   final bool isSendingMessage;
-  final Product? attachedProduct;
-  final bool attachProductOnCompose;
 
   const ChatInput({
     super.key,
     required this.onSendMessage,
     this.isLoading = false,
     this.isSendingMessage = false,
-    this.attachedProduct,
-    this.attachProductOnCompose = false,
   });
 
   @override
@@ -24,29 +23,18 @@ class ChatInput extends StatefulWidget {
 }
 
 class _ChatInputState extends State<ChatInput> {
-  late TextEditingController _controller;
+  static const int _maxImages = 4;
+
+  late final TextEditingController _controller;
+  final ImagePicker _picker = ImagePicker();
+  final List<XFile> _selectedImages = <XFile>[];
   bool _isEmpty = true;
-  late bool _includeAttachedProduct;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
     _controller.addListener(_handleTextChange);
-    _includeAttachedProduct =
-        widget.attachedProduct != null && widget.attachProductOnCompose;
-  }
-
-  @override
-  void didUpdateWidget(covariant ChatInput oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.attachProductOnCompose != oldWidget.attachProductOnCompose) {
-      _includeAttachedProduct =
-          widget.attachedProduct != null && widget.attachProductOnCompose;
-    }
-    if (widget.attachedProduct == null && oldWidget.attachedProduct != null) {
-      _includeAttachedProduct = false;
-    }
   }
 
   @override
@@ -61,19 +49,53 @@ class _ChatInputState extends State<ChatInput> {
     });
   }
 
-  Future<void> _handleSend() async {
-    final message = _controller.text.trim();
-    if (message.isNotEmpty && !widget.isSendingMessage) {
-      final shouldAttach = _includeAttachedProduct;
-      await widget.onSendMessage(message, shouldAttach);
-      _controller.clear();
-      setState(() {
-        _isEmpty = true;
-        if (shouldAttach) {
-          _includeAttachedProduct = false;
-        }
-      });
+  bool get _canSend =>
+      !widget.isSendingMessage &&
+      (!_isEmpty || _selectedImages.isNotEmpty);
+
+  Future<void> _pickImages() async {
+    if (widget.isSendingMessage || widget.isLoading) {
+      return;
     }
+
+    final remaining = _maxImages - _selectedImages.length;
+    if (remaining <= 0) {
+      return;
+    }
+
+    final picked = await _picker.pickMultiImage(
+      imageQuality: 85,
+      maxWidth: 1800,
+    );
+
+    if (!mounted || picked.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _selectedImages.addAll(picked.take(remaining));
+    });
+  }
+
+  Future<void> _handleSend() async {
+    if (!_canSend) {
+      return;
+    }
+
+    final message = _controller.text.trim();
+    final imagePaths = _selectedImages.map((image) => image.path).toList(growable: false);
+
+    await widget.onSendMessage(message, imagePaths);
+
+    if (!mounted) {
+      return;
+    }
+
+    _controller.clear();
+    setState(() {
+      _isEmpty = true;
+      _selectedImages.clear();
+    });
   }
 
   @override
@@ -81,161 +103,176 @@ class _ChatInputState extends State<ChatInput> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey[300]!, width: 1),
+        border: const Border(
+          top: BorderSide(color: AppColors.border),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textPrimary.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, -6),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_includeAttachedProduct && widget.attachedProduct != null) ...[
-              _buildProductAttachment(widget.attachedProduct!),
-              const SizedBox(height: 8),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    enabled: !widget.isLoading && !widget.isSendingMessage,
-                    maxLines: null,
-                    decoration: InputDecoration(
-                      hintText: 'Type a message...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: Theme.of(context).primaryColor),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _isEmpty || widget.isSendingMessage ? null : _handleSend,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isEmpty || widget.isSendingMessage
-                          ? Colors.grey[300]
-                          : Theme.of(context).primaryColor,
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: widget.isSendingMessage
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.send,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                  ),
-                ),
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_selectedImages.isNotEmpty) ...[
+                _buildSelectedImages(),
+                const SizedBox(height: 8),
               ],
-            ),
-            if (!_includeAttachedProduct && widget.attachedProduct != null)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: widget.isSendingMessage
-                      ? null
-                      : () {
-                          setState(() {
-                            _includeAttachedProduct = true;
-                          });
-                        },
-                  icon: const Icon(Icons.link, size: 16),
-                  label: const Text('Attach product'),
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      enabled: !widget.isLoading && !widget.isSendingMessage,
+                      maxLines: 5,
+                      minLines: 1,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.35,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Message, photos, or a listing update...',
+                        hintStyle: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 15,
+                        ),
+                        fillColor: Colors.white,
+                        filled: true,
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        prefixIcon: IconButton(
+                          onPressed: _selectedImages.length >= _maxImages ? null : _pickImages,
+                          icon: const Icon(Icons.add_photo_alternate_outlined),
+                          color: AppColors.primary,
+                          splashRadius: 20,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _buildSendButton(),
+                ],
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProductAttachment(Product product) {
-    final imageUrl = product.firstImageUrl?.trim();
-    final s3Key = imageUrl != null && imageUrl.isNotEmpty
-        ? ImageUrlHelper.extractS3KeyFromUrl(imageUrl) ?? imageUrl
-        : null;
-    final resolvedImageUrl = imageUrl != null && imageUrl.isNotEmpty
-        ? ImageUrlHelper.getFullImageUrl(imageUrl)
-        : null;
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
+  Widget _buildSendButton() {
+    return GestureDetector(
+      onTap: _canSend ? _handleSend : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: _canSend
+              ? const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: _canSend ? null : AppColors.border,
+        ),
+        child: Center(
+          child: widget.isSendingMessage
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Icon(
+                  Icons.arrow_upward_rounded,
+                  color: Colors.white,
+                ),
+        ),
       ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: resolvedImageUrl != null
-                ? S3CachedNetworkImage(
-                    imageUrl: resolvedImageUrl,
-                    s3Key: s3Key,
-                    width: 44,
-                    height: 44,
+    );
+  }
+
+  Widget _buildSelectedImages() {
+    return SizedBox(
+      height: 82,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _selectedImages.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final image = _selectedImages[index];
+          return Stack(
+            children: [
+              GestureDetector(
+                onTap: () => FullScreenImageViewer.show(
+                  context,
+                  image.path,
+                  allImages: _selectedImages.map((item) => item.path).toList(growable: false),
+                  initialIndex: index,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Image.file(
+                    File(image.path),
+                    width: 82,
+                    height: 82,
                     fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 44,
-                    height: 44,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image_not_supported_outlined, size: 18),
-                  ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  product.formattedPrice,
-                  style: TextStyle(
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.w700,
+                    errorBuilder: (_, _, _) => Container(
+                      width: 82,
+                      height: 82,
+                      color: AppColors.surface,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined),
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _includeAttachedProduct = false;
-              });
-            },
-            icon: const Icon(Icons.close, size: 18),
-            tooltip: 'Remove attached product',
-          ),
-        ],
+              ),
+              Positioned(
+                top: 6,
+                right: 6,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedImages.removeAt(index);
+                    });
+                  },
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.close, size: 14, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:aad_oauth/model/config.dart';
 import 'package:flutter/foundation.dart';
 
 import '../navigation/app_navigator.dart';
+import 'auth_session.dart';
 import 'auth_token_store.dart';
 import 'microsoft_auth_api.dart';
 
@@ -141,8 +142,17 @@ class MicrosoftAuthService {
   final MicrosoftAuthApi _authApi = MicrosoftAuthApi();
   final AuthTokenStore _tokenStore = AuthTokenStore.instance;
 
+  Future<void> logout() async {
+    await _tokenStore.clearToken();
+    AuthSession.instance.markLoggedOut();
+    await _safeLogout();
+  }
+
   Future<MicrosoftAuthResult> signIn() async {
     try {
+      await _tokenStore.clearToken();
+      AuthSession.instance.markLoggedOut();
+
       await _oauth.login();
       final idToken = await _oauth.getIdToken();
       if (idToken == null || idToken.isEmpty) {
@@ -187,6 +197,7 @@ class MicrosoftAuthService {
       }
 
       await _tokenStore.saveToken(token);
+      AuthSession.instance.markAuthenticated();
       return MicrosoftAuthResult.authenticated(
         email: email,
         token: token,
@@ -225,6 +236,7 @@ class MicrosoftAuthService {
     }
 
     await _tokenStore.saveToken(token);
+    AuthSession.instance.markAuthenticated();
     return PasswordSetupResult.success(token);
   }
 

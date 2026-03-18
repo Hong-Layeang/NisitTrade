@@ -49,7 +49,7 @@ class NisitTradeApp extends StatelessWidget {
           create: (_) => getIt<CommunityViewModel>(),
         ),
         ChangeNotifierProvider<ChatRoomViewModel>(
-          create: (_) => getIt<ChatRoomViewModel>(),
+          create: (_) => getIt<ChatRoomViewModel>()..loadPersistedAttachments(),
         ),
       ],
       child: MaterialApp(

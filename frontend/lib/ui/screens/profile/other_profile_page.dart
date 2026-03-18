@@ -19,6 +19,7 @@ import '../../widgets/empty_state.dart';
 import '../community/community_detail_page.dart';
 import '../marketplace/product_detail_page.dart';
 import '../../../core/utils/school_short_name.dart';
+import '../../../logic/view_models/chat_view_model.dart';
 import 'widgets/profile_widgets.dart';
 
 final getIt = GetIt.instance;
@@ -280,11 +281,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton.icon(
-              onPressed: () => Navigator.pushNamed(
-                context,
-                AppRoutes.chatRoom,
-                arguments: {'userId': profile.id},
-              ),
+              onPressed: () => _openDirectChat(profile),
               icon: const Icon(Icons.chat_bubble_outline, size: 18),
               label: const Text('Message'),
               style: FilledButton.styleFrom(
@@ -504,6 +501,54 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         postId: post.id,
         initialPost: post,
       ),
+    );
+  }
+
+  Future<void> _openDirectChat(UserProfile profile) async {
+    final currentUserId = context.read<UserViewModel>().userId;
+    if (currentUserId == null) {
+      return;
+    }
+
+    if (currentUserId == profile.id) {
+      return;
+    }
+
+    final chatViewModel = context.read<ChatRoomViewModel>();
+    final existingConversation =
+        chatViewModel.findConversationWithUser(profile.id);
+    if (existingConversation != null) {
+      chatViewModel.selectConversation(existingConversation);
+      await Navigator.pushNamed(
+        context,
+        AppRoutes.chatRoom,
+        arguments: ChatRoomRouteArgs(conversationId: existingConversation.id),
+      );
+      return;
+    }
+
+    final conversation = await chatViewModel.createConversationWithUser(profile.id);
+    if (!mounted) return;
+
+    if (conversation == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              AppErrorMessages.resolve(
+                chatViewModel.currentConversationError ?? 'Unable to open chat.',
+              ),
+            ),
+          ),
+        );
+      return;
+    }
+
+    await Navigator.pushNamed(
+      context,
+      AppRoutes.chatRoom,
+      arguments: ChatRoomRouteArgs(conversationId: conversation.id),
     );
   }
 }

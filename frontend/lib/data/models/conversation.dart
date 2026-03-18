@@ -136,6 +136,7 @@ class Message {
   final int conversationId;
   final DateTime sentAt;
   final List<int> readBy; // List of user IDs who have read this message
+  final List<String> imageUrls;
   final Product? attachedProduct;
 
   // Associated data
@@ -148,6 +149,7 @@ class Message {
     required this.conversationId,
     required this.sentAt,
     this.readBy = const [],
+    this.imageUrls = const [],
     this.attachedProduct,
     this.sender,
   });
@@ -180,6 +182,14 @@ class Message {
           .toList();
     }
 
+    final imageUrlsData = json['image_urls'] ?? json['imageUrls'] ?? [];
+    final parsedImageUrls = imageUrlsData is List
+        ? imageUrlsData
+            .map((item) => item?.toString() ?? '')
+            .where((item) => item.trim().isNotEmpty)
+            .toList(growable: false)
+        : const <String>[];
+
     return Message(
       id: _toInt(json['id']),
       messageText: (json['message_text'] ?? json['messageText'] ?? '') as String,
@@ -187,6 +197,7 @@ class Message {
       conversationId: _toInt(json['conversation_id'] ?? json['conversationId']),
       sentAt: DateTime.parse(json['sent_at'] ?? json['sentAt'] ?? DateTime.now().toIso8601String()),
       readBy: readByList,
+      imageUrls: parsedImageUrls,
       attachedProduct: attachedProductJson != null
           ? Product.fromJson(attachedProductJson as Map<String, dynamic>)
           : null,
@@ -200,5 +211,8 @@ class Message {
     'sender_id': senderId,
     'conversation_id': conversationId,
     'sent_at': sentAt.toIso8601String(),
+    'image_urls': imageUrls,
   };
+
+  bool get hasImages => imageUrls.isNotEmpty;
 }

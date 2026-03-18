@@ -2,6 +2,7 @@ import '../models/conversation.dart';
 import '../../core/errors/api_response.dart';
 import 'api_client.dart';
 import 'base_api_service.dart';
+import 'package:dio/dio.dart';
 
 class ChatApiService extends BaseApiService {
   ChatApiService._() : super(ApiClient.instance.dio);
@@ -13,14 +14,14 @@ class ChatApiService extends BaseApiService {
 
   /// Get all conversations for the current user with pagination
   Future<ApiResponse<List<Conversation>>> getConversations({
-    int page = 1,
+    int offset = 0,
     int limit = 20,
   }) async {
     return executeApiCall(
       call: () => dio.get(
         _baseRoute,
         queryParameters: {
-          'page': page,
+          'offset': offset,
           'limit': limit,
         },
       ),
@@ -76,14 +77,14 @@ class ChatApiService extends BaseApiService {
   /// Get messages for a conversation with pagination
   Future<ApiResponse<List<Message>>> getMessages({
     required int conversationId,
-    int page = 1,
+    int offset = 0,
     int limit = 50,
   }) async {
     return executeApiCall(
       call: () => dio.get(
         '$_messagesRoute/conversation/$conversationId',
         queryParameters: {
-          'page': page,
+          'offset': offset,
           'limit': limit,
         },
       ),
@@ -108,14 +109,24 @@ class ChatApiService extends BaseApiService {
     required int conversationId,
     required String messageText,
     int? attachedProductId,
+    List<String> imagePaths = const [],
   }) async {
+    final formData = FormData.fromMap({
+      'message_text': messageText,
+      if (attachedProductId != null) 'attached_product_id': attachedProductId,
+    });
+
+    for (final imagePath in imagePaths) {
+      formData.files.add(
+        MapEntry('images', await MultipartFile.fromFile(imagePath)),
+      );
+    }
+
     return executeApiCall(
       call: () => dio.post(
         '$_messagesRoute/conversation/$conversationId',
-        data: {
-          'message_text': messageText,
-          if (attachedProductId != null) 'attached_product_id': attachedProductId,
-        },
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
       ),
       parser: (data) => Message.fromJson(data as Map<String, dynamic>),
       errorMessage: 'Failed to send message',
@@ -128,6 +139,14 @@ class ChatApiService extends BaseApiService {
       call: () => dio.post('$_messagesRoute/$messageId/read'),
       parser: (data) {},
       errorMessage: 'Failed to mark message as read',
+    );
+  }
+
+  Future<ApiResponse<void>> deleteConversation(int conversationId) async {
+    return executeApiCall(
+      call: () => dio.delete('$_baseRoute/$conversationId'),
+      parser: (_) {},
+      errorMessage: 'Failed to delete conversation',
     );
   }
 

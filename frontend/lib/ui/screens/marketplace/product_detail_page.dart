@@ -159,6 +159,26 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
 
     final chatViewModel = context.read<ChatRoomViewModel>();
+
+    // Prefer existing conversation for this product, else any chat with seller
+    final existingConversation =
+        chatViewModel.findConversationForProduct(product.id) ??
+        chatViewModel.findConversationWithUser(product.userId);
+    if (existingConversation != null) {
+      chatViewModel.selectConversation(existingConversation);
+      chatViewModel.addAttachedProduct(product);
+      if (!mounted) return;
+      await Navigator.pushNamed(
+        context,
+        AppRoutes.chatRoom,
+        arguments: ChatRoomRouteArgs(
+          conversationId: existingConversation.id,
+          attachProductOnCompose: true,
+        ),
+      );
+      return;
+    }
+
     final conversation = await chatViewModel.createConversation(product.id);
     if (!mounted) return;
 
@@ -170,6 +190,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       return;
     }
 
+    chatViewModel.addAttachedProduct(product);
     await Navigator.pushNamed(
       context,
       AppRoutes.chatRoom,

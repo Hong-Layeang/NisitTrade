@@ -29,10 +29,16 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    final hasCachedValidSession = AuthSession.instance.hasCachedValidSession;
+
     return FutureBuilder<bool>(
       future: _authFuture,
+      initialData: hasCachedValidSession ? true : null,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
+          if (hasCachedValidSession) {
+            return widget.child;
+          }
           return const AppPageLoading();
         }
 

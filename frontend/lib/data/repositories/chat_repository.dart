@@ -11,10 +11,10 @@ class ChatRepository {
 
   /// Get all conversations for the current user
   Future<ApiResponse<List<Conversation>>> getConversations({
-    int page = 1,
+    int offset = 0,
     int limit = 20,
   }) async {
-    return _apiService.getConversations(page: page, limit: limit);
+    return _apiService.getConversations(offset: offset, limit: limit);
   }
 
   /// Get a single conversation
@@ -35,12 +35,12 @@ class ChatRepository {
   /// Get messages for a conversation
   Future<ApiResponse<List<Message>>> getMessages({
     required int conversationId,
-    int page = 1,
+    int offset = 0,
     int limit = 50,
   }) async {
     return _apiService.getMessages(
       conversationId: conversationId,
-      page: page,
+      offset: offset,
       limit: limit,
     );
   }
@@ -50,17 +50,23 @@ class ChatRepository {
     required int conversationId,
     required String messageText,
     int? attachedProductId,
+    List<String> imagePaths = const [],
   }) async {
     return _apiService.sendMessage(
       conversationId: conversationId,
       messageText: messageText,
       attachedProductId: attachedProductId,
+      imagePaths: imagePaths,
     );
   }
 
   /// Mark message as read
   Future<ApiResponse<void>> markMessageAsRead(int messageId) async {
     return _apiService.markMessageAsRead(messageId);
+  }
+
+  Future<ApiResponse<void>> deleteConversation(int conversationId) async {
+    return _apiService.deleteConversation(conversationId);
   }
 
   /// Get conversation participants

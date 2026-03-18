@@ -8,8 +8,11 @@ import '../../../data/models/user_profile.dart';
 import '../../../data/providers/user_api_service.dart';
 import '../../../logic/view_models/chat_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../ui/widgets/app_action_sheet.dart';
 import '../../../ui/widgets/app_snack_bar.dart';
 import '../../../ui/widgets/user_widgets.dart';
+import '../profile/other_profile_page.dart';
+import 'widgets/chat_menu_helpers.dart';
 
 class ConversationsListScreen extends StatefulWidget {
   static const routeName = '/conversations';
@@ -28,6 +31,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   String? _usersError;
   int? _openingUserId;
   List<UserProfile> _allUsers = [];
+  String _searchQuery = '';
 
   @override
   void didChangeDependencies() {
@@ -156,9 +160,10 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         _ChatListEntry(
           userId: userId,
           title: user.name.trim().isNotEmpty ? user.name : 'User',
-          subtitle: (conversation.lastMessage?.messageText ?? '').trim().isNotEmpty
-              ? conversation.lastMessage!.messageText.trim()
-              : user.username,
+          subtitle: _conversationSubtitle(
+            conversation,
+            'Start a conversation',
+          ),
           avatarUrl: user.avatarUrl,
           conversation: conversation,
         ),
@@ -179,7 +184,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         _ChatListEntry(
           userId: user.id,
           title: user.fullName.trim().isNotEmpty ? user.fullName : 'User',
-          subtitle: user.email,
+          subtitle: 'Start a conversation',
           avatarUrl: user.profileImage,
         ),
       );
@@ -188,11 +193,29 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     return entries;
   }
 
+  String _conversationSubtitle(Conversation conversation, String fallback) {
+    final lastMessage = conversation.lastMessage;
+    final messageText = (lastMessage?.messageText ?? '').trim();
+    if (messageText.isNotEmpty) {
+      return messageText;
+    }
+    if ((lastMessage?.imageUrls ?? const <String>[]).isNotEmpty) {
+      return 'Shared photos';
+    }
+    if (lastMessage?.attachedProduct != null) {
+      return 'Shared a listing';
+    }
+    return fallback;
+  }
+
   Future<void> _openChat(_ChatListEntry entry) async {
     if (_openingUserId != null) return;
 
+    final chatRoomViewModel = context.read<ChatRoomViewModel>();
+
     final existingConversation = entry.conversation;
     if (existingConversation != null) {
+      chatRoomViewModel.selectConversation(existingConversation);
       Navigator.of(context).pushNamed(
         AppRoutes.chatRoom,
         arguments: existingConversation.id,
@@ -205,9 +228,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     });
 
     try {
-      final conversation = await context
-          .read<ChatRoomViewModel>()
-          .createConversationWithUser(entry.userId);
+      final conversation = await chatRoomViewModel.createConversationWithUser(entry.userId);
 
       if (!mounted) return;
 
@@ -216,6 +237,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         return;
       }
 
+      // Chat list selection: open with no attachment
       Navigator.of(context).pushNamed(
         AppRoutes.chatRoom,
         arguments: conversation.id,
@@ -229,13 +251,151 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     }
   }
 
+  Future<void> _showEntryActions(_ChatListEntry entry) async {
+    final conversation = entry.conversation;
+    if (conversation == null) return;
+
+    await AppActionSheet.show(
+      context,
+      items: [
+        AppActionSheetItem(
+          label: 'View profile',
+          icon: Icons.person_outline_rounded,
+          onTap: () => Navigator.of(context).pushNamed(
+            AppRoutes.userProfile,
+            arguments: OtherProfileArgs(userId: entry.userId),
+          ),
+        ),
+        AppActionSheetItem(
+          label: 'Block user',
+          icon: Icons.block_rounded,
+          isDestructive: true,
+          onTap: () => _blockUser(
+            userId: entry.userId,
+            displayName: entry.title,
+          ),
+        ),
+        AppActionSheetItem(
+          label: 'Report user',
+          icon: Icons.flag_outlined,
+          isDestructive: true,
+          onTap: () => _reportUser(
+            userId: entry.userId,
+            displayName: entry.title,
+          ),
+        ),
+        AppActionSheetItem(
+          label: 'Delete chat',
+          icon: Icons.delete_outline_rounded,
+          isDestructive: true,
+          onTap: () => _deleteConversation(conversation),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _blockUser({
+    required int userId,
+    required String displayName,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Block $displayName?'),
+        content: const Text(
+          'They won\'t be able to message you or see your listings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD64545),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+
+    final response = await UserApiService.instance.blockUser(userId);
+    if (!mounted) return;
+
+    if (response.isSuccess) {
+      AppSnackBar.success(context, '$displayName blocked');
+    } else {
+      AppSnackBar.error(
+        context,
+        response.error?.message ?? 'Failed to block user',
+      );
+    }
+  }
+
+  Future<void> _reportUser({
+    required int userId,
+    required String displayName,
+  }) async {
+    final reason = await showUserReportReasonDialog(
+      context,
+      title: 'Report $displayName',
+    );
+    if (!mounted || reason == null) return;
+
+    final response = await UserApiService.instance.reportUser(
+      userId: userId,
+      reason: reason,
+    );
+    if (!mounted) return;
+
+    if (response.isSuccess) {
+      AppSnackBar.success(context, 'Report submitted');
+    } else {
+      AppSnackBar.error(
+        context,
+        response.error?.message ?? 'Failed to submit report',
+      );
+    }
+  }
+
+  Future<void> _deleteConversation(Conversation conversation) async {
+    final confirmed = await showDeleteChatConfirmation(
+      context,
+      title: 'Delete chat',
+      message: 'This removes the conversation from your chat list.',
+    );
+    if (!mounted || !confirmed) return;
+
+    final chatViewModel = context.read<ChatRoomViewModel>();
+    final success = await chatViewModel.deleteConversation(conversation.id);
+    if (!mounted) return;
+
+    if (success) {
+      AppSnackBar.success(context, 'Chat deleted');
+    } else {
+      AppSnackBar.error(
+        context,
+        chatViewModel.conversationsError ?? 'Failed to delete conversation',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.read<UserViewModel>().userId ?? 0;
 
     return Consumer<ChatRoomViewModel>(
       builder: (context, chatViewModel, child) {
-        final entries = _buildEntries(chatViewModel.conversations, currentUserId);
+        final entries = _buildEntries(chatViewModel.conversations, currentUserId)
+            .where((entry) {
+          final query = _searchQuery.trim().toLowerCase();
+          if (query.isEmpty) return true;
+          return entry.title.toLowerCase().contains(query) ||
+              entry.subtitle.toLowerCase().contains(query);
+        }).toList();
 
         return Scaffold(
           appBar: AppBar(
@@ -254,13 +414,50 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
               ),
             ),
           ),
-          body: RefreshIndicator(
-            onRefresh: _refresh,
-            child: _buildBody(
-              entries: entries,
-              isLoadingConversations: chatViewModel.isLoadingConversations,
-              conversationsError: chatViewModel.conversationsError,
-            ),
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: TextField(
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                    hintText: 'Search chats',
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.cancel, color: AppColors.textSecondary),
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: _buildBody(
+                    entries: entries,
+                    isLoadingConversations: chatViewModel.isLoadingConversations,
+                    conversationsError: chatViewModel.conversationsError,
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -273,7 +470,13 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     required String? conversationsError,
   }) {
     if (_isLoadingUsers && entries.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 180),
+          Center(child: CircularProgressIndicator()),
+        ],
+      );
     }
 
     final combinedError = conversationsError ?? _usersError;
@@ -394,29 +597,56 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : entry.conversation != null && entry.conversation!.unreadCount > 0
-                      ? CircleAvatar(
-                          radius: 11,
-                          backgroundColor: AppColors.primary,
-                          child: Text(
-                            entry.conversation!.unreadCount > 99
-                                ? '99+'
-                                : entry.conversation!.unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (entry.conversation != null &&
+                            entry.conversation!.unreadCount > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: CircleAvatar(
+                              radius: 11,
+                              backgroundColor: AppColors.primary,
+                              child: Text(
+                                entry.conversation!.unreadCount > 99
+                                    ? '99+'
+                                    : entry.conversation!.unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ),
-                        )
-                      : const Icon(
-                          Icons.chevron_right_rounded,
-                          color: AppColors.textSecondary,
-                        ),
+                        if (entry.conversation != null)
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(
+                                Icons.more_horiz_rounded,
+                                color: AppColors.textSecondary,
+                                size: 22,
+                              ),
+                              onPressed: () => _showEntryActions(entry),
+                            ),
+                          ),
+                      ],
+                    ),
               onTap: isOpening ? null : () => _openChat(entry),
             ),
             if (index < entries.length - 1)
-              const Divider(height: 1, indent: 84),
+              // Divider now spans full width
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Divider(
+                  height: 1,
+                  thickness: 0.7,
+                  color: AppColors.textSecondary.withOpacity(0.15),
+                ),
+              ),
           ],
         );
       },

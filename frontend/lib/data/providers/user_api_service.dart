@@ -168,6 +168,55 @@ class UserApiService {
     }
   }
 
+  Future<ApiResponse<void>> reportUser({
+    required int userId,
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      await _dio.post(
+        '/users/$userId/reports',
+        data: <String, dynamic>{
+          'reason': reason,
+          if (details != null && details.trim().isNotEmpty) 'details': details.trim(),
+        },
+      );
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(
+        ApiException(message: 'Failed to report user: $e'),
+      );
+    }
+  }
+
+  Future<ApiResponse<bool>> blockUser(int userId) async {
+    try {
+      await _dio.post('/users/$userId/block');
+      return ApiResponse.success(true);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(
+        ApiException(message: 'Failed to block user: $e'),
+      );
+    }
+  }
+
+  Future<ApiResponse<bool>> unblockUser(int userId) async {
+    try {
+      await _dio.delete('/users/$userId/block');
+      return ApiResponse.success(true);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(
+        ApiException(message: 'Failed to unblock user: $e'),
+      );
+    }
+  }
+
   Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
     required int userId,
     int? limit,

@@ -12,15 +12,28 @@ class AuthSession {
   static final AuthSession instance = AuthSession._();
 
   final AuthTokenStore _tokenStore = AuthTokenStore.instance;
+  bool? _lastKnownValidSession;
+
+  bool get hasCachedValidSession => _lastKnownValidSession == true;
+
+  void markAuthenticated() {
+    _lastKnownValidSession = true;
+  }
+
+  void markLoggedOut() {
+    _lastKnownValidSession = false;
+  }
 
   Future<bool> hasValidSession() async {
     final token = await _tokenStore.readToken();
     if (token == null || token.isEmpty) {
+      _lastKnownValidSession = false;
       return false;
     }
 
     if (_isExpired(token)) {
       await _tokenStore.clearToken();
+      _lastKnownValidSession = false;
       return false;
     }
 
@@ -31,11 +44,13 @@ class AuthSession {
     } on DioException catch (e) {
       if (e.response?.statusCode == 401 || e.response?.statusCode == 404) {
         await _tokenStore.clearToken();
+        _lastKnownValidSession = false;
         return false;
       }
       // Network errors — allow through so the app doesn't block on offline.
     }
 
+    _lastKnownValidSession = true;
     return true;
   }
 

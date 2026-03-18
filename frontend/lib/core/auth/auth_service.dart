@@ -1,5 +1,7 @@
 import '../../data/providers/auth_api.dart';
+import 'auth_session.dart';
 import 'auth_token_store.dart';
+import 'microsoft_auth_service.dart';
 
 enum LoginStatus {
   authenticated,
@@ -62,6 +64,9 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    await _tokenStore.clearToken();
+    AuthSession.instance.markLoggedOut();
+
     final response = await _authApi.login(
       email: email,
       password: password,
@@ -78,6 +83,7 @@ class AuthService {
     }
 
     await _tokenStore.saveToken(token);
+    AuthSession.instance.markAuthenticated();
     return LoginResult.authenticated(
       token: token,
       user: response.user,
@@ -86,6 +92,8 @@ class AuthService {
 
   Future<void> logout() async {
     await _tokenStore.clearToken();
+    AuthSession.instance.markLoggedOut();
+    await MicrosoftAuthService.instance.logout();
   }
 
   static String? _sanitizeMessage(String? message) {
