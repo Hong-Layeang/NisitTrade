@@ -28,16 +28,14 @@ class StudentListTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: const BoxDecoration(
           border: Border(
-            bottom: BorderSide(
-              color: AppColors.surface,
-              width: 1,
-            ),
+            bottom: BorderSide(color: AppColors.surface, width: 1),
           ),
         ),
         child: Row(
           children: [
             UserAvatar(
               imageUrl: student.avatarUrl ?? '',
+              displayName: student.name,
               radius: 28,
             ),
             const SizedBox(width: 14),
@@ -64,10 +62,7 @@ class StudentListTile extends StatelessWidget {
                 ],
               ),
             ),
-            FollowButton(
-              isFollowing: isFollowing,
-              onTap: onFollowTap,
-            ),
+            FollowButton(isFollowing: isFollowing, onTap: onFollowTap),
           ],
         ),
       ),
@@ -78,15 +73,51 @@ class StudentListTile extends StatelessWidget {
 /// Reusable user avatar with proper error handling
 class UserAvatar extends StatelessWidget {
   final String imageUrl;
+  final String? displayName;
   final double radius;
-  final IconData fallbackIcon;
+  final bool showStatusDot;
+  final Color statusDotColor;
+  final Color statusDotBorderColor;
+  final double statusDotSize;
+  final double statusDotBorderWidth;
 
   const UserAvatar({
     super.key,
     required this.imageUrl,
+    this.displayName,
     this.radius = 24,
-    this.fallbackIcon = Icons.person,
+    this.showStatusDot = false,
+    this.statusDotColor = AppColors.primary,
+    this.statusDotBorderColor = Colors.white,
+    this.statusDotSize = 12,
+    this.statusDotBorderWidth = 2,
   });
+
+  String _initials() {
+    final name = displayName?.trim() ?? '';
+    final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  Widget _buildInitialsFallback() {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      color: AppColors.primary.withValues(alpha: 0.15),
+      child: Center(
+        child: Text(
+          _initials(),
+          style: TextStyle(
+            color: AppColors.primary,
+            fontSize: radius * 0.42,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,53 +125,71 @@ class UserAvatar extends StatelessWidget {
     final resolvedImageUrl = trimmedImageUrl.isEmpty
         ? ''
         : ImageUrlHelper.getFullImageUrl(trimmedImageUrl);
+    final hasValidImage = ImageUrlHelper.isValidUrl(resolvedImageUrl);
 
     return RepaintBoundary(
-      child: CircleAvatar(
-        key: ValueKey('avatar_$resolvedImageUrl'),
-        radius: radius,
-        backgroundColor: AppColors.surface,
-        child: ClipOval(
-          child: S3CachedNetworkImage(
-            imageUrl: resolvedImageUrl,
-            width: radius * 2,
-            height: radius * 2,
-            fit: BoxFit.cover,
-            useOldImageOnUrlChange: true,
-            fadeInDuration: Duration.zero,
-            fadeOutDuration: Duration.zero,
-            errorWidget: (context, url, error) {
-              return Container(
-                width: radius * 2,
-                height: radius * 2,
-                color: AppColors.surface,
-                child: Icon(
-                  fallbackIcon,
-                  color: AppColors.textSecondary,
-                  size: radius,
-                ),
-              );
-            },
-            progressIndicatorBuilder: (context, url, progress) {
-              final total = progress.totalSize ?? 1;
-              final downloaded = progress.downloaded;
-              final progressValue = total > 0 ? (downloaded / total) : 0.0;
-              return Container(
-                width: radius * 2,
-                height: radius * 2,
-                color: AppColors.surface,
-                child: Center(
-                  child: AppLoadingIndicator(
-                    size: radius,
-                    strokeWidth: 2,
-                    value: progressValue,
-                    color: AppColors.textSecondary,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CircleAvatar(
+            key: ValueKey('avatar_$resolvedImageUrl'),
+            radius: radius,
+            backgroundColor: AppColors.surface,
+            child: ClipOval(
+              child: hasValidImage
+                  ? S3CachedNetworkImage(
+                      imageUrl: resolvedImageUrl,
+                      width: radius * 2,
+                      height: radius * 2,
+                      fit: BoxFit.cover,
+                      useOldImageOnUrlChange: true,
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
+                      errorWidget: (context, url, error) {
+                        return _buildInitialsFallback();
+                      },
+                      progressIndicatorBuilder: (context, url, progress) {
+                        final total = progress.totalSize ?? 1;
+                        final downloaded = progress.downloaded;
+                        final progressValue = total > 0
+                            ? (downloaded / total)
+                            : 0.0;
+                        return Container(
+                          width: radius * 2,
+                          height: radius * 2,
+                          color: AppColors.surface,
+                          child: Center(
+                            child: AppLoadingIndicator(
+                              size: radius,
+                              strokeWidth: 2,
+                              value: progressValue,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : _buildInitialsFallback(),
+            ),
+          ),
+          if (showStatusDot)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: statusDotSize,
+                height: statusDotSize,
+                decoration: BoxDecoration(
+                  color: statusDotColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: statusDotBorderColor,
+                    width: statusDotBorderWidth,
                   ),
                 ),
-              );
-            },
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -178,7 +227,9 @@ class FollowButton extends StatelessWidget {
               ? const AppLoadingIndicator(size: 24, strokeWidth: 2)
               : Icon(
                   isFollowing ? Icons.person : Icons.person_add_outlined,
-                  color: isFollowing ? AppColors.primary : AppColors.textSecondary,
+                  color: isFollowing
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
                   size: 24,
                 ),
         ),
@@ -221,7 +272,11 @@ class UserProfileListTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            UserAvatar(imageUrl: avatarUrl, radius: 28),
+            UserAvatar(
+              imageUrl: avatarUrl,
+              displayName: user.fullName,
+              radius: 28,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

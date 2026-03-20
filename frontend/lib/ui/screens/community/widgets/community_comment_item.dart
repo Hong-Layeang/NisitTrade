@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 
 import '../../../../core/constants/colors.dart';
+import '../../../widgets/user_widgets.dart';
 
 class CommunityCommentItem extends StatelessWidget {
   final String? avatarUrl;
@@ -28,19 +28,13 @@ class CommunityCommentItem extends StatelessWidget {
     required this.onDelete,
   });
 
-  bool _isValidNetworkUrl(String? url) {
-    if (url == null || url.trim().isEmpty) return false;
-    final uri = Uri.tryParse(url.trim());
-    return uri != null &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.hasAuthority;
-  }
-
   @override
   Widget build(BuildContext context) {
     final safeHandle = (handle ?? '').trim();
     final showEditMenu = canEdit && (onEdit != null || onDelete != null);
-    final normalizedName = displayName.trim().isEmpty ? 'User' : displayName.trim();
+    final normalizedName = displayName.trim().isEmpty
+        ? 'User'
+        : displayName.trim();
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,19 +43,10 @@ class CommunityCommentItem extends StatelessWidget {
           padding: const EdgeInsets.only(top: 2),
           child: GestureDetector(
             onTap: onUserTap,
-            child: CircleAvatar(
+            child: UserAvatar(
+              imageUrl: avatarUrl ?? '',
+              displayName: normalizedName,
               radius: 16,
-              backgroundColor: AppColors.surface,
-              backgroundImage: _isValidNetworkUrl(avatarUrl)
-                  ? CachedNetworkImageProvider(avatarUrl!.trim()) as ImageProvider
-                  : null,
-              child: !_isValidNetworkUrl(avatarUrl)
-                  ? const Icon(
-                      Icons.person,
-                      color: AppColors.textSecondary,
-                      size: 18,
-                    )
-                  : null,
             ),
           ),
         ),
@@ -147,9 +132,16 @@ class CommunityCommentItem extends StatelessWidget {
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete, size: 18, color: Colors.red),
+                                  Icon(
+                                    Icons.delete,
+                                    size: 18,
+                                    color: Colors.red,
+                                  ),
                                   SizedBox(width: 8),
-                                  Text('Delete', style: TextStyle(color: Colors.red)),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
                                 ],
                               ),
                             ),

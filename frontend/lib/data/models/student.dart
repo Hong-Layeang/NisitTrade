@@ -4,6 +4,8 @@ class Student {
   final String username;
   final String? avatarUrl;
   final bool isFollowing;
+  final bool isOnline;
+  final DateTime? lastSeenAt;
 
   const Student({
     required this.id,
@@ -11,6 +13,8 @@ class Student {
     required this.username,
     this.avatarUrl,
     this.isFollowing = false,
+    this.isOnline = false,
+    this.lastSeenAt,
   });
 
   String? get profileImage => avatarUrl;
@@ -31,6 +35,10 @@ class Student {
       username: (json['email'] ?? json['username'] ?? '') as String,
       avatarUrl: json['profile_image'] as String?,
       isFollowing: json['is_following'] as bool? ?? false,
+      isOnline: json['is_online'] as bool? ?? false,
+      lastSeenAt: (json['last_seen_at'] ?? json['lastSeenAt']) is String
+          ? DateTime.tryParse((json['last_seen_at'] ?? json['lastSeenAt']) as String)
+          : null,
     );
   }
 
@@ -40,5 +48,7 @@ class Student {
     'email': username,
     'profile_image': avatarUrl,
     'is_following': isFollowing,
+    'is_online': isOnline,
+    'last_seen_at': lastSeenAt?.toIso8601String(),
   };
 }

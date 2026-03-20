@@ -32,10 +32,13 @@ import '../../domain/repository_interfaces/i_user_repository.dart';
 import '../../logic/view_models/chat_view_model.dart';
 import '../../logic/view_models/community_view_model.dart';
 import '../../logic/view_models/product_feed_view_model.dart';
+import '../../logic/view_models/presence_view_model.dart';
 import '../../logic/view_models/saved_listings_view_model.dart';
 import '../../logic/view_models/search_view_model.dart';
 import '../../logic/view_models/marketplace_view_model.dart';
 import '../../logic/view_models/user_view_model.dart';
+import '../../logic/services/presence_websocket_service.dart';
+import '../../logic/services/chat_websocket_service.dart';
 
 final getIt = GetIt.instance;
 
@@ -127,6 +130,14 @@ Future<void> setupServiceLocator() async {
     () => ChatRepository.instance,
   );
 
+  getIt.registerLazySingleton<PresenceWebSocketService>(
+    () => PresenceWebSocketService(),
+  );
+
+  getIt.registerLazySingleton<ChatWebSocketService>(
+    () => ChatWebSocketService(),
+  );
+
 
   getIt.registerFactory<ProductFeedViewModel>(
     () => ProductFeedViewModel(
@@ -175,6 +186,13 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<ChatRoomViewModel>(
     () => ChatRoomViewModel(
       chatRepository: getIt<ChatRepository>(),
+      chatWebSocket: getIt<ChatWebSocketService>(),
+    ),
+  );
+
+  getIt.registerFactory<PresenceViewModel>(
+    () => PresenceViewModel(
+      presenceService: getIt<PresenceWebSocketService>(),
     ),
   );
 }

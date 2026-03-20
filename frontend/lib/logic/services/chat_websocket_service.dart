@@ -1,176 +1,327 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:io';
 
-/// WebSocket event callbacks
-typedef OnMessageReceived = Function(Map<String, dynamic> message);
-typedef OnMessageRead = Function(Map<String, dynamic> readData);
-typedef OnTypingStart = Function(int userId);
-typedef OnTypingStop = Function(int userId);
-typedef OnUserOnline = Function(int userId);
-typedef OnUserOffline = Function(int userId);
-typedef OnError = Function(String error);
+import 'package:flutter/foundation.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
-/// Service for real-time chat using WebSocket (Socket.io)
-/// This is a placeholder for real-time communication.
-/// 
-/// Note: For MVP, the backend REST API is used with polling.
-/// WebSocket support will be added in the future for true real-time updates.
+import '../../core/config/app_config.dart';
+import '../../data/models/conversation.dart';
+
 class ChatWebSocketService {
   static const String _tag = 'ChatWebSocketService';
-  
-  // TODO: Implement WebSocket connection using socket_io_client package
-  // For now, this is a stub that can be extended later
-  
-  late OnMessageReceived _onMessageReceived; // ignore: unused_field
-  late OnMessageRead _onMessageRead; // ignore: unused_field
-  late OnTypingStart _onTypingStart; // ignore: unused_field
-  late OnTypingStop _onTypingStop; // ignore: unused_field
-  late OnUserOnline _onUserOnline; // ignore: unused_field
-  late OnUserOffline _onUserOffline; // ignore: unused_field
-  late OnError _onError; // ignore: unused_field
 
-  bool _isConnected = false;
+  io.Socket? _socket;
+  String? _token;
+  String _activeBaseUrl = AppConfig.baseUrl;
+  bool _retryingFallback = false;
 
-  bool get isConnected => _isConnected;
+  // Stream controllers for each event type
+  final _messageReceivedController = StreamController<Message>.broadcast();
+  final _messageUpdatedController =
+      StreamController<MessageUpdateEvent>.broadcast();
+  final _messageDeletedController =
+      StreamController<MessageDeleteEvent>.broadcast();
+  final _messageReadController =
+      StreamController<MessageReadEvent>.broadcast();
+  final _typingController = StreamController<TypingEvent>.broadcast();
 
-  /// Initialize WebSocket connection
-  /// Token should be JWT from authentication
-  Future<void> connect({
-    required String token,
-    required OnMessageReceived onMessageReceived,
-    required OnMessageRead onMessageRead,
-    required OnTypingStart onTypingStart,
-    required OnTypingStop onTypingStop,
-    required OnUserOnline onUserOnline,
-    required OnUserOffline onUserOffline,
-    required OnError onError,
-  }) async {
-    try {
-      _onMessageReceived = onMessageReceived;
-      _onMessageRead = onMessageRead;
-      _onTypingStart = onTypingStart;
-      _onTypingStop = onTypingStop;
-      _onUserOnline = onUserOnline;
-      _onUserOffline = onUserOffline;
-      _onError = onError;
+  bool get isConnected => _socket?.connected == true;
 
-      // TODO: Implement actual WebSocket connection
-      // socket = IO('http://your-backend-url', <String, dynamic>{
-      //   'auth': {'token': token},
-      //   'reconnection': true,
-      //   'reconnectionDelay': 1000,
-      //   'reconnectionDelayMax': 5000,
-      // });
-      //
-      // socket.on('connect', (_) {
-      //   _isConnected = true;
-      //   debugPrint('WebSocket connected');
-      // });
-      //
-      // socket.on('disconnect', (_) {
-      //   _isConnected = false;
-      //   debugPrint('WebSocket disconnected');
-      // });
-      //
-      // socket.on('message:receive', (data) {
-      //   _onMessageReceived(data);
-      // });
-      //
-      // ... other event handlers
+  Stream<Message> get onMessageReceived => _messageReceivedController.stream;
+  Stream<MessageUpdateEvent> get onMessageUpdated =>
+      _messageUpdatedController.stream;
+  Stream<MessageDeleteEvent> get onMessageDeleted =>
+      _messageDeletedController.stream;
+  Stream<MessageReadEvent> get onMessageRead => _messageReadController.stream;
+  Stream<TypingEvent> get onTyping => _typingController.stream;
 
-      _isConnected = true;
-      debugPrint('[$_tag] Connection initialized (MVP mode - REST API only)');
-    } catch (e) {
-      _onError('Failed to connect: $e');
-      debugPrint('[$_tag] Connection error: $e');
+  Future<void> connect({required String token}) async {
+    _token = token;
+
+    if (_socket != null && _socket!.connected) {
+      return;
     }
+
+    _activeBaseUrl = AppConfig.baseUrl;
+    _retryingFallback = false;
+    _connectTo(_activeBaseUrl);
   }
 
-  /// Join a conversation room for real-time updates
+  void _connectTo(String baseUrl) {
+    final token = _token;
+    if (token == null || token.isEmpty) return;
+
+    _socket?.dispose();
+
+    final socket = io.io(
+      baseUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .enableReconnection()
+          .setReconnectionDelay(1000)
+          .setReconnectionDelayMax(5000)
+          .setAuth({'token': token})
+          .disableAutoConnect()
+          .build(),
+    );
+
+    socket.onConnect((_) {
+      debugPrint('[$_tag] Connected to $baseUrl');
+    });
+
+    socket.onDisconnect((reason) {
+      debugPrint('[$_tag] Disconnected: $reason');
+    });
+
+    socket.onConnectError((error) {
+      debugPrint('[$_tag] Connect error: $error');
+      _handleConnectError();
+    });
+
+    socket.on('chat:receive', (data) {
+      try {
+        if (data is Map) {
+          final message = Message.fromJson(Map<String, dynamic>.from(data));
+          _messageReceivedController.add(message);
+        }
+      } catch (e) {
+        debugPrint('[$_tag] Error parsing received message: $e');
+      }
+    });
+
+    socket.on('chat:updated', (data) {
+      try {
+        if (data is Map) {
+          final event =
+              MessageUpdateEvent.fromJson(Map<String, dynamic>.from(data));
+          _messageUpdatedController.add(event);
+        }
+      } catch (e) {
+        debugPrint('[$_tag] Error parsing message update: $e');
+      }
+    });
+
+    socket.on('chat:deleted', (data) {
+      try {
+        if (data is Map) {
+          final event =
+              MessageDeleteEvent.fromJson(Map<String, dynamic>.from(data));
+          _messageDeletedController.add(event);
+        }
+      } catch (e) {
+        debugPrint('[$_tag] Error parsing message delete: $e');
+      }
+    });
+
+    socket.on('chat:read', (data) {
+      try {
+        if (data is Map) {
+          final event =
+              MessageReadEvent.fromJson(Map<String, dynamic>.from(data));
+          _messageReadController.add(event);
+        }
+      } catch (e) {
+        debugPrint('[$_tag] Error parsing read receipt: $e');
+      }
+    });
+
+    socket.on('chat:typing', (data) {
+      try {
+        if (data is Map) {
+          _typingController.add(TypingEvent(
+            conversationId: _toInt(data['conversationId']),
+            userId: _toInt(data['userId']),
+            isTyping: true,
+          ));
+        }
+      } catch (e) {
+        debugPrint('[$_tag] Error parsing typing event: $e');
+      }
+    });
+
+    socket.on('chat:stop_typing', (data) {
+      try {
+        if (data is Map) {
+          _typingController.add(TypingEvent(
+            conversationId: _toInt(data['conversationId']),
+            userId: _toInt(data['userId']),
+            isTyping: false,
+          ));
+        }
+      } catch (e) {
+        debugPrint('[$_tag] Error parsing stop typing event: $e');
+      }
+    });
+
+    _socket = socket;
+    socket.connect();
+  }
+
+  void _handleConnectError() {
+    if (!Platform.isAndroid || _retryingFallback) return;
+    _retryingFallback = true;
+    _activeBaseUrl = AppConfig.fallbackBaseUrl;
+    _connectTo(_activeBaseUrl);
+  }
+
   void joinConversation(int conversationId) {
-    if (!_isConnected) return;
-    
-    // TODO: Emit 'conversation:join' event
-    // socket.emit('conversation:join', conversationId);
-    
-    debugPrint('[$_tag] Joined conversation $conversationId');
+    _socket?.emit('chat:join', {'conversationId': conversationId});
   }
 
-  /// Leave a conversation room
   void leaveConversation(int conversationId) {
-    if (!_isConnected) return;
-    
-    // TODO: Emit 'conversation:leave' event
-    // socket.emit('conversation:leave', conversationId);
-    
-    debugPrint('[$_tag] Left conversation $conversationId');
+    _socket?.emit('chat:leave', {'conversationId': conversationId});
   }
 
-  /// Send a message via WebSocket
   void sendMessage({
     required int conversationId,
     required String messageText,
   }) {
-    if (!_isConnected) return;
-    
-    // TODO: Emit 'message:send' event
-    // socket.emit('message:send', {
-    //   'conversationId': conversationId,
-    //   'messageText': messageText,
-    // });
-    
-    debugPrint('[$_tag] Message sent via WebSocket: $messageText');
+    _socket?.emit('chat:send', {
+      'conversationId': conversationId,
+      'messageText': messageText,
+    });
   }
 
-  /// Mark message as read via WebSocket
   void markMessageRead(int messageId) {
-    if (!_isConnected) return;
-    
-    // TODO: Emit 'message:read' event
-    // socket.emit('message:read', {'messageId': messageId});
-    
-    debugPrint('[$_tag] Message $messageId marked as read');
+    _socket?.emit('chat:read', {'messageId': messageId});
   }
 
-  /// Notify others that user is typing
   void notifyTyping(int conversationId) {
-    if (!_isConnected) return;
-    
-    // TODO: Emit 'typing:start' event
-    // socket.emit('typing:start', conversationId);
-    
-    debugPrint('[$_tag] Typing notification sent');
+    _socket?.emit('chat:typing', {'conversationId': conversationId});
   }
 
-  /// Notify others that user stopped typing
   void stopTyping(int conversationId) {
-    if (!_isConnected) return;
-    
-    // TODO: Emit 'typing:stop' event
-    // socket.emit('typing:stop', conversationId);
-    
-    debugPrint('[$_tag] Stop typing notification sent');
+    _socket?.emit('chat:stop_typing', {'conversationId': conversationId});
   }
 
-  /// Disconnect from WebSocket server
+  void editMessage({
+    required int messageId,
+    required String messageText,
+  }) {
+    _socket?.emit('chat:edit', {
+      'messageId': messageId,
+      'messageText': messageText,
+    });
+  }
+
+  void deleteMessages(List<int> messageIds) {
+    _socket?.emit('chat:delete', {
+      'messageIds': messageIds,
+    });
+  }
+
   Future<void> disconnect() async {
-    try {
-      // TODO: Disconnect socket
-      // socket.disconnect();
-      
-      _isConnected = false;
-      debugPrint('[$_tag] Disconnected from WebSocket');
-    } catch (e) {
-      debugPrint('[$_tag] Disconnect error: $e');
-    }
+    final socket = _socket;
+    if (socket == null) return;
+
+    socket.off('connect');
+    socket.off('disconnect');
+    socket.off('connect_error');
+    socket.off('chat:receive');
+    socket.off('chat:updated');
+    socket.off('chat:deleted');
+    socket.off('chat:read');
+    socket.off('chat:typing');
+    socket.off('chat:stop_typing');
+    socket.disconnect();
+    socket.dispose();
+    _socket = null;
   }
 
-  /// Force reconnection
-  Future<void> reconnect() async {
-    try {
-      // TODO: Implement reconnection logic
-      debugPrint('[$_tag] Reconnecting...');
-    } catch (e) {
-      debugPrint('[$_tag] Reconnection error: $e');
-    }
+  Future<void> dispose() async {
+    await disconnect();
+    await _messageReceivedController.close();
+    await _messageUpdatedController.close();
+    await _messageDeletedController.close();
+    await _messageReadController.close();
+    await _typingController.close();
   }
+
+  static int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+}
+
+class MessageUpdateEvent {
+  final int messageId;
+  final int conversationId;
+  final String messageText;
+  final DateTime editedAt;
+
+  const MessageUpdateEvent({
+    required this.messageId,
+    required this.conversationId,
+    required this.messageText,
+    required this.editedAt,
+  });
+
+  factory MessageUpdateEvent.fromJson(Map<String, dynamic> json) {
+    return MessageUpdateEvent(
+      messageId: ChatWebSocketService._toInt(json['messageId']),
+      conversationId: ChatWebSocketService._toInt(json['conversationId']),
+      messageText: (json['messageText'] ?? '') as String,
+      editedAt: DateTime.parse(
+          json['editedAt'] ?? DateTime.now().toIso8601String()),
+    );
+  }
+}
+
+class MessageDeleteEvent {
+  final List<int> messageIds;
+  final int conversationId;
+
+  const MessageDeleteEvent({
+    required this.messageIds,
+    required this.conversationId,
+  });
+
+  factory MessageDeleteEvent.fromJson(Map<String, dynamic> json) {
+    final rawIds = json['messageIds'] as List? ?? [];
+    return MessageDeleteEvent(
+      messageIds: rawIds
+          .map((id) => ChatWebSocketService._toInt(id))
+          .where((id) => id > 0)
+          .toList(),
+      conversationId: ChatWebSocketService._toInt(json['conversationId']),
+    );
+  }
+}
+
+class MessageReadEvent {
+  final int messageId;
+  final int conversationId;
+  final int userId;
+  final DateTime readAt;
+
+  const MessageReadEvent({
+    required this.messageId,
+    required this.conversationId,
+    required this.userId,
+    required this.readAt,
+  });
+
+  factory MessageReadEvent.fromJson(Map<String, dynamic> json) {
+    return MessageReadEvent(
+      messageId: ChatWebSocketService._toInt(json['messageId']),
+      conversationId: ChatWebSocketService._toInt(json['conversationId']),
+      userId: ChatWebSocketService._toInt(json['userId']),
+      readAt: DateTime.parse(
+          json['readAt'] ?? DateTime.now().toIso8601String()),
+    );
+  }
+}
+
+class TypingEvent {
+  final int conversationId;
+  final int userId;
+  final bool isTyping;
+
+  const TypingEvent({
+    required this.conversationId,
+    required this.userId,
+    required this.isTyping,
+  });
 }

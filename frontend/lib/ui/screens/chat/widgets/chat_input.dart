@@ -10,12 +10,16 @@ class ChatInput extends StatefulWidget {
   final Future<void> Function(String, List<String>) onSendMessage;
   final bool isLoading;
   final bool isSendingMessage;
+  final bool isDisabled;
+  final String? disabledHintText;
 
   const ChatInput({
     super.key,
     required this.onSendMessage,
     this.isLoading = false,
     this.isSendingMessage = false,
+    this.isDisabled = false,
+    this.disabledHintText,
   });
 
   @override
@@ -50,11 +54,12 @@ class _ChatInputState extends State<ChatInput> {
   }
 
   bool get _canSend =>
+      !widget.isDisabled &&
       !widget.isSendingMessage &&
       (!_isEmpty || _selectedImages.isNotEmpty);
 
   Future<void> _pickImages() async {
-    if (widget.isSendingMessage || widget.isLoading) {
+    if (widget.isDisabled || widget.isSendingMessage || widget.isLoading) {
       return;
     }
 
@@ -132,7 +137,7 @@ class _ChatInputState extends State<ChatInput> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      enabled: !widget.isLoading && !widget.isSendingMessage,
+                      enabled: !widget.isDisabled && !widget.isLoading && !widget.isSendingMessage,
                       maxLines: 5,
                       minLines: 1,
                       textCapitalization: TextCapitalization.sentences,
@@ -142,7 +147,7 @@ class _ChatInputState extends State<ChatInput> {
                         color: AppColors.textPrimary,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Message, photos, or a listing update...',
+                        hintText: widget.disabledHintText ?? 'Message, photos, or a listing update...',
                         hintStyle: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 15,
@@ -154,7 +159,9 @@ class _ChatInputState extends State<ChatInput> {
                           minHeight: 44,
                         ),
                         prefixIcon: IconButton(
-                          onPressed: _selectedImages.length >= _maxImages ? null : _pickImages,
+                          onPressed: widget.isDisabled || _selectedImages.length >= _maxImages
+                              ? null
+                              : _pickImages,
                           icon: const Icon(Icons.add_photo_alternate_outlined),
                           color: AppColors.primary,
                           splashRadius: 20,

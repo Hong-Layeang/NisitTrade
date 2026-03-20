@@ -160,4 +160,34 @@ class ChatApiService extends BaseApiService {
       errorMessage: 'Failed to load participants',
     );
   }
+
+  /// Edit a message
+  Future<ApiResponse<Map<String, dynamic>>> editMessage({
+    required int messageId,
+    required String messageText,
+  }) async {
+    return executeApiCall(
+      call: () => dio.patch(
+        '$_messagesRoute/$messageId',
+        data: {'message_text': messageText},
+      ),
+      parser: (data) => data as Map<String, dynamic>,
+      errorMessage: 'Failed to edit message',
+    );
+  }
+
+  /// Delete multiple messages
+  Future<ApiResponse<List<int>>> deleteMessages(List<int> messageIds) async {
+    return executeApiCall(
+      call: () => dio.post(
+        '$_messagesRoute/delete',
+        data: {'message_ids': messageIds},
+      ),
+      parser: (data) {
+        final deleted = (data as Map<String, dynamic>)['deleted'] as List? ?? [];
+        return deleted.map((id) => id is int ? id : int.tryParse('$id') ?? 0).where((id) => id > 0).toList();
+      },
+      errorMessage: 'Failed to delete messages',
+    );
+  }
 }

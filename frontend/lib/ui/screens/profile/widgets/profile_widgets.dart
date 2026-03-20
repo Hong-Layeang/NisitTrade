@@ -40,7 +40,6 @@ class ProfileUtils {
   }
 }
 
-
 class ProfileAvatar extends StatefulWidget {
   final String? imageUrl;
   final String? displayName;
@@ -93,14 +92,17 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
   @override
   Widget build(BuildContext context) {
     final hasImage = widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
-    
+
     return RepaintBoundary(
       child: Container(
         padding: EdgeInsets.all(widget.gapWidth),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: AppColors.background,
-          border: Border.all(color: widget.borderColor, width: widget.borderWidth),
+          border: Border.all(
+            color: widget.borderColor,
+            width: widget.borderWidth,
+          ),
         ),
         child: ClipOval(
           child: SizedBox(
@@ -108,7 +110,9 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
             height: widget.radius * 2,
             child: hasImage
                 ? CachedNetworkImage(
-                    key: ValueKey('profile_avatar_${_stableImageKey(widget.imageUrl)}'),
+                    key: ValueKey(
+                      'profile_avatar_${_stableImageKey(widget.imageUrl)}',
+                    ),
                     imageUrl: widget.imageUrl!,
                     fit: BoxFit.cover,
                     useOldImageOnUrlChange: true,
@@ -265,10 +269,7 @@ class UserStatsRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ProfileStatItem(
-                    icon: Icons.school_outlined,
-                    value: major,
-                  ),
+                  ProfileStatItem(icon: Icons.school_outlined, value: major),
                   SizedBox(height: detailGap),
                   ProfileStatItem(
                     icon: Icons.verified_outlined,
@@ -406,6 +407,7 @@ class ProfileHeaderSection extends StatelessWidget {
   final Widget? actionsBelow;
   final VoidCallback? onCoverTap;
   final VoidCallback? onAvatarTap;
+  final bool canEditCover;
   final double avatarRadius;
   final double avatarBorder;
   final double avatarGap;
@@ -420,6 +422,7 @@ class ProfileHeaderSection extends StatelessWidget {
     this.actionsBelow,
     this.onCoverTap,
     this.onAvatarTap,
+    this.canEditCover = false,
     this.avatarRadius = 65,
     this.avatarBorder = 3,
     this.avatarGap = 3,
@@ -483,7 +486,9 @@ class ProfileHeaderSection extends StatelessWidget {
                 children: [
                   hasCover
                       ? CachedNetworkImage(
-                          key: ValueKey('cover_image_${_stableImageKey(coverUrl)}'),
+                          key: ValueKey(
+                            'cover_image_${_stableImageKey(coverUrl)}',
+                          ),
                           imageUrl: coverUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
@@ -491,19 +496,12 @@ class ProfileHeaderSection extends StatelessWidget {
                           useOldImageOnUrlChange: true,
                           fadeInDuration: Duration.zero,
                           fadeOutDuration: Duration.zero,
-                          placeholder: (context, url) => Container(
-                            color: Colors.black87,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white54,
-                              ),
-                            ),
-                          ),
+                          placeholder: (context, url) =>
+                              _buildCoverPlaceholder(isLoading: true),
                           errorWidget: (context, url, error) =>
-                              const ColoredBox(color: Colors.black),
+                              _buildCoverPlaceholder(),
                         )
-                      : const ColoredBox(color: Colors.black),
+                      : _buildCoverPlaceholder(),
                   if (coverOverlay != null) coverOverlay!,
                 ],
               ),
@@ -511,6 +509,78 @@ class ProfileHeaderSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCoverPlaceholder({bool isLoading = false}) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary.withValues(alpha: 0.32),
+            const Color(0xFFB7D7EA),
+          ],
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: -24,
+            right: -18,
+            child: Container(
+              width: 118,
+              height: 118,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.22),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 18,
+            bottom: -30,
+            child: Container(
+              width: 134,
+              height: 134,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.14),
+              ),
+            ),
+          ),
+          Center(
+            child: isLoading
+                ? const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.landscape_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        child: Text(
+                          canEditCover ? 'Add a cover photo' : 'No cover photo',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -527,8 +597,7 @@ class ProfileHeaderSection extends StatelessWidget {
             borderWidth: avatarBorder,
             gapWidth: avatarGap,
           ),
-          if (avatarOverlay != null)
-            Positioned.fill(child: avatarOverlay!),
+          if (avatarOverlay != null) Positioned.fill(child: avatarOverlay!),
         ],
       ),
     );

@@ -8,10 +8,12 @@ class S3PresignedUrlService {
   final Map<String, _CachedUrl> _urlCache = {};
 
   // S3 base URL for direct access (fallback when presigned URL service is unavailable)
-  static const String s3BaseUrl = 'https://nisittrade-images.s3.ap-northeast-1.amazonaws.com';
-  static const String _baseUrl = '/presigned-url';
+  static const String s3BaseUrl =
+      'https://nisittrade-images.s3.ap-northeast-1.amazonaws.com';
+  static const String _baseUrl = '/presigned-url/';
   static const int _defaultExpirationSeconds = 3600; // 1 hour
-  static const int _refreshThresholdSeconds = 300; // Refresh if expires in < 5 minutes
+  static const int _refreshThresholdSeconds =
+      300; // Refresh if expires in < 5 minutes
 
   S3PresignedUrlService(this._dio);
 
@@ -32,21 +34,21 @@ class S3PresignedUrlService {
     try {
       final response = await _dio.post(
         _baseUrl,
-        data: {
-          's3Key': s3Key,
-          'expirationSeconds': expirationSeconds,
-        },
+        data: {'s3Key': s3Key, 'expirationSeconds': expirationSeconds},
       );
 
       if (response.statusCode == 200) {
-        final presignedUrl = response.data['presignedUrl'] as String? ??
+        
+        final presignedUrl =
+            response.data['presignedUrl'] as String? ??
             response.data['presigned_url'] as String?;
-        final expiresIn = (response.data['expiresIn'] as int?) ??
+        final expiresIn =
+            (response.data['expiresIn'] as int?) ??
             (response.data['expires_in'] as int?) ??
             expirationSeconds;
 
         if (presignedUrl == null || presignedUrl.isEmpty) {
-          throw Exception('Presigned URL response missing presignedUrl');
+          throw Exception('Presigned URL response missing presignedUrl. Response: ${response.data}');
         }
 
         // Cache the URL with expiration time
@@ -60,6 +62,8 @@ class S3PresignedUrlService {
 
       throw Exception('Failed to get presigned URL: ${response.statusCode}');
     } on DioException catch (e) {
+      final statusCode = e.response?.statusCode ?? 'N/A';
+      
       // If presigned URL service is not available (404), fall back to direct S3 URL
       if (e.response?.statusCode == 404) {
         // Remove leading slash if present
@@ -74,9 +78,25 @@ class S3PresignedUrlService {
 
         return directUrl;
       }
-
-      throw Exception('Error fetching presigned URL: ${e.message}');
+      
+      // More detailed error message for debugging
+      final errorMessage = _extractErrorMessage(e);
+      throw Exception('Error fetching presigned URL (status: $statusCode): $errorMessage');
+    } catch (e) {
+      throw Exception('Unexpected error fetching presigned URL: $e');
     }
+  }
+
+  String _extractErrorMessage(DioException e) {
+    // Try to extract error message from response body
+    if (e.response?.data != null) {
+      final data = e.response!.data;
+      if (data is Map<String, dynamic>) {
+        return data['message'] ?? data['error'] ?? e.message ?? 'Unknown error';
+      }
+      return data.toString();
+    }
+    return e.message ?? 'Unknown error';
   }
 
   /// Clear cache for a specific key
@@ -90,7 +110,9 @@ class S3PresignedUrlService {
   }
 
   bool _isExpiringSoon(DateTime expiresAt) {
-    return DateTime.now().add(const Duration(seconds: _refreshThresholdSeconds)).isAfter(expiresAt);
+    return DateTime.now()
+        .add(const Duration(seconds: _refreshThresholdSeconds))
+        .isAfter(expiresAt);
   }
 }
 

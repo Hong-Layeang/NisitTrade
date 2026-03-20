@@ -6,6 +6,7 @@ import 'data/providers/s3_presigned_url_service.dart';
 import 'logic/view_models/chat_view_model.dart';
 import 'logic/view_models/community_view_model.dart';
 import 'logic/view_models/marketplace_view_model.dart';
+import 'logic/view_models/presence_view_model.dart';
 import 'logic/view_models/product_feed_view_model.dart';
 import 'logic/view_models/saved_listings_view_model.dart';
 import 'logic/view_models/search_view_model.dart';
@@ -47,6 +48,9 @@ class NisitTradeApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<CommunityViewModel>(
           create: (_) => getIt<CommunityViewModel>(),
+        ),
+        ChangeNotifierProvider<PresenceViewModel>(
+          create: (_) => getIt<PresenceViewModel>(),
         ),
         ChangeNotifierProvider<ChatRoomViewModel>(
           create: (_) => getIt<ChatRoomViewModel>()..loadPersistedAttachments(),

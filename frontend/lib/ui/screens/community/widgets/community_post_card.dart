@@ -51,11 +51,13 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   }
 
   String? _resolveAvatarUrl(BuildContext context) {
-    final currentUser = context.select<UserViewModel, ({int? id, String? image})>(
-      (vm) => (id: vm.userId, image: vm.profile?.profileImage),
-    );
+    final currentUser = context
+        .select<UserViewModel, ({int? id, String? image})>(
+          (vm) => (id: vm.userId, image: vm.profile?.profileImage),
+        );
 
-    final isCurrentUserPost = currentUser.id != null && currentUser.id == widget.post.author.id;
+    final isCurrentUserPost =
+        currentUser.id != null && currentUser.id == widget.post.author.id;
     if (isCurrentUserPost && (currentUser.image?.isNotEmpty ?? false)) {
       return currentUser.image;
     }
@@ -71,7 +73,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   Widget build(BuildContext context) {
     const contentPadding = EdgeInsets.symmetric(horizontal: 16);
     final handle = _uniHandle();
-    final avatarUrl = _resolveAvatarUrl(context) ?? 'https://i.pravatar.cc/300?img=99';
+    final avatarUrl = _resolveAvatarUrl(context) ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,6 +90,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   children: [
                     UserAvatar(
                       imageUrl: avatarUrl,
+                      displayName: widget.post.author.fullName,
                       radius: 22,
                     ),
                     const SizedBox(width: 12),
@@ -99,7 +102,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                             onTap: widget.onUserTap,
                             borderRadius: BorderRadius.circular(8),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                                vertical: 1,
+                              ),
                               child: Text(
                                 widget.post.author.fullName,
                                 style: const TextStyle(
@@ -115,7 +121,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                               onTap: widget.onUserTap,
                               borderRadius: BorderRadius.circular(8),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 1,
+                                ),
                                 child: Text(
                                   '@$handle',
                                   style: const TextStyle(
@@ -198,7 +207,8 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     itemBuilder: (context, index) {
                       final imageUrl = widget.post.orderedImages[index];
                       final isNetwork =
-                          imageUrl.startsWith('http://') || imageUrl.startsWith('https://');
+                          imageUrl.startsWith('http://') ||
+                          imageUrl.startsWith('https://');
 
                       if (!isNetwork) {
                         return Image.asset(
@@ -253,7 +263,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                       top: 12,
                       right: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(12),
@@ -281,10 +294,15 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                               : widget.post.orderedImages.length,
                           (index) {
                             int displayIndex = index;
-                            if (widget.post.orderedImages.length > 8 && _currentImageIndex > 3) {
+                            if (widget.post.orderedImages.length > 8 &&
+                                _currentImageIndex > 3) {
                               displayIndex = _currentImageIndex - 3 + index;
-                              if (displayIndex >= widget.post.orderedImages.length) {
-                                displayIndex = widget.post.orderedImages.length - 8 + index;
+                              if (displayIndex >=
+                                  widget.post.orderedImages.length) {
+                                displayIndex =
+                                    widget.post.orderedImages.length -
+                                    8 +
+                                    index;
                               }
                             }
                             final isActive = displayIndex == _currentImageIndex;
@@ -319,11 +337,15 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                 AppActionChip(
                   icon: Icon(
                     widget.isLiked ? Icons.favorite : Icons.favorite_border,
-                    color: widget.isLiked ? Colors.redAccent : AppColors.textPrimary,
+                    color: widget.isLiked
+                        ? Colors.redAccent
+                        : AppColors.textPrimary,
                     size: 18,
                   ),
                   label: NumberFormatters.formatCount(widget.post.likesCount),
-                  labelColor: widget.isLiked ? Colors.redAccent : AppColors.textPrimary,
+                  labelColor: widget.isLiked
+                      ? Colors.redAccent
+                      : AppColors.textPrimary,
                   onTap: widget.onLikeTap,
                 ),
                 const SizedBox(width: 6),
@@ -333,7 +355,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     color: AppColors.textPrimary,
                     size: 18,
                   ),
-                  label: NumberFormatters.formatCount(widget.post.commentsCount),
+                  label: NumberFormatters.formatCount(
+                    widget.post.commentsCount,
+                  ),
                   labelColor: AppColors.textPrimary,
                   onTap: widget.onCommentTap,
                 ),
@@ -359,4 +383,3 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     );
   }
 }
-

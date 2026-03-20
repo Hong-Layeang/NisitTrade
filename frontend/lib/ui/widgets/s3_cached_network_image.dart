@@ -43,6 +43,16 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
   int _retryCount = 0;
   bool _isLoading = false;
 
+  bool _isValidNetworkUrl(String? url) {
+    final value = url?.trim() ?? '';
+    if (value.isEmpty) return false;
+
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        (uri.host.isNotEmpty);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -89,11 +99,14 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
       setState(() => _isLoading = true);
 
       final presignedUrlService = context.read<S3PresignedUrlService>();
+      debugPrint('[S3Image] Attempting to fetch presigned URL for key: $s3Key');
+      
       if (forceRefresh) {
         presignedUrlService.invalidateCache(s3Key); // Force refresh
       }
       
       final newUrl = await presignedUrlService.getPresignedUrl(s3Key);
+      debugPrint('[S3Image] Successfully fetched presigned URL');
 
       if (mounted) {
         setState(() {
@@ -101,11 +114,14 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
           _isLoading = false;
           _retryCount = 0;
         });
+        final hasQueryParams = newUrl.contains('?');
+        debugPrint('[S3Image] Updated _currentImageUrl (has query params: $hasQueryParams)');
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         debugPrint('[S3Image] Error refreshing presigned URL: $e');
+        debugPrint('[S3Image] Stack trace: ${StackTrace.current}');
       }
     }
   }
@@ -158,6 +174,18 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isValidNetworkUrl(_currentImageUrl)) {
+      return Container(
+        width: widget.width,
+        height: widget.height,
+        color: widget.backgroundColor ?? Colors.grey.shade200,
+        child: const Icon(
+          Icons.image_not_supported,
+          color: Colors.grey,
+        ),
+      );
+    }
+
     if (_isLoading) {
       return Container(
         width: widget.width,
@@ -184,6 +212,8 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
             );
           },
       errorWidget: (context, url, error) {
+        final hasQueryParams = _currentImageUrl.contains('?');
+        debugPrint('[S3Image] Error loading URL (has query params: $hasQueryParams): $_currentImageUrl');
         _handleImageError(error);
 
         return widget.errorWidget?.call(context, url, error) ??

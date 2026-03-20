@@ -4,13 +4,16 @@ import 'dart:async';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/navigation/app_routes.dart';
+import '../../../core/utils/chat_timestamp_formatter.dart';
 import '../../../core/utils/school_short_name.dart';
+import '../../../core/utils/user_presence_formatter.dart';
 import '../../../data/models/conversation.dart';
 import '../../../data/models/product.dart';
 import '../../../logic/view_models/chat_view_model.dart';
+import '../../../logic/view_models/presence_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../ui/screens/marketplace/product_detail_page.dart';
-import '../../../ui/screens/profile/other_profile_page.dart';
+import '../../../ui/screens/profile/other_profile_page.dart' hide getIt;
 import '../../../ui/widgets/app_action_sheet.dart';
 import '../../../ui/widgets/app_snack_bar.dart';
 import '../../../ui/widgets/user_widgets.dart';
@@ -65,6 +68,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     _viewModel = Provider.of<ChatRoomViewModel>(context, listen: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureWebSocketAndJoin();
       _loadConversation();
     });
     _hasInitialized = true;
@@ -77,11 +81,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     super.dispose();
   }
 
+  Future<void> _ensureWebSocketAndJoin() async {
+    await _viewModel.ensureWebSocketConnected();
+    _viewModel.joinConversationRoom(widget.conversationId);
+  }
+
   Future<void> _loadConversation() async {
     final currentConversation = _viewModel.currentConversation;
     final hasMatchingConversation =
         currentConversation?.id == widget.conversationId;
-    final needsHydration = !hasMatchingConversation ||
+    final needsHydration =
+        !hasMatchingConversation ||
         _requiresConversationHydration(currentConversation);
 
     if (needsHydration) {
@@ -92,7 +102,27 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       await _viewModel.loadMessages(refresh: true);
     }
 
+    _watchCurrentParticipantPresence();
+
     _scrollToBottom(animated: false);
+  }
+
+  void _watchCurrentParticipantPresence() {
+    final conversation = _viewModel.currentConversation;
+    if (conversation == null) {
+      return;
+    }
+
+    final participant = _otherParticipant(conversation);
+    if (participant == null || participant.userId <= 0) {
+      return;
+    }
+
+    final presenceViewModel = Provider.of<PresenceViewModel>(
+      context,
+      listen: false,
+    );
+    presenceViewModel.watchUserIds([participant.userId]);
   }
 
   bool _requiresConversationHydration(Conversation? conversation) {
@@ -162,95 +192,218 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.textPrimary,
-        titleSpacing: 0,
-        title: Consumer<ChatRoomViewModel>(
+    return Consumer<ChatRoomViewModel>(
+      builder: (context, viewModel, _) {
+        final isSelectionMode = viewModel.isSelectionMode;
+
+        return PopScope(
+          canPop: !isSelectionMode,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && isSelectionMode) {
+              viewModel.clearSelection();
+            }
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.surface,
+            appBar: isSelectionMode
+                ? _buildSelectionAppBar(viewModel)
+                : _buildNormalAppBar(),
+            body: _buildBody(viewModel),
+          ),
+        );
+      },
+    );
+  }
+
+  PreferredSizeWidget _buildSelectionAppBar(ChatRoomViewModel viewModel) {
+    final currentUserId = _getCurrentUserId();
+    final canEdit = viewModel.canEditSelectedMessages(currentUserId);
+    final canDelete = viewModel.canDeleteSelectedMessages(currentUserId);
+
+    return AppBar(
+      elevation: 0,
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      leading: IconButton(
+        icon: const Icon(Icons.close_rounded),
+        onPressed: viewModel.clearSelection,
+      ),
+      title: Text(
+        '${viewModel.selectedCount} selected',
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      actions: [
+        if (canEdit)
+          IconButton(
+            icon: const Icon(Icons.edit_rounded),
+            tooltip: 'Edit',
+            onPressed: () => _editSelectedMessage(viewModel),
+          ),
+        if (canDelete)
+          IconButton(
+            icon: const Icon(Icons.delete_rounded),
+            tooltip: 'Delete',
+            onPressed: () => _deleteSelectedMessages(viewModel),
+          ),
+      ],
+    );
+  }
+
+  PreferredSizeWidget _buildNormalAppBar() {
+    return AppBar(
+      elevation: 0,
+      backgroundColor: Colors.white,
+      foregroundColor: AppColors.textPrimary,
+      titleSpacing: 0,
+      title: Consumer2<ChatRoomViewModel, PresenceViewModel>(
+        builder: (context, viewModel, presenceViewModel, _) {
+          final conversation = viewModel.currentConversation;
+          return _buildAppBarTitle(conversation, presenceViewModel);
+        },
+      ),
+      actions: [
+        Consumer<ChatRoomViewModel>(
           builder: (context, viewModel, _) {
             final conversation = viewModel.currentConversation;
-            return _buildAppBarTitle(conversation);
+            return IconButton(
+              icon: const Icon(Icons.more_vert_rounded),
+              onPressed: conversation == null
+                  ? null
+                  : () => _showChatActions(conversation),
+            );
           },
         ),
-        actions: [
+      ],
+    );
+  }
+
+  Widget _buildBody(ChatRoomViewModel viewModel) {
+    final conversation = viewModel.currentConversation;
+    final isMessagingBlocked = conversation?.isMessagingBlocked ?? false;
+    final isShowingRequestedConversation =
+        conversation?.id == widget.conversationId;
+
+    if (viewModel.isLoadingCurrentConversation &&
+        !isShowingRequestedConversation) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (viewModel.currentConversationError != null) {
+      return _buildErrorState(viewModel.currentConversationError ?? '');
+    }
+
+    if (conversation == null) {
+      return const Center(child: Text('No conversation found'));
+    }
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF4FBFF), AppColors.surface],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Attachment carousel for attached products
           Consumer<ChatRoomViewModel>(
-            builder: (context, viewModel, _) {
-              final conversation = viewModel.currentConversation;
-              return IconButton(
-                icon: const Icon(Icons.more_horiz_rounded),
-                onPressed: conversation == null
-                    ? null
-                    : () => _showChatActions(conversation),
+            builder: (context, vm, _) {
+              if (vm.attachedProducts.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return AttachmentCarousel(
+                attachedProducts: vm.attachedProducts,
+                countdownLabelBuilder: _buildProductCountdownLabel,
+                isExpiredBuilder: _isProductCountdownExpired,
+                onTapProduct: (product) => _navigateToProduct(product),
+                onConfirmPurchase: (product) =>
+                    _navigateToProduct(product),
+                onRemove: (product) =>
+                    vm.removeAttachedProduct(product.id),
               );
             },
           ),
+          Expanded(child: _buildMessagesList(viewModel)),
+          if (viewModel.isSelectionMode)
+            const SizedBox.shrink()
+          else if (isMessagingBlocked)
+            _buildBlockedComposerState(conversation)
+          else
+            ChatInput(
+              onSendMessage: _handleSendMessage,
+              isLoading: viewModel.isLoadingCurrentConversation,
+              isSendingMessage: viewModel.isSendingMessage,
+            ),
         ],
-      ),
-      body: Consumer<ChatRoomViewModel>(
-        builder: (context, viewModel, _) {
-          final conversation = viewModel.currentConversation;
-          final isShowingRequestedConversation =
-              conversation?.id == widget.conversationId;
-
-          if (viewModel.isLoadingCurrentConversation &&
-              !isShowingRequestedConversation) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (viewModel.currentConversationError != null) {
-            return _buildErrorState(viewModel.currentConversationError ?? '');
-          }
-
-          if (conversation == null) {
-            return const Center(child: Text('No conversation found'));
-          }
-
-          return Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFF4FBFF), AppColors.surface],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: Column(
-              children: [
-                // Attachment carousel for attached products
-                Consumer<ChatRoomViewModel>(
-                  builder: (context, vm, _) {
-                    if (vm.attachedProducts.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return AttachmentCarousel(
-                      attachedProducts: vm.attachedProducts,
-                      countdownLabelBuilder: _buildProductCountdownLabel,
-                      isExpiredBuilder: _isProductCountdownExpired,
-                      onTapProduct: (product) => _navigateToProduct(product),
-                      onConfirmPurchase: (product) => _navigateToProduct(product),
-                      onRemove: (product) => vm.removeAttachedProduct(product.id),
-                    );
-                  },
-                ),
-                Expanded(
-                  child: _buildMessagesList(viewModel),
-                ),
-                ChatInput(
-                  onSendMessage: _handleSendMessage,
-                  isLoading: viewModel.isLoadingCurrentConversation,
-                  isSendingMessage: viewModel.isSendingMessage,
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }
 
-  Widget _buildAppBarTitle(Conversation? conversation) {
+  Future<void> _editSelectedMessage(ChatRoomViewModel viewModel) async {
+    final messageId = viewModel.selectedMessageIds.first;
+    final message = viewModel.messages.firstWhere(
+      (m) => m.id == messageId,
+      orElse: () => Message(id: 0, messageText: '', senderId: 0, conversationId: 0, sentAt: DateTime.now()),
+    );
+    if (message.id == 0) return;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => _EditMessageDialog(initialText: message.messageText),
+    );
+
+    if (!mounted || result == null) return;
+    final success = await viewModel.editMessage(messageId, result);
+    if (!mounted) return;
+    if (success) {
+      AppSnackBar.success(context, 'Message edited');
+    } else {
+      AppSnackBar.error(context, 'Failed to edit message');
+    }
+  }
+
+  Future<void> _deleteSelectedMessages(ChatRoomViewModel viewModel) async {
+    final count = viewModel.selectedCount;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete $count message${count > 1 ? 's' : ''}?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD64545),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+
+    final success = await viewModel.deleteSelectedMessages();
+    if (!mounted) return;
+    if (success) {
+      AppSnackBar.success(context, '$count message${count > 1 ? 's' : ''} deleted');
+    } else {
+      AppSnackBar.error(context, 'Failed to delete messages');
+    }
+  }
+
+  Widget _buildAppBarTitle(
+    Conversation? conversation,
+    PresenceViewModel presenceViewModel,
+  ) {
     if (conversation == null) {
       return const Text(
         'Messages',
@@ -265,11 +418,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       email: participant?.user?.username,
       fallback: '',
     );
-    final statusInfo = _buildPresenceLabel(conversation.updatedAt);
+    final participantUserId = participant?.userId ?? 0;
+    final realtimePresence = participantUserId > 0
+      ? presenceViewModel.presenceForUser(participantUserId)
+      : null;
+    final isOnline =
+      realtimePresence?.isOnline ?? participant?.user?.isOnline ?? false;
+    final lastSeenAt =
+      realtimePresence?.lastSeenAt ?? participant?.user?.lastSeenAt;
+    final statusInfo = buildPresenceLabel(
+      isOnline: isOnline,
+      lastSeenAt: lastSeenAt,
+    );
 
     return Row(
       children: [
-        UserAvatar(imageUrl: avatarUrl, radius: 18),
+        UserAvatar(imageUrl: avatarUrl, displayName: displayName, radius: 18),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -309,7 +473,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     width: 7,
                     height: 7,
                     decoration: BoxDecoration(
-                      color: _presenceColor(conversation.updatedAt),
+                      color: presenceColor(isOnline: isOnline),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -498,10 +662,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           Future.microtask(() => viewModel.markMessageAsRead(message.id));
         }
 
+        final isSelected = viewModel.isMessageSelected(message.id);
+        final isSelectionMode = viewModel.isSelectionMode;
+
         return ChatBubble(
           message: message,
           isCurrentUser: isCurrentUser,
-          attachedProduct: null,
+          attachedProduct: message.attachedProduct,
+          isSelected: isSelected,
+          isSelectionMode: isSelectionMode,
+          onLongPress: () {
+            if (isCurrentUser) {
+              viewModel.startSelection(message.id);
+            }
+          },
+          onTap: isSelectionMode && isCurrentUser
+              ? () => viewModel.toggleMessageSelection(message.id)
+              : null,
         );
       },
     );
@@ -512,7 +689,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     String? activeDateLabel;
 
     for (final message in viewModel.messages) {
-      final dateLabel = _formatDateDivider(message.sentAt);
+      final dateLabel = formatChatDateLabel(message.sentAt);
       if (dateLabel != activeDateLabel) {
         activeDateLabel = dateLabel;
         items.add(_ChatTimelineItem.dateDivider(dateLabel));
@@ -540,6 +717,93 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBlockedComposerState(Conversation conversation) {
+    final title = conversation.isBlockedByMe
+        ? 'Messaging paused'
+        : 'Messaging unavailable';
+    final message = conversation.isBlockedByMe
+        ? 'You blocked this account. Conversation history stays available, and messaging will resume after you unblock them.'
+        : 'This account is not available for new messages right now. Your conversation history remains available below.';
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: AppColors.border)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textPrimary.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.warningBackground,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    conversation.isBlockedByMe
+                        ? Icons.block_flipped
+                        : Icons.shield_outlined,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        message,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -583,13 +847,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
         if (participant != null && participant.userId > 0)
           AppActionSheetItem(
-            label: 'Block user',
-            icon: Icons.block_rounded,
+            label: conversation.isBlockedByMe ? 'Unblock user' : 'Block user',
+            icon: conversation.isBlockedByMe
+                ? Icons.lock_open_rounded
+                : Icons.block_rounded,
             isDestructive: true,
-            onTap: () => _blockUser(
-              userId: participant.userId,
-              displayName: participant.user?.name ?? 'user',
-            ),
+            onTap: () => conversation.isBlockedByMe
+                ? _unblockUser(
+                    conversation: conversation,
+                    userId: participant.userId,
+                    displayName: participant.user?.name ?? 'user',
+                  )
+                : _blockUser(
+                    conversation: conversation,
+                    userId: participant.userId,
+                    displayName: participant.user?.name ?? 'user',
+                  ),
           ),
         AppActionSheetItem(
           label: 'Delete chat',
@@ -630,6 +903,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> _blockUser({
+    required Conversation conversation,
     required int userId,
     required String displayName,
   }) async {
@@ -638,7 +912,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       builder: (context) => AlertDialog(
         title: Text('Block $displayName?'),
         content: const Text(
-          'They won\'t be able to message you or see your listings.',
+          'You will both stop being able to message each other, but your previous messages will stay visible until you unblock them.',
         ),
         actions: [
           TextButton(
@@ -662,6 +936,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     if (response.isSuccess) {
       AppSnackBar.success(context, '$displayName blocked');
+      _viewModel.setConversationBlockState(
+        conversation.id,
+        isBlockedByMe: true,
+        hasBlockedMe: conversation.hasBlockedMe,
+      );
     } else {
       AppSnackBar.error(
         context,
@@ -670,11 +949,35 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
+  Future<void> _unblockUser({
+    required Conversation conversation,
+    required int userId,
+    required String displayName,
+  }) async {
+    final response = await UserApiService.instance.unblockUser(userId);
+    if (!mounted) return;
+
+    if (response.isSuccess) {
+      AppSnackBar.success(context, '$displayName unblocked');
+      _viewModel.setConversationBlockState(
+        conversation.id,
+        isBlockedByMe: false,
+        hasBlockedMe: conversation.hasBlockedMe,
+      );
+      return;
+    }
+
+    AppSnackBar.error(
+      context,
+      response.error?.message ?? 'Failed to unblock user',
+    );
+  }
+
   Future<void> _deleteConversation(Conversation conversation) async {
     final confirmed = await showDeleteChatConfirmation(
       context,
       title: 'Delete chat',
-      message: 'This removes the conversation from your chat list.',
+      message: 'This clears the conversation history for this chat.',
     );
     if (!mounted || !confirmed) return;
 
@@ -718,82 +1021,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         );
   }
 
-  String _formatDateDivider(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final target = DateTime(date.year, date.month, date.day);
-
-    if (target == today) {
-      return 'Today';
-    }
-    if (target == yesterday) {
-      return 'Yesterday';
-    }
-
-    const months = <String>[
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-
-    final month = months[date.month - 1];
-    if (date.year == now.year) {
-      return '$month ${date.day}';
-    }
-    return '$month ${date.day}, ${date.year}';
-  }
-
   int _getCurrentUserId() {
     final userViewModel = Provider.of<UserViewModel>(context, listen: false);
     return userViewModel.userId ?? 0;
   }
 
-  String _buildPresenceLabel(DateTime updatedAt) {
-    final now = DateTime.now();
-    final diff = now.difference(updatedAt);
-    if (diff.inMinutes <= 5) {
-      return 'Active now';
-    }
-    if (diff.inHours < 1) {
-      return 'Recently active';
-    }
-    if (diff.inDays < 1) {
-      return 'Active today';
-    }
-    return 'Offline';
-  }
-
-  Color _presenceColor(DateTime updatedAt) {
-    final now = DateTime.now();
-    final diff = now.difference(updatedAt);
-    if (diff.inMinutes <= 5) {
-      return const Color(0xFF34C759);
-    }
-    if (diff.inHours < 24) {
-      return const Color(0xFFFFB020);
-    }
-    return AppColors.textSecondary;
-  }
 }
 
 class _ChatTimelineItem {
   final String? dateLabel;
   final Message? message;
 
-  const _ChatTimelineItem._({
-    this.dateLabel,
-    this.message,
-  });
+  const _ChatTimelineItem._({this.dateLabel, this.message});
 
   factory _ChatTimelineItem.dateDivider(String label) {
     return _ChatTimelineItem._(dateLabel: label);
@@ -804,4 +1043,64 @@ class _ChatTimelineItem {
   }
 
   bool get isDateDivider => dateLabel != null;
+}
+
+// Dialog that owns its TextEditingController so it is disposed at the correct
+// point in the widget lifecycle — avoiding the "used after dispose" crash that
+// occurs when the controller is disposed synchronously after showDialog returns.
+class _EditMessageDialog extends StatefulWidget {
+  final String initialText;
+
+  const _EditMessageDialog({required this.initialText});
+
+  @override
+  State<_EditMessageDialog> createState() => _EditMessageDialogState();
+}
+
+class _EditMessageDialogState extends State<_EditMessageDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit message'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLines: 5,
+        minLines: 1,
+        decoration: const InputDecoration(
+          hintText: 'Enter new message text',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final text = _controller.text.trim();
+            if (text.isNotEmpty) {
+              Navigator.of(context).pop(text);
+            }
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
 }

@@ -61,7 +61,8 @@ class ProductCardSellerHeader extends StatelessWidget {
                     RepaintBoundary(
                       child: UserAvatar(
                         key: ValueKey('seller_avatar_${product.userId}_${avatarUrl ?? "default"}'),
-                        imageUrl: avatarUrl ?? 'https://i.pravatar.cc/300?img=99',
+                        imageUrl: avatarUrl ?? '',
+                        displayName: product.seller?.fullName,
                         radius: 20,
                       ),
                     ),

@@ -75,4 +75,17 @@ class ChatRepository {
   ) async {
     return _apiService.getConversationParticipants(conversationId);
   }
+
+  /// Edit a message
+  Future<ApiResponse<Map<String, dynamic>>> editMessage({
+    required int messageId,
+    required String messageText,
+  }) async {
+    return _apiService.editMessage(messageId: messageId, messageText: messageText);
+  }
+
+  /// Delete multiple messages
+  Future<ApiResponse<List<int>>> deleteMessages(List<int> messageIds) async {
+    return _apiService.deleteMessages(messageIds);
+  }
 }

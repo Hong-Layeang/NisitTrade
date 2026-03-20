@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:timeago_flutter/timeago_flutter.dart';
 
 import 'package:frontend/core/constants/colors.dart';
+import 'package:frontend/core/utils/chat_timestamp_formatter.dart';
 import 'package:frontend/core/utils/image_url_helper.dart';
 import 'package:frontend/data/models/conversation.dart';
 import 'package:frontend/data/models/product.dart';
@@ -12,103 +12,146 @@ class ChatBubble extends StatelessWidget {
   final Message message;
   final bool isCurrentUser;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
   final Product? attachedProduct;
+  final bool isSelected;
+  final bool isSelectionMode;
 
   const ChatBubble({
     super.key,
     required this.message,
     required this.isCurrentUser,
     this.onLongPress,
+    this.onTap,
     this.attachedProduct,
+    this.isSelected = false,
+    this.isSelectionMode = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isCurrentUser ? const Color(0xFF1298D6) : Colors.white;
     final textColor = isCurrentUser ? Colors.white : AppColors.textPrimary;
+    final hasMessageText = message.messageText.trim().isNotEmpty;
     final imageUrls = message.imageUrls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
         .map(ImageUrlHelper.getFullImageUrl)
+        .where(ImageUrlHelper.isValidUrl)
         .toList(growable: false);
+    final hasImages = imageUrls.isNotEmpty;
+    final bubblePadding = hasImages
+        ? const EdgeInsets.fromLTRB(6, 6, 6, 8)
+        : const EdgeInsets.fromLTRB(12, 9, 12, 8);
 
     return Align(
       alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
+          maxWidth: MediaQuery.of(context).size.width * 0.74,
         ),
         child: GestureDetector(
           onLongPress: onLongPress,
+          onTap: isSelectionMode ? onTap : null,
           child: Container(
             margin: EdgeInsets.only(
-              left: isCurrentUser ? 52 : 12,
+              left: isCurrentUser ? 52 : (isSelectionMode ? 0 : 12),
               right: isCurrentUser ? 12 : 52,
               top: 5,
               bottom: 5,
             ),
-            padding: const EdgeInsets.fromLTRB(13, 11, 13, 10),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(22),
-                topRight: const Radius.circular(22),
-                bottomLeft: Radius.circular(isCurrentUser ? 22 : 8),
-                bottomRight: Radius.circular(isCurrentUser ? 8 : 22),
-              ),
-              border: isCurrentUser
-                  ? null
-                  : Border.all(color: AppColors.border),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.textPrimary.withValues(alpha: 0.04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: isCurrentUser
+                  ? MainAxisAlignment.end
+                  : MainAxisAlignment.start,
               children: [
-                if (attachedProduct != null) ...[
-                  _buildAttachedProduct(context),
-                  if (message.messageText.trim().isNotEmpty || imageUrls.isNotEmpty)
-                    const SizedBox(height: 10),
-                ],
-                if (imageUrls.isNotEmpty) ...[
-                  _buildImageGallery(context, imageUrls),
-                  if (message.messageText.trim().isNotEmpty) const SizedBox(height: 10),
-                ],
-                if (message.messageText.trim().isNotEmpty)
-                  Text(
-                    message.messageText,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 1.45,
+                if (isSelectionMode) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, right: 4),
+                    child: Icon(
+                      isSelected
+                          ? Icons.check_circle_rounded
+                          : Icons.circle_outlined,
+                      size: 22,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textSecondary.withValues(alpha: 0.5),
                     ),
                   ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Timeago(
-                      date: message.sentAt,
-                      builder: (context, value) => Text(
-                        value,
-                        style: TextStyle(
-                          color: isCurrentUser
-                              ? Colors.white.withValues(alpha: 0.84)
-                              : AppColors.textSecondary,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
+                ],
+                Flexible(
+                  child: IntrinsicWidth(
+                    child: Container(
+                      padding: bubblePadding,
+                      decoration: _buildBubbleDecoration(),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (attachedProduct != null) ...[
+                          _buildAttachedProduct(context),
+                          if (hasMessageText || imageUrls.isNotEmpty)
+                            const SizedBox(height: 8),
+                        ],
+                        if (imageUrls.isNotEmpty) ...[
+                          _buildImageGallery(context, imageUrls),
+                          if (hasMessageText) const SizedBox(height: 8),
+                        ],
+                        if (hasMessageText)
+                          Text(
+                            message.messageText,
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              height: 1.32,
+                            ),
+                          ),
+                        SizedBox(height: hasMessageText ? 2 : 4),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (message.isEdited) ...[
+                                Text(
+                                  'edited',
+                                  style: TextStyle(
+                                    color: isCurrentUser
+                                        ? Colors.white.withValues(alpha: 0.6)
+                                        : AppColors.textSecondary
+                                            .withValues(alpha: 0.7),
+                                    fontSize: 10,
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                formatChatTimestamp(message.sentAt),
+                                style: TextStyle(
+                                  color: isCurrentUser
+                                      ? Colors.white.withValues(alpha: 0.78)
+                                      : AppColors.textSecondary
+                                          .withValues(alpha: 0.92),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                              if (isCurrentUser) ...[
+                                const SizedBox(width: 4),
+                                _buildReadStatus(),
+                              ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    if (isCurrentUser) ...[
-                      const SizedBox(width: 6),
-                      _buildReadStatus(),
-                    ],
-                  ],
+                  ),
+                  ),
                 ),
               ],
             ),
@@ -118,38 +161,202 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
+  BoxDecoration _buildBubbleDecoration() {
+    final borderRadius = BorderRadius.only(
+      topLeft: const Radius.circular(20),
+      topRight: const Radius.circular(20),
+      bottomLeft: Radius.circular(isCurrentUser ? 20 : 8),
+      bottomRight: Radius.circular(isCurrentUser ? 8 : 20),
+    );
+
+    if (isCurrentUser) {
+      return BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF18A4DF), Color(0xFF008DCF)],
+        ),
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF008DCF).withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      );
+    }
+
+    return BoxDecoration(
+      color: const Color(0xFFFBFDFF),
+      borderRadius: borderRadius,
+      border: Border.all(color: const Color(0xFFD9E6EE)),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.textPrimary.withValues(alpha: 0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    );
+  }
+
   Widget _buildReadStatus() {
     if (message.readBy.isEmpty) {
-      return const Icon(Icons.done_rounded, size: 14, color: Colors.white70);
+      return const Icon(Icons.done_rounded, size: 13, color: Colors.white70);
     }
-    return const Icon(Icons.done_all_rounded, size: 14, color: Colors.lightBlueAccent);
+    return const Icon(
+      Icons.done_all_rounded,
+      size: 13,
+      color: Color(0xFFB9F0FF),
+    );
   }
 
   Widget _buildImageGallery(BuildContext context, List<String> imageUrls) {
     if (imageUrls.length == 1) {
-      return _buildImageTile(
-        context,
-        imageUrls: imageUrls,
-        imageUrl: imageUrls.first,
-        index: 0,
-        height: 220,
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return _buildImageTile(
+            context,
+            imageUrls: imageUrls,
+            imageUrl: imageUrls.first,
+            index: 0,
+            maxWidth: constraints.maxWidth,
+            maxHeight: 320,
+            fit: BoxFit.contain,
+          );
+        },
       );
     }
 
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: List<Widget>.generate(
-        imageUrls.length.clamp(0, 4),
-        (index) => _buildImageTile(
-          context,
-          imageUrls: imageUrls,
-          imageUrl: imageUrls[index],
-          index: index,
-          width: imageUrls.length == 2 ? 120 : 98,
-          height: imageUrls.length == 2 ? 140 : 98,
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 6.0;
+        final visibleCount = imageUrls.length.clamp(0, 4);
+        final tileWidth = (constraints.maxWidth - spacing) / 2;
+        final tileHeight = tileWidth * 1.02;
+
+        if (visibleCount == 2) {
+          return Row(
+            children: [
+              _buildImageTile(
+                context,
+                imageUrls: imageUrls,
+                imageUrl: imageUrls[0],
+                index: 0,
+                width: tileWidth,
+                height: tileHeight,
+                fit: BoxFit.cover,
+              ),
+              const SizedBox(width: spacing),
+              _buildImageTile(
+                context,
+                imageUrls: imageUrls,
+                imageUrl: imageUrls[1],
+                index: 1,
+                width: tileWidth,
+                height: tileHeight,
+                fit: BoxFit.cover,
+              ),
+            ],
+          );
+        }
+
+        if (visibleCount == 3) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildImageTile(
+                    context,
+                    imageUrls: imageUrls,
+                    imageUrl: imageUrls[0],
+                    index: 0,
+                    width: tileWidth,
+                    height: tileHeight,
+                    fit: BoxFit.cover,
+                  ),
+                  const SizedBox(width: spacing),
+                  _buildImageTile(
+                    context,
+                    imageUrls: imageUrls,
+                    imageUrl: imageUrls[1],
+                    index: 1,
+                    width: tileWidth,
+                    height: tileHeight,
+                    fit: BoxFit.cover,
+                  ),
+                ],
+              ),
+              const SizedBox(height: spacing),
+              _buildImageTile(
+                context,
+                imageUrls: imageUrls,
+                imageUrl: imageUrls[2],
+                index: 2,
+                width: constraints.maxWidth,
+                height: tileHeight,
+                fit: BoxFit.cover,
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                _buildImageTile(
+                  context,
+                  imageUrls: imageUrls,
+                  imageUrl: imageUrls[0],
+                  index: 0,
+                  width: tileWidth,
+                  height: tileHeight,
+                  fit: BoxFit.cover,
+                ),
+                const SizedBox(width: spacing),
+                _buildImageTile(
+                  context,
+                  imageUrls: imageUrls,
+                  imageUrl: imageUrls[1],
+                  index: 1,
+                  width: tileWidth,
+                  height: tileHeight,
+                  fit: BoxFit.cover,
+                ),
+              ],
+            ),
+            const SizedBox(height: spacing),
+            Row(
+              children: [
+                _buildImageTile(
+                  context,
+                  imageUrls: imageUrls,
+                  imageUrl: imageUrls[2],
+                  index: 2,
+                  width: tileWidth,
+                  height: tileHeight,
+                  fit: BoxFit.cover,
+                ),
+                const SizedBox(width: spacing),
+                _buildImageTile(
+                  context,
+                  imageUrls: imageUrls,
+                  imageUrl: imageUrls[3],
+                  index: 3,
+                  width: tileWidth,
+                  height: tileHeight,
+                  fit: BoxFit.cover,
+                ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -160,8 +367,18 @@ class ChatBubble extends StatelessWidget {
     required int index,
     double? width,
     double? height,
+    double? maxWidth,
+    double? maxHeight,
+    BoxFit fit = BoxFit.contain,
   }) {
     final s3Key = ImageUrlHelper.extractS3KeyFromUrl(imageUrl) ?? imageUrl;
+    final image = S3CachedNetworkImage(
+      imageUrl: imageUrl,
+      s3Key: s3Key,
+      width: width,
+      height: height,
+      fit: fit,
+    );
 
     return GestureDetector(
       onTap: () => FullScreenImageViewer.show(
@@ -172,13 +389,15 @@ class ChatBubble extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
-        child: S3CachedNetworkImage(
-          imageUrl: imageUrl,
-          s3Key: s3Key,
-          width: width,
-          height: height,
-          fit: BoxFit.cover,
-        ),
+        child: maxWidth != null || maxHeight != null
+            ? ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: maxWidth ?? double.infinity,
+                  maxHeight: maxHeight ?? double.infinity,
+                ),
+                child: image,
+              )
+            : image,
       ),
     );
   }
@@ -195,15 +414,21 @@ class ChatBubble extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isCurrentUser
-            ? Colors.white.withValues(alpha: 0.16)
-            : const Color(0xFFF4F8FB),
-        borderRadius: BorderRadius.circular(18),
+            ? Colors.white.withValues(alpha: 0.14)
+            : const Color(0xFFF2F8FC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCurrentUser
+              ? Colors.white.withValues(alpha: 0.12)
+              : const Color(0xFFDCE8F0),
+        ),
       ),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(9),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(11),
             child: resolvedImageUrl != null
                 ? S3CachedNetworkImage(
                     imageUrl: resolvedImageUrl,

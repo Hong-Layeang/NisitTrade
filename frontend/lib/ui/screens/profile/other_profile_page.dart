@@ -9,6 +9,7 @@ import '../../../core/errors/api_exception.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/extensions/state_extensions.dart';
+import '../../../core/utils/user_presence_formatter.dart';
 import '../../../data/models/community_post.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/user_profile.dart';
@@ -20,6 +21,7 @@ import '../community/community_detail_page.dart';
 import '../marketplace/product_detail_page.dart';
 import '../../../core/utils/school_short_name.dart';
 import '../../../logic/view_models/chat_view_model.dart';
+import '../../../logic/view_models/presence_view_model.dart';
 import 'widgets/profile_widgets.dart';
 
 final getIt = GetIt.instance;
@@ -108,6 +110,10 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         _isFollowing = profile.isFollowing;
         _isLoading = false;
       });
+
+      if (mounted) {
+        context.read<PresenceViewModel>().watchUserIds([profile.id]);
+      }
     } on ApiException catch (e) {
       setStateIfMounted(() {
         _error = e.message;
@@ -126,7 +132,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
       _isFollowing = !_isFollowing;
       _profile = _profile!.copyWith(
         isFollowing: _isFollowing,
-        followerCount: _isFollowing ? oldFollowerCount + 1 : oldFollowerCount - 1,
+        followerCount: _isFollowing
+            ? oldFollowerCount + 1
+            : oldFollowerCount - 1,
       );
     });
     context.read<UserViewModel>().adjustFollowingCount(increment: _isFollowing);
@@ -143,7 +151,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
           followerCount: oldFollowerCount,
         );
       });
-      context.read<UserViewModel>().adjustFollowingCount(increment: wasFollowing);
+      context.read<UserViewModel>().adjustFollowingCount(
+        increment: wasFollowing,
+      );
     }
   }
 
@@ -152,9 +162,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     final textTheme = Theme.of(context).textTheme;
 
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_error != null) {
@@ -166,7 +174,10 @@ class _OtherProfilePageState extends State<OtherProfilePage>
             children: [
               Text(AppErrorMessages.resolve(_error)),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _loadProfile, child: const Text('Retry')),
+              ElevatedButton(
+                onPressed: _loadProfile,
+                child: const Text('Retry'),
+              ),
             ],
           ),
         ),
@@ -175,9 +186,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
 
     final profile = _profile;
     if (profile == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -210,20 +219,24 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                         followingCount: profile.followingCount,
                         major: profile.major,
                         schoolShortName: () {
-                            final h = buildSchoolShortName(
-                              universityName: profile.university?.name,
-                                universityDomain: profile.university?.domain ?? profile.emailDomain,
-                              email: profile.email,
-                              fallback: '',
-                            );
-                            return h.isNotEmpty ? h.toUpperCase() : 'N/A';
-                          }(),
+                          final h = buildSchoolShortName(
+                            universityName: profile.university?.name,
+                            universityDomain:
+                                profile.university?.domain ??
+                                profile.emailDomain,
+                            email: profile.email,
+                            fallback: '',
+                          );
+                          return h.isNotEmpty ? h.toUpperCase() : 'N/A';
+                        }(),
                       ),
                       coverHeight: AppDimensions.profileCoverHeight,
                       avatarRadius: AppDimensions.profileAvatarRadius,
                       avatarBorder: AppDimensions.profileAvatarBorder,
                       avatarGap: AppDimensions.profileAvatarGap,
                       statsDetailGap: 20,
+                      canEditCover: false,
+                      avatarOverlay: _buildAvatarPresenceDot(profile),
                       actionsBelow: _buildActionButtons(profile),
                     ),
                   ),
@@ -245,6 +258,31 @@ class _OtherProfilePageState extends State<OtherProfilePage>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAvatarPresenceDot(UserProfile profile) {
+    return Consumer<PresenceViewModel>(
+      builder: (context, presenceViewModel, _) {
+        final realtimePresence = presenceViewModel.presenceForUser(profile.id);
+        final isOnline = realtimePresence?.isOnline ?? profile.isOnline;
+
+        return Align(
+          alignment: Alignment.bottomRight,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 10, bottom: 6),
+            child: Container(
+              width: 25,
+              height: 25,
+              decoration: BoxDecoration(
+                color: presenceColor(isOnline: isOnline),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -497,10 +535,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     Navigator.pushNamed(
       context,
       AppRoutes.communityDetail,
-      arguments: CommunityDetailArgs(
-        postId: post.id,
-        initialPost: post,
-      ),
+      arguments: CommunityDetailArgs(postId: post.id, initialPost: post),
     );
   }
 
@@ -515,8 +550,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     }
 
     final chatViewModel = context.read<ChatRoomViewModel>();
-    final existingConversation =
-        chatViewModel.findConversationWithUser(profile.id);
+    final existingConversation = chatViewModel.findConversationWithUser(
+      profile.id,
+    );
     if (existingConversation != null) {
       chatViewModel.selectConversation(existingConversation);
       await Navigator.pushNamed(
@@ -527,7 +563,9 @@ class _OtherProfilePageState extends State<OtherProfilePage>
       return;
     }
 
-    final conversation = await chatViewModel.createConversationWithUser(profile.id);
+    final conversation = await chatViewModel.createConversationWithUser(
+      profile.id,
+    );
     if (!mounted) return;
 
     if (conversation == null) {
@@ -537,7 +575,8 @@ class _OtherProfilePageState extends State<OtherProfilePage>
           SnackBar(
             content: Text(
               AppErrorMessages.resolve(
-                chatViewModel.currentConversationError ?? 'Unable to open chat.',
+                chatViewModel.currentConversationError ??
+                    'Unable to open chat.',
               ),
             ),
           ),

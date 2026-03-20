@@ -13,6 +13,8 @@ class Seller {
   final DateTime createdAt;
   final DateTime updatedAt;
   final University? university;
+  final bool isOnline;
+  final DateTime? lastSeenAt;
 
   const Seller({
     required this.id,
@@ -26,6 +28,8 @@ class Seller {
     required this.createdAt,
     required this.updatedAt,
     this.university,
+    this.isOnline = false,
+    this.lastSeenAt,
   });
 
   factory Seller.fromJson(Map<String, dynamic> json) {
@@ -49,6 +53,10 @@ class Seller {
       university: universityJson is Map<String, dynamic>
           ? University.fromJson(universityJson)
           : null,
+        isOnline: json['is_online'] as bool? ?? false,
+        lastSeenAt: (json['last_seen_at'] ?? json['lastSeenAt']) is String
+          ? DateTime.tryParse((json['last_seen_at'] ?? json['lastSeenAt']) as String)
+          : null,
     );
   }
 
@@ -65,6 +73,8 @@ class Seller {
       'major': major,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'is_online': isOnline,
+      'last_seen_at': lastSeenAt?.toIso8601String(),
     };
   }
 
@@ -78,7 +88,10 @@ class Seller {
     int? universityId,
     String? major,
     DateTime? createdAt,
+    DateTime? updatedAt,
     University? university,
+    bool? isOnline,
+    DateTime? lastSeenAt,
   }) {
     return Seller(
       id: id ?? this.id,
@@ -90,8 +103,10 @@ class Seller {
       universityId: universityId ?? this.universityId,
       major: major ?? this.major,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       university: university ?? this.university,
+      isOnline: isOnline ?? this.isOnline,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
     );
   }
 
@@ -121,6 +136,8 @@ class Seller {
       major: entity.major,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      isOnline: false,
+      lastSeenAt: null,
     );
   }
 }

@@ -97,13 +97,15 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       duration: AppDurations.slow,
       vsync: this,
     );
-    
+
     // Use initial product if provided, or check cache
     if (widget.initialProduct != null) {
       _product = Product.fromEntity(widget.initialProduct!);
       _loadData(silent: true);
     } else {
-      final cachedProduct = context.read<ProductFeedViewModel>().getCachedProduct(widget.productId);
+      final cachedProduct = context
+          .read<ProductFeedViewModel>()
+          .getCachedProduct(widget.productId);
       if (cachedProduct != null) {
         _product = Product.fromEntity(cachedProduct);
         _loadData(silent: true);
@@ -220,9 +222,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
 
     try {
-      final product = await context
-          .read<ProductFeedViewModel>()
-          .refreshProduct(widget.productId);
+      final product = await context.read<ProductFeedViewModel>().refreshProduct(
+        widget.productId,
+      );
       if (product == null) {
         throw ApiException(message: 'Product not found');
       }
@@ -252,9 +254,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
   Future<void> _refreshProduct() async {
     try {
-      final product = await context
-          .read<ProductFeedViewModel>()
-          .refreshProduct(widget.productId);
+      final product = await context.read<ProductFeedViewModel>().refreshProduct(
+        widget.productId,
+      );
       if (mounted && product != null) {
         setState(() => _product = Product.fromEntity(product));
       }
@@ -281,7 +283,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
     final optimisticProduct = wasLiked
         ? product.copyWith(
-            likes: [...product.likes]..removeWhere((like) => like.userId == userId),
+            likes: [...product.likes]
+              ..removeWhere((like) => like.userId == userId),
           )
         : product.copyWith(
             likes: [
@@ -332,10 +335,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     setState(() => _isSubmittingComment = true);
 
     try {
-      final updatedProduct = await context.read<ProductFeedViewModel>().addComment(
-            productId: widget.productId,
-            content: content,
-          );
+      final updatedProduct = await context
+          .read<ProductFeedViewModel>()
+          .addComment(productId: widget.productId, content: content);
       _commentController.clear();
       if (mounted && updatedProduct != null) {
         setState(() => _product = Product.fromEntity(updatedProduct));
@@ -363,7 +365,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     if (newContent == null || newContent == comment.content) return;
 
     try {
-      final updatedProduct = await context.read<ProductFeedViewModel>().updateComment(
+      final updatedProduct = await context
+          .read<ProductFeedViewModel>()
+          .updateComment(
             productId: widget.productId,
             commentId: comment.id,
             content: newContent,
@@ -404,10 +408,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     if (confirmed != true) return;
 
     try {
-      final updatedProduct = await context.read<ProductFeedViewModel>().deleteComment(
-            productId: widget.productId,
-            commentId: comment.id,
-          );
+      final updatedProduct = await context
+          .read<ProductFeedViewModel>()
+          .deleteComment(productId: widget.productId, commentId: comment.id);
       if (mounted && updatedProduct != null) {
         setState(() => _product = Product.fromEntity(updatedProduct));
         AppSnackBar.success(context, 'Comment deleted successfully');
@@ -426,14 +429,18 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   bool _isSavedProduct() {
-    return context.read<SavedListingsViewModel>().hasSavedProduct(widget.productId);
+    return context.read<SavedListingsViewModel>().hasSavedProduct(
+      widget.productId,
+    );
   }
 
   Future<void> _ensureSavedProductsLoaded() async {
     final userId = context.read<UserViewModel>().userId;
     if (userId == null) return;
 
-    await context.read<SavedListingsViewModel>().ensureLoadedForUser(userId: userId);
+    await context.read<SavedListingsViewModel>().ensureLoadedForUser(
+      userId: userId,
+    );
   }
 
   Future<void> _handleToggleSaveProduct() async {
@@ -447,7 +454,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     setState(() => _isActionLoading = true);
     try {
       if (isSaved) {
-        await context.read<ProductFeedViewModel>().unsaveListing(widget.productId);
+        await context.read<ProductFeedViewModel>().unsaveListing(
+          widget.productId,
+        );
         savedListingsVm.removeSavedProductLocally(productId: widget.productId);
 
         if (mounted) {
@@ -456,7 +465,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
             'Removed from saved.',
             onUndo: () async {
               try {
-                await context.read<ProductFeedViewModel>().saveListing(widget.productId);
+                await context.read<ProductFeedViewModel>().saveListing(
+                  widget.productId,
+                );
                 savedListingsVm.addSavedProductLocally(product.toEntity());
               } catch (_) {
                 if (!mounted) return;
@@ -466,7 +477,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           );
         }
       } else {
-        await context.read<ProductFeedViewModel>().saveListing(widget.productId);
+        await context.read<ProductFeedViewModel>().saveListing(
+          widget.productId,
+        );
         savedListingsVm.addSavedProductLocally(product.toEntity());
 
         if (mounted) {
@@ -475,8 +488,12 @@ class _ProductDetailPageState extends State<ProductDetailPage>
             'Saved to your list.',
             onUndo: () async {
               try {
-                await context.read<ProductFeedViewModel>().unsaveListing(widget.productId);
-                savedListingsVm.removeSavedProductLocally(productId: widget.productId);
+                await context.read<ProductFeedViewModel>().unsaveListing(
+                  widget.productId,
+                );
+                savedListingsVm.removeSavedProductLocally(
+                  productId: widget.productId,
+                );
               } catch (_) {
                 if (!mounted) return;
                 AppSnackBar.error(context, 'Failed to undo save product.');
@@ -594,14 +611,17 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   Future<void> _handleShareProduct() async {
     await executeAction(
       () async {
-        final shareUrl = await context.read<ProductFeedViewModel>().shareProduct(widget.productId);
+        final shareUrl = await context
+            .read<ProductFeedViewModel>()
+            .shareProduct(widget.productId);
         if (shareUrl == null || shareUrl.isEmpty) {
           throw Exception('Failed to get share link');
         }
         await ShareService.shareProduct(
           title: _product?.title ?? 'Product',
           url: shareUrl,
-          text: '${_product?.title ?? 'Check this out'} - ${_product?.price ?? ''} on NisitTrade',
+          text:
+              '${_product?.title ?? 'Check this out'} - ${_product?.price ?? ''} on NisitTrade',
         );
       },
       onLoadingChanged: (loading) => setState(() => _isActionLoading = loading),
@@ -632,7 +652,10 @@ class _ProductDetailPageState extends State<ProductDetailPage>
                         .map(
                           (reason) => DropdownMenuItem<String>(
                             value: reason,
-                            child: Text(reason, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              reason,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),
@@ -682,10 +705,10 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
     try {
       await context.read<ProductFeedViewModel>().reportProduct(
-            productId: widget.productId,
-            reason: reason,
-            details: details.isEmpty ? null : details,
-          );
+        productId: widget.productId,
+        reason: reason,
+        details: details.isEmpty ? null : details,
+      );
       if (mounted) {
         AppSnackBar.success(context, 'Report submitted.');
       }
@@ -726,26 +749,19 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Product'),
-        ),
+        appBar: AppBar(title: const Text('Product')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(AppErrorMessages.resolve(_error)),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: const Text('Retry'),
-              ),
+              ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
             ],
           ),
         ),
@@ -754,9 +770,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
     final product = _product;
     if (product == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -849,7 +863,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           images: images,
           currentIndex: _currentImageIndex,
           pageController: _pageController,
-          pageViewKey: PageStorageKey('product-detail-carousel-${widget.productId}'),
+          pageViewKey: PageStorageKey(
+            'product-detail-carousel-${widget.productId}',
+          ),
           onPageChanged: (index) {
             setState(() => _currentImageIndex = index);
           },
@@ -942,15 +958,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Widget _buildSellerRow(Product product) {
-    return Selector<UserViewModel,
-        ({
-          int? userId,
-          String? profileImage,
-        })>(
-      selector: (_, vm) => (
-        userId: vm.userId,
-        profileImage: vm.profile?.profileImage,
-      ),
+    return Selector<UserViewModel, ({int? userId, String? profileImage})>(
+      selector: (_, vm) =>
+          (userId: vm.userId, profileImage: vm.profile?.profileImage),
       builder: (context, userData, _) {
         final isCurrentUser =
             userData.userId != null && product.userId == userData.userId;
@@ -969,8 +979,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     String? avatarUrl,
   ) {
     final trimmedAvatarUrl = avatarUrl?.trim();
-    final resolvedAvatarUrl = trimmedAvatarUrl != null &&
-            trimmedAvatarUrl.isNotEmpty
+    final resolvedAvatarUrl =
+        trimmedAvatarUrl != null && trimmedAvatarUrl.isNotEmpty
         ? ImageUrlHelper.getFullImageUrl(trimmedAvatarUrl)
         : '';
     final handle = buildSchoolShortName(
@@ -988,8 +998,11 @@ class _ProductDetailPageState extends State<ProductDetailPage>
             children: [
               RepaintBoundary(
                 child: UserAvatar(
-                  key: ValueKey('detail_seller_avatar_${product.userId}_$resolvedAvatarUrl'),
+                  key: ValueKey(
+                    'detail_seller_avatar_${product.userId}_$resolvedAvatarUrl',
+                  ),
                   imageUrl: resolvedAvatarUrl,
+                  displayName: product.sellerName,
                   radius: 18,
                 ),
               ),
@@ -1019,7 +1032,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         const Spacer(),
         if (!isCurrentUser)
           FilledButton.icon(
-            onPressed: _isActionLoading ? null : () => _openChatWithSeller(product),
+            onPressed: _isActionLoading
+                ? null
+                : () => _openChatWithSeller(product),
             icon: const Icon(Icons.send_rounded, size: 16),
             label: const Text('Chat'),
             style: FilledButton.styleFrom(
@@ -1036,8 +1051,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
   Widget _buildActions(Product product) {
     final userId = context.read<UserViewModel>().userId;
-    final isLiked = userId != null &&
-        product.likes.any((like) => like.userId == userId);
+    final isLiked =
+        userId != null && product.likes.any((like) => like.userId == userId);
     return Row(
       children: [
         AppActionChip(
@@ -1089,10 +1104,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         const SizedBox(height: 8),
         Text(
           product.description ?? 'No description provided.',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            height: 1.4,
-          ),
+          style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
         ),
       ],
     );
@@ -1137,7 +1149,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       itemCount: comments.length,
-      separatorBuilder: (_, _) => const Divider(height: 16, color: AppColors.border),
+      separatorBuilder: (_, _) =>
+          const Divider(height: 16, color: AppColors.border),
       itemBuilder: (context, index) {
         final comment = comments[index];
         return CommentItem(
@@ -1161,6 +1174,4 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       pinnedToBottom: true,
     );
   }
-
 }
-

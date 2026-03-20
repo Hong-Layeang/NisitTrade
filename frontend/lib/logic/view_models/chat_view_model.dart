@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/auth/auth_token_store.dart';
 import '../../data/models/conversation.dart';
 import '../../data/models/product.dart';
 import '../../data/repositories/chat_repository.dart';
+import '../../logic/services/chat_websocket_service.dart';
 
 class AttachedProduct {
   final Product product;
@@ -35,11 +38,21 @@ class AttachedProduct {
   }
 }
 
-class ChatRoomViewModel extends ChangeNotifier {
-  ChatRoomViewModel({required ChatRepository chatRepository})
-      : _chatRepository = chatRepository;
+class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
+  ChatRoomViewModel({
+    required ChatRepository chatRepository,
+    required ChatWebSocketService chatWebSocket,
+    AuthTokenStore? tokenStore,
+  })  : _chatRepository = chatRepository,
+        _chatWebSocket = chatWebSocket,
+        _tokenStore = tokenStore ?? AuthTokenStore.instance {
+    WidgetsBinding.instance.addObserver(this);
+    _attachWebSocketListeners();
+    unawaited(ensureWebSocketConnected());
+  }
 
   final ChatRepository _chatRepository;
+  final AuthTokenStore _tokenStore;
 
   // Conversations list state
   List<Conversation> _conversations = [];
@@ -68,6 +81,185 @@ class ChatRoomViewModel extends ChangeNotifier {
   final Set<int> _messagesWithProductAttachment = <int>{};
 
   final Map<int, List<AttachedProduct>> _attachedProductsByConversation = {};
+
+  // Multi-select state
+  final Set<int> _selectedMessageIds = {};
+  bool _isSelectionMode = false;
+
+  // WebSocket subscriptions
+  final List<StreamSubscription> _wsSubscriptions = [];
+  final ChatWebSocketService _chatWebSocket;
+  bool _isConnecting = false;
+
+  void _attachWebSocketListeners() {
+    _wsSubscriptions.add(_chatWebSocket.onMessageReceived.listen(_onWsMessageReceived));
+    _wsSubscriptions.add(_chatWebSocket.onMessageUpdated.listen(_onWsMessageUpdated));
+    _wsSubscriptions.add(_chatWebSocket.onMessageDeleted.listen(_onWsMessageDeleted));
+    _wsSubscriptions.add(_chatWebSocket.onMessageRead.listen(_onWsMessageRead));
+  }
+
+  Future<void> ensureWebSocketConnected() async {
+    if (_isConnecting || _chatWebSocket.isConnected) return;
+    _isConnecting = true;
+    try {
+      final token = await _tokenStore.readToken();
+      if (token != null && token.isNotEmpty) {
+        await _chatWebSocket.connect(token: token);
+      }
+    } catch (e) {
+      debugPrint('ChatRoomViewModel: WS connect error: $e');
+    } finally {
+      _isConnecting = false;
+    }
+  }
+
+  void joinConversationRoom(int conversationId) {
+    _chatWebSocket.joinConversation(conversationId);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        unawaited(ensureWebSocketConnected());
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        break;
+    }
+  }
+
+  void _onWsMessageReceived(Message message) {
+    addMessageToChat(message);
+  }
+
+  void _onWsMessageUpdated(MessageUpdateEvent event) {
+    final idx = _messages.indexWhere((m) => m.id == event.messageId);
+    if (idx != -1) {
+      _messages[idx] = _messages[idx].copyWith(
+        messageText: event.messageText,
+        editedAt: event.editedAt,
+      );
+      notifyListeners();
+    }
+  }
+
+  void _onWsMessageDeleted(MessageDeleteEvent event) {
+    _messages.removeWhere((m) => event.messageIds.contains(m.id));
+    _selectedMessageIds.removeAll(event.messageIds);
+    if (_selectedMessageIds.isEmpty) _isSelectionMode = false;
+    notifyListeners();
+  }
+
+  void _onWsMessageRead(MessageReadEvent event) {
+    final idx = _messages.indexWhere((m) => m.id == event.messageId);
+    if (idx != -1) {
+      final current = _messages[idx];
+      if (!current.readBy.contains(event.userId)) {
+        _messages[idx] = current.copyWith(
+          readBy: [...current.readBy, event.userId],
+        );
+        notifyListeners();
+      }
+    }
+  }
+
+  // Selection getters
+  bool get isSelectionMode => _isSelectionMode;
+  Set<int> get selectedMessageIds => Set.unmodifiable(_selectedMessageIds);
+  int get selectedCount => _selectedMessageIds.length;
+
+  bool isMessageSelected(int messageId) =>
+      _selectedMessageIds.contains(messageId);
+
+  void toggleMessageSelection(int messageId) {
+    if (_selectedMessageIds.contains(messageId)) {
+      _selectedMessageIds.remove(messageId);
+      if (_selectedMessageIds.isEmpty) _isSelectionMode = false;
+    } else {
+      _selectedMessageIds.add(messageId);
+      _isSelectionMode = true;
+    }
+    notifyListeners();
+  }
+
+  void startSelection(int messageId) {
+    _isSelectionMode = true;
+    _selectedMessageIds.add(messageId);
+    notifyListeners();
+  }
+
+  void clearSelection() {
+    _selectedMessageIds.clear();
+    _isSelectionMode = false;
+    notifyListeners();
+  }
+
+  /// Returns true if all selected messages belong to [userId].
+  bool canEditSelectedMessages(int userId) {
+    if (_selectedMessageIds.length != 1) return false;
+    final msg = _messages.firstWhere(
+      (m) => m.id == _selectedMessageIds.first,
+      orElse: () => Message(id: 0, messageText: '', senderId: 0, conversationId: 0, sentAt: DateTime.now()),
+    );
+    return msg.senderId == userId && msg.imageUrls.isEmpty;
+  }
+
+  bool canDeleteSelectedMessages(int userId) {
+    if (_selectedMessageIds.isEmpty) return false;
+    return _messages
+        .where((m) => _selectedMessageIds.contains(m.id))
+        .every((m) => m.senderId == userId);
+  }
+
+  /// Edit a single message
+  Future<bool> editMessage(int messageId, String newText) async {
+    try {
+      final response = await _chatRepository.editMessage(
+        messageId: messageId,
+        messageText: newText,
+      );
+      if (response.isSuccess && response.data != null) {
+        final idx = _messages.indexWhere((m) => m.id == messageId);
+        if (idx != -1) {
+          final editedAt = response.data!['editedAt'] != null
+              ? DateTime.tryParse(response.data!['editedAt'] as String)
+              : DateTime.now();
+          _messages[idx] = _messages[idx].copyWith(
+            messageText: newText,
+            editedAt: editedAt,
+          );
+        }
+        clearSelection();
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete selected messages
+  Future<bool> deleteSelectedMessages() async {
+    if (_selectedMessageIds.isEmpty) return false;
+    try {
+      final ids = _selectedMessageIds.toList();
+      final response = await _chatRepository.deleteMessages(ids);
+      if (response.isSuccess) {
+        final deleted = response.data ?? ids;
+        _messages.removeWhere((m) => deleted.contains(m.id));
+        clearSelection();
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   List<AttachedProduct> get attachedProducts {
     final convId = _currentConversation?.id;
@@ -204,6 +396,31 @@ class ChatRoomViewModel extends ChangeNotifier {
     return null;
   }
 
+  void setConversationBlockState(
+    int conversationId, {
+    required bool isBlockedByMe,
+    required bool hasBlockedMe,
+  }) {
+    if (_currentConversation?.id == conversationId) {
+      _currentConversation = _currentConversation?.copyWith(
+        isBlockedByMe: isBlockedByMe,
+        hasBlockedMe: hasBlockedMe,
+      );
+    }
+
+    final index = _conversations.indexWhere(
+      (conversation) => conversation.id == conversationId,
+    );
+    if (index != -1) {
+      _conversations[index] = _conversations[index].copyWith(
+        isBlockedByMe: isBlockedByMe,
+        hasBlockedMe: hasBlockedMe,
+      );
+    }
+
+    notifyListeners();
+  }
+
   // Load conversations list
   Future<void> loadConversations({bool refresh = false}) async {
     if (_isLoadingConversations) return;
@@ -273,6 +490,19 @@ class ChatRoomViewModel extends ChangeNotifier {
       if (response.isSuccess) {
         _currentConversation = response.data;
         _messagesWithProductAttachment.clear();
+        if (response.data != null) {
+          final existingIndex = _conversations.indexWhere(
+            (conversation) => conversation.id == response.data!.id,
+          );
+          if (existingIndex != -1) {
+            _conversations[existingIndex] = _conversations[existingIndex].copyWith(
+              participants: response.data!.participants,
+              product: response.data!.product,
+              isBlockedByMe: response.data!.isBlockedByMe,
+              hasBlockedMe: response.data!.hasBlockedMe,
+            );
+          }
+        }
       } else {
         _currentConversationError = response.error?.message ?? 'Failed to load conversation';
       }
@@ -424,11 +654,19 @@ class ChatRoomViewModel extends ChangeNotifier {
       );
 
       if (response.isSuccess && response.data != null) {
-        _messages.add(response.data!);
-        if (attachConversationProduct) {
-          _messagesWithProductAttachment.add(response.data!.id);
+        final msg = response.data!;
+        // Guard against duplicate from WebSocket race
+        if (!_messages.any((m) => m.id == msg.id)) {
+          _messages.add(msg);
         }
-        _stampPendingCountdowns(response.data!.sentAt);
+        _upsertConversationLastMessage(
+          msg,
+          unreadCount: 0,
+        );
+        if (attachConversationProduct) {
+          _messagesWithProductAttachment.add(msg.id);
+        }
+        _stampPendingCountdowns(msg.sentAt);
         _saveAttachments();
         _sendMessageError = null;
         notifyListeners();
@@ -451,6 +689,7 @@ class ChatRoomViewModel extends ChangeNotifier {
   // Mark message as read
   Future<void> markMessageAsRead(int messageId) async {
     try {
+      _chatWebSocket?.markMessageRead(messageId);
       final response = await _chatRepository.markMessageAsRead(messageId);
       if (response.isSuccess) {
         // Update message in local cache
@@ -466,7 +705,13 @@ class ChatRoomViewModel extends ChangeNotifier {
 
   // Set current conversation (without fetching)
   void selectConversation(Conversation conversation) {
-    _currentConversation = conversation;
+    _currentConversation = conversation.copyWith(unreadCount: 0);
+
+    final index = _conversations.indexWhere((item) => item.id == conversation.id);
+    if (index != -1) {
+      _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
+    }
+
     _messages = [];
     _messageOffset = 0;
     _hasMoreMessages = true;
@@ -486,8 +731,18 @@ class ChatRoomViewModel extends ChangeNotifier {
 
   // Add message to local list (for real-time updates)
   void addMessageToChat(Message message) {
+    final alreadyInThread = _messages.any((item) => item.id == message.id);
     if (_currentConversation?.id == message.conversationId) {
-      _messages.add(message);
+      if (!alreadyInThread) {
+        _messages.add(message);
+      }
+      _upsertConversationLastMessage(message, unreadCount: 0);
+      notifyListeners();
+      return;
+    }
+
+    if (!alreadyInThread) {
+      _upsertConversationLastMessage(message, incrementUnread: true);
       notifyListeners();
     }
   }
@@ -502,9 +757,34 @@ class ChatRoomViewModel extends ChangeNotifier {
         return false;
       }
 
-      _conversations.removeWhere((conversation) => conversation.id == conversationId);
+      final now = DateTime.now();
+      final index = _conversations.indexWhere(
+        (conversation) => conversation.id == conversationId,
+      );
+      if (index != -1) {
+        final existing = _conversations[index];
+        _conversations[index] = existing.copyWith(
+          unreadCount: 0,
+          updatedAt: now,
+          clearLastMessage: true,
+        );
+      }
+
+      _attachedProductsByConversation.remove(conversationId);
+
       if (_currentConversation?.id == conversationId) {
-        clearCurrentConversation();
+        _currentConversation = _currentConversation?.copyWith(
+          unreadCount: 0,
+          updatedAt: now,
+          clearLastMessage: true,
+        );
+        _messages = [];
+        _messagesWithProductAttachment.clear();
+        _messageOffset = 0;
+        _hasMoreMessages = true;
+        _sendMessageError = null;
+        _currentConversationError = null;
+        notifyListeners();
       } else {
         notifyListeners();
       }
@@ -519,5 +799,46 @@ class ChatRoomViewModel extends ChangeNotifier {
   void _upsertConversation(Conversation conversation) {
     _conversations.removeWhere((item) => item.id == conversation.id);
     _conversations.insert(0, conversation);
+  }
+
+  void _upsertConversationLastMessage(
+    Message message, {
+    int? unreadCount,
+    bool incrementUnread = false,
+  }) {
+    final conversationId = message.conversationId;
+    final index = _conversations.indexWhere((item) => item.id == conversationId);
+    if (index == -1) {
+      return;
+    }
+
+    final existing = _conversations[index];
+    final nextUnreadCount = unreadCount ?? (incrementUnread ? existing.unreadCount + 1 : existing.unreadCount);
+    final updatedConversation = existing.copyWith(
+      lastMessage: message,
+      unreadCount: nextUnreadCount,
+      updatedAt: message.sentAt,
+    );
+
+    _conversations.removeAt(index);
+    _conversations.insert(0, updatedConversation);
+
+    if (_currentConversation?.id == conversationId) {
+      _currentConversation = _currentConversation?.copyWith(
+        lastMessage: message,
+        unreadCount: nextUnreadCount,
+        updatedAt: message.sentAt,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    for (final sub in _wsSubscriptions) {
+      sub.cancel();
+    }
+    _wsSubscriptions.clear();
+    super.dispose();
   }
 }

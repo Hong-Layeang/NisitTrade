@@ -95,56 +95,65 @@ class ProfilePageState extends State<ProfilePage>
             child: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) {
                 return [
-                SliverToBoxAdapter(
-                  child: ProfileHeaderSection(
-                    data: ProfileHeaderData(
-                      coverImage: profile.coverImage,
-                      profileImage: profile.profileImage,
-                      fullName: profile.fullName,
-                      bio: profile.bio,
-                      followerCount: profile.followerCount,
-                      followingCount: profile.followingCount,
-                      major: profile.major,
-                      schoolShortName: () {
+                  SliverToBoxAdapter(
+                    child: ProfileHeaderSection(
+                      data: ProfileHeaderData(
+                        coverImage: profile.coverImage,
+                        profileImage: profile.profileImage,
+                        fullName: profile.fullName,
+                        bio: profile.bio,
+                        followerCount: profile.followerCount,
+                        followingCount: profile.followingCount,
+                        major: profile.major,
+                        schoolShortName: () {
                           final h = buildSchoolShortName(
                             universityName: profile.university?.name,
-                              universityDomain: profile.university?.domain ?? profile.emailDomain,
+                            universityDomain:
+                                profile.university?.domain ??
+                                profile.emailDomain,
                             email: profile.email,
                             fallback: '',
                           );
                           return h.isNotEmpty ? h.toUpperCase() : 'N/A';
                         }(),
+                      ),
+                      coverHeight: AppDimensions.profileCoverHeight,
+                      avatarRadius: AppDimensions.profileAvatarRadius,
+                      avatarBorder: AppDimensions.profileAvatarBorder,
+                      avatarGap: AppDimensions.profileAvatarGap,
+                      statsDetailGap: 10,
+                      canEditCover: true,
+                      onCoverTap:
+                          profile.coverImage != null &&
+                              profile.coverImage!.isNotEmpty &&
+                              !_isUploadingCover
+                          ? () => _viewFullScreen(profile.coverImage!)
+                          : null,
+                      onAvatarTap:
+                          profile.profileImage != null &&
+                              profile.profileImage!.isNotEmpty &&
+                              !_isUploadingAvatar
+                          ? () => _viewFullScreen(profile.profileImage!)
+                          : null,
+                      coverOverlay: _buildCoverOverlay(profile),
+                      avatarOverlay: _buildAvatarOverlay(),
                     ),
-                    coverHeight: AppDimensions.profileCoverHeight,
-                    avatarRadius: AppDimensions.profileAvatarRadius,
-                    avatarBorder: AppDimensions.profileAvatarBorder,
-                    avatarGap: AppDimensions.profileAvatarGap,
-                    statsDetailGap: 10,
-                    onCoverTap: profile.coverImage != null && profile.coverImage!.isNotEmpty && !_isUploadingCover
-                        ? () => _viewFullScreen(profile.coverImage!)
-                        : null,
-                    onAvatarTap: profile.profileImage != null && profile.profileImage!.isNotEmpty && !_isUploadingAvatar
-                        ? () => _viewFullScreen(profile.profileImage!)
-                        : null,
-                    coverOverlay: _buildCoverOverlay(profile),
-                    avatarOverlay: _buildAvatarOverlay(),
                   ),
-                ),
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _StickyTabBarDelegate(
-                    tabBar: _buildTabBar(context),
-                    productCount: _products.length,
-                    postCount: _posts.length,
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _StickyTabBarDelegate(
+                      tabBar: _buildTabBar(context),
+                      productCount: _products.length,
+                      postCount: _posts.length,
+                    ),
                   ),
-                ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: [_buildProductGrid(), _buildPostsTab()],
+                ];
+              },
+              body: TabBarView(
+                controller: _tabController,
+                children: [_buildProductGrid(), _buildPostsTab()],
+              ),
             ),
-          ),
           ),
         ),
       ],
@@ -185,7 +194,9 @@ class ProfilePageState extends State<ProfilePage>
               onTap: _pickAndUploadCover,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(20),
@@ -249,8 +260,7 @@ class ProfilePageState extends State<ProfilePage>
                     children: [
                       Icon(Icons.logout, size: 20, color: Colors.red),
                       SizedBox(width: 8),
-                      Text('Log out',
-                          style: TextStyle(color: Colors.red)),
+                      Text('Log out', style: TextStyle(color: Colors.red)),
                     ],
                   ),
                 ),
@@ -295,14 +305,17 @@ class ProfilePageState extends State<ProfilePage>
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.background, width: 2),
                 ),
-                child: const Icon(Icons.camera_alt, color: Colors.white, size: 13),
+                child: const Icon(
+                  Icons.camera_alt,
+                  color: Colors.white,
+                  size: 13,
+                ),
               ),
             ),
           ),
       ],
     );
   }
-
 
   Widget _buildTabBar(BuildContext context) {
     final productCount = _products.length;
@@ -328,7 +341,10 @@ class ProfilePageState extends State<ProfilePage>
               label: Text('$productCount'),
               backgroundColor: AppColors.primary,
               textColor: Colors.white,
-              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              textStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
               child: const Icon(Icons.shopping_bag_outlined, size: 24),
             ),
           ),
@@ -337,7 +353,10 @@ class ProfilePageState extends State<ProfilePage>
               label: Text('$postCount'),
               backgroundColor: AppColors.primary,
               textColor: Colors.white,
-              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              textStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
               child: const Icon(Icons.article_outlined, size: 24),
             ),
           ),
@@ -500,10 +519,7 @@ class ProfilePageState extends State<ProfilePage>
     Navigator.pushNamed(
       context,
       AppRoutes.communityDetail,
-      arguments: CommunityDetailArgs(
-        postId: post.id,
-        initialPost: post,
-      ),
+      arguments: CommunityDetailArgs(postId: post.id, initialPost: post),
     );
   }
 
@@ -523,7 +539,7 @@ class ProfilePageState extends State<ProfilePage>
     if (route != null) {
       routeObserver.subscribe(this, route as PageRoute);
     }
-    
+
     if (!_productsLoaded) {
       final userId = context.read<UserViewModel>().userId;
       if (userId != null) {
@@ -541,7 +557,7 @@ class ProfilePageState extends State<ProfilePage>
   void didPopNext() {
     _productsLoaded = false;
     if (mounted) {
-      refresh();  
+      refresh();
     }
     super.didPopNext();
   }
@@ -765,7 +781,6 @@ class ProfilePageState extends State<ProfilePage>
       });
     }
   }
-
 }
 
 // Delegate for sticky tab bar in NestedScrollView
@@ -803,11 +818,7 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class _EditProfileResult {
-  const _EditProfileResult({
-    required this.fullName,
-    this.bio,
-    this.major,
-  });
+  const _EditProfileResult({required this.fullName, this.bio, this.major});
 
   final String fullName;
   final String? bio;
@@ -898,10 +909,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Save'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('Save')),
       ],
     );
   }
@@ -923,4 +931,3 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     );
   }
 }
-

@@ -196,6 +196,9 @@ class UserApiService {
       await _dio.post('/users/$userId/block');
       return ApiResponse.success(true);
     } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        return ApiResponse.success(true);
+      }
       return ApiResponse.error(ApiException.fromDioException(e));
     } catch (e) {
       return ApiResponse.error(
@@ -209,6 +212,9 @@ class UserApiService {
       await _dio.delete('/users/$userId/block');
       return ApiResponse.success(true);
     } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return ApiResponse.success(true);
+      }
       return ApiResponse.error(ApiException.fromDioException(e));
     } catch (e) {
       return ApiResponse.error(
