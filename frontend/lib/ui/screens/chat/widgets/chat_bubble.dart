@@ -81,76 +81,13 @@ class ChatBubble extends StatelessWidget {
                   ),
                 ],
                 Flexible(
-                  child: IntrinsicWidth(
-                    child: Container(
-                      padding: bubblePadding,
-                      decoration: _buildBubbleDecoration(),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (attachedProduct != null) ...[
-                          _buildAttachedProduct(context),
-                          if (hasMessageText || imageUrls.isNotEmpty)
-                            const SizedBox(height: 8),
-                        ],
-                        if (imageUrls.isNotEmpty) ...[
-                          _buildImageGallery(context, imageUrls),
-                          if (hasMessageText) const SizedBox(height: 8),
-                        ],
-                        if (hasMessageText)
-                          Text(
-                            message.messageText,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              height: 1.32,
-                            ),
-                          ),
-                        SizedBox(height: hasMessageText ? 2 : 4),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (message.isEdited) ...[
-                                Text(
-                                  'edited',
-                                  style: TextStyle(
-                                    color: isCurrentUser
-                                        ? Colors.white.withValues(alpha: 0.6)
-                                        : AppColors.textSecondary
-                                            .withValues(alpha: 0.7),
-                                    fontSize: 10,
-                                    fontStyle: FontStyle.italic,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                              ],
-                              Text(
-                                formatChatTimestamp(message.sentAt),
-                                style: TextStyle(
-                                  color: isCurrentUser
-                                      ? Colors.white.withValues(alpha: 0.78)
-                                      : AppColors.textSecondary
-                                          .withValues(alpha: 0.92),
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.1,
-                                ),
-                              ),
-                              if (isCurrentUser) ...[
-                                const SizedBox(width: 4),
-                                _buildReadStatus(),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: _buildBubbleContent(
+                    context,
+                    bubblePadding: bubblePadding,
+                    textColor: textColor,
+                    hasMessageText: hasMessageText,
+                    hasImages: hasImages,
+                    imageUrls: imageUrls,
                   ),
                 ),
               ],
@@ -159,6 +96,86 @@ class ChatBubble extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildBubbleContent(
+    BuildContext context, {
+    required EdgeInsets bubblePadding,
+    required Color textColor,
+    required bool hasMessageText,
+    required bool hasImages,
+    required List<String> imageUrls,
+  }) {
+    final container = Container(
+      padding: bubblePadding,
+      decoration: _buildBubbleDecoration(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (attachedProduct != null) ...[
+            _buildAttachedProduct(context),
+            if (hasMessageText || imageUrls.isNotEmpty)
+              const SizedBox(height: 8),
+          ],
+          if (imageUrls.isNotEmpty) ...[
+            _buildImageGallery(context, imageUrls),
+            if (hasMessageText) const SizedBox(height: 8),
+          ],
+          if (hasMessageText)
+            Text(
+              message.messageText,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                height: 1.32,
+              ),
+            ),
+          SizedBox(height: hasMessageText ? 2 : 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message.isEdited) ...[
+                  Text(
+                    'edited',
+                    style: TextStyle(
+                      color: isCurrentUser
+                          ? Colors.white.withValues(alpha: 0.6)
+                          : AppColors.textSecondary.withValues(alpha: 0.7),
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  formatChatTimestamp(message.sentAt),
+                  style: TextStyle(
+                    color: isCurrentUser
+                        ? Colors.white.withValues(alpha: 0.78)
+                        : AppColors.textSecondary.withValues(alpha: 0.92),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+                if (isCurrentUser) ...[
+                  const SizedBox(width: 4),
+                  _buildReadStatus(),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (hasImages) return container;
+    return IntrinsicWidth(child: container);
   }
 
   BoxDecoration _buildBubbleDecoration() {
@@ -221,9 +238,9 @@ class ChatBubble extends StatelessWidget {
             imageUrls: imageUrls,
             imageUrl: imageUrls.first,
             index: 0,
-            maxWidth: constraints.maxWidth,
-            maxHeight: 320,
-            fit: BoxFit.contain,
+            width: constraints.maxWidth,
+            height: 200,
+            fit: BoxFit.fill,
           );
         },
       );

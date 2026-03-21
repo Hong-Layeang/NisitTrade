@@ -99,6 +99,15 @@ class S3PresignedUrlService {
     return e.message ?? 'Unknown error';
   }
 
+  /// Returns a cached presigned URL if available and not expiring soon, or null.
+  String? getCachedUrl(String s3Key) {
+    final cached = _urlCache[s3Key];
+    if (cached != null && !_isExpiringSoon(cached.expiresAt)) {
+      return cached.url;
+    }
+    return null;
+  }
+
   /// Clear cache for a specific key
   void invalidateCache(String s3Key) {
     _urlCache.remove(s3Key);

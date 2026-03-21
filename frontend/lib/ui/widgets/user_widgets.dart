@@ -243,6 +243,9 @@ class UserProfileListTile extends StatelessWidget {
   final bool isFollowing;
   final bool isFollowLoading;
   final bool showFollowButton;
+  final String? subtitle;
+  final bool showStatusDot;
+  final Color? statusDotColor;
   final VoidCallback? onTap;
   final VoidCallback? onFollowTap;
 
@@ -252,6 +255,9 @@ class UserProfileListTile extends StatelessWidget {
     this.isFollowing = false,
     this.isFollowLoading = false,
     this.showFollowButton = true,
+    this.subtitle,
+    this.showStatusDot = false,
+    this.statusDotColor,
     this.onTap,
     this.onFollowTap,
   });
@@ -259,7 +265,7 @@ class UserProfileListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final avatarUrl = user.profileImage ?? '';
-    final university = user.university?.name ?? '';
+    final secondaryText = subtitle ?? user.university?.name ?? '';
 
     return GestureDetector(
       onTap: onTap,
@@ -276,6 +282,8 @@ class UserProfileListTile extends StatelessWidget {
               imageUrl: avatarUrl,
               displayName: user.fullName,
               radius: 28,
+              showStatusDot: showStatusDot,
+              statusDotColor: statusDotColor ?? AppColors.textSecondary,
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -290,10 +298,12 @@ class UserProfileListTile extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  if (university.isNotEmpty) ...[
+                  if (secondaryText.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
-                      university,
+                      secondaryText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,

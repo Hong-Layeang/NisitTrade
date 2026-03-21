@@ -813,8 +813,8 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         final presenceDotColor = presenceColor(isOnline: isOnline);
         // override subtitle for multiple unread
         final subtitleText = (hasUnread && unreadCount > 1)
-            ? '$unreadCount new messages'
-            : entry.subtitle;
+          ? '$unreadCount new messages'
+          : entry.subtitle;
 
         return Column(
           key: ValueKey('chat_user_${entry.userId}'),

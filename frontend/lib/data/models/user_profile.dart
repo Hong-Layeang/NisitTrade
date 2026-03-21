@@ -140,6 +140,8 @@ class UserProfile {
       followingCount: followingCount,
       isFollowing: isFollowing,
       emailDomain: emailDomain,
+      isOnline: isOnline,
+      lastSeenAt: lastSeenAt,
     );
   }
 
@@ -167,8 +169,8 @@ class UserProfile {
       emailDomain: entity.emailDomain,
       isBlockedByMe: false,
       hasBlockedMe: false,
-      isOnline: false,
-      lastSeenAt: null,
+      isOnline: entity.isOnline,
+      lastSeenAt: entity.lastSeenAt,
     );
   }
 }

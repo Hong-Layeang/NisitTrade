@@ -9,7 +9,9 @@ import '../../../domain/entities/product_entity.dart';
 import '../../../logic/helpers/product_like_helpers.dart';
 import '../../../logic/view_models/search_view_model.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
+import '../../../logic/view_models/presence_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
+import '../../../core/utils/user_presence_formatter.dart';
 import '../../widgets/product_grid_card.dart';
 import '../../widgets/category_filter_strip.dart';
 import '../../widgets/search_bar_widget.dart';
@@ -595,15 +597,27 @@ class SearchPageState extends State<SearchPage>
           data.searchQuery,
         );
 
-        return AppRefreshIndicator(
-          onRefresh: () async {
-            await context.read<SearchViewModel>().loadUsers();
+        return Consumer<PresenceViewModel>(
+          builder: (context, presenceViewModel, _) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              presenceViewModel.watchUserIds(
+                filtered.map((user) => user.id).where((id) => id > 0),
+              );
+            });
+
+            return AppRefreshIndicator(
+              onRefresh: () async {
+                await context.read<SearchViewModel>().loadUsers();
+              },
+              child: _buildStudentsContent(
+                context,
+                filtered,
+                data.updatingFollowUserIds,
+                presenceViewModel,
+              ),
+            );
           },
-          child: _buildStudentsContent(
-            context,
-            filtered,
-            data.updatingFollowUserIds,
-          ),
         );
       },
     );
@@ -626,6 +640,7 @@ class SearchPageState extends State<SearchPage>
     BuildContext context,
     List<UserEntity> filtered,
     Set<int> updatingFollowUserIds,
+    PresenceViewModel presenceViewModel,
   ) {
     if (filtered.isEmpty) {
       return ListView(
@@ -671,10 +686,24 @@ class SearchPageState extends State<SearchPage>
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final user = filtered[index];
+        final realtimePresence = presenceViewModel.presenceForUser(user.id);
+        final isOnline = realtimePresence?.isOnline ?? user.isOnline;
+        final lastSeenAt = realtimePresence?.lastSeenAt ?? user.lastSeenAt;
+        final statusLabel = buildPresenceLabel(
+          isOnline: isOnline,
+          lastSeenAt: lastSeenAt,
+        );
+        final university = user.university?.name?.trim() ?? '';
+        final subtitle = university.isEmpty
+            ? statusLabel
+            : '$university · $statusLabel';
         final currentUserId = context.read<UserViewModel>().userId;
         final isCurrentUser = currentUserId == user.id;
         return UserProfileListTile(
           user: user,
+          subtitle: subtitle,
+          showStatusDot: true,
+          statusDotColor: presenceColor(isOnline: isOnline),
           isFollowing: user.isFollowing,
           isFollowLoading: updatingFollowUserIds.contains(user.id),
           showFollowButton: !isCurrentUser,

@@ -58,10 +58,18 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
     super.initState();
     _currentImageUrl = widget.imageUrl;
     if (_shouldFetchPresignedUrl(widget.imageUrl, widget.s3Key)) {
+      // Try to resolve from cache synchronously first to avoid flicker
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _refreshPresignedUrl(forceRefresh: false);
+        if (!mounted) return;
+        final s3Key = widget.s3Key ?? _extractS3KeyFromUrl(widget.imageUrl);
+        if (s3Key != null) {
+          final cached = context.read<S3PresignedUrlService>().getCachedUrl(s3Key);
+          if (cached != null) {
+            setState(() => _currentImageUrl = cached);
+            return;
+          }
         }
+        _refreshPresignedUrl(forceRefresh: false);
       });
     }
   }
@@ -74,9 +82,16 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
       _retryCount = 0;
       if (_shouldFetchPresignedUrl(widget.imageUrl, widget.s3Key)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _refreshPresignedUrl(forceRefresh: false);
+          if (!mounted) return;
+          final s3Key = widget.s3Key ?? _extractS3KeyFromUrl(widget.imageUrl);
+          if (s3Key != null) {
+            final cached = context.read<S3PresignedUrlService>().getCachedUrl(s3Key);
+            if (cached != null) {
+              setState(() => _currentImageUrl = cached);
+              return;
+            }
           }
+          _refreshPresignedUrl(forceRefresh: false);
         });
       }
     }
