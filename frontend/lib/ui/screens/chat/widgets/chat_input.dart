@@ -132,49 +132,67 @@ class _ChatInputState extends State<ChatInput> {
                 const SizedBox(height: 8),
               ],
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  IconButton(
+                    onPressed: widget.isDisabled ||
+                            widget.isLoading ||
+                            widget.isSendingMessage ||
+                            _selectedImages.length >= _maxImages
+                        ? null
+                        : _pickImages,
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    color: _selectedImages.length >= _maxImages
+                        ? AppColors.textSecondary
+                        : AppColors.primary,
+                    iconSize: 26,
+                    padding: const EdgeInsets.only(bottom: 4),
+                  ),
+                  const SizedBox(width: 4),
                   Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      enabled: !widget.isDisabled && !widget.isLoading && !widget.isSendingMessage,
-                      maxLines: 5,
-                      minLines: 1,
-                      textCapitalization: TextCapitalization.sentences,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        height: 1.35,
-                        color: AppColors.textPrimary,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4F6F8),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFDDE3EA)),
                       ),
-                      decoration: InputDecoration(
-                        hintText: widget.disabledHintText ?? 'Message, photos, or a listing update...',
-                        hintStyle: const TextStyle(
-                          color: AppColors.textSecondary,
+                      child: TextField(
+                        controller: _controller,
+                        enabled: !widget.isDisabled &&
+                            !widget.isLoading &&
+                            !widget.isSendingMessage,
+                        maxLines: 5,
+                        minLines: 1,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: const TextStyle(
                           fontSize: 15,
+                          height: 1.4,
+                          color: AppColors.textPrimary,
                         ),
-                        fillColor: Colors.white,
-                        filled: true,
-                        prefixIconConstraints: const BoxConstraints(
-                          minWidth: 44,
-                          minHeight: 44,
-                        ),
-                        prefixIcon: IconButton(
-                          onPressed: widget.isDisabled || _selectedImages.length >= _maxImages
-                              ? null
-                              : _pickImages,
-                          icon: const Icon(Icons.add_photo_alternate_outlined),
-                          color: AppColors.primary,
-                          splashRadius: 20,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
+                        decoration: InputDecoration(
+                          hintText: widget.disabledHintText ?? 'Message...',
+                          hintStyle: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 15,
+                          ),
+                          fillColor: Colors.transparent,
+                          filled: true,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  _buildSendButton(),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: _buildSendButton(),
+                  ),
                 ],
               ),
             ],

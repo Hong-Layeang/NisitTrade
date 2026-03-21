@@ -54,6 +54,9 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   final ChatRepository _chatRepository;
   final AuthTokenStore _tokenStore;
 
+  int? _currentUserId;
+  void setCurrentUserId(int? id) => _currentUserId = id;
+
   // Conversations list state
   List<Conversation> _conversations = [];
   bool _isLoadingConversations = false;
@@ -86,6 +89,10 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   final Set<int> _selectedMessageIds = {};
   bool _isSelectionMode = false;
 
+  // Track message IDs already processed for unread counting (prevent double-count
+  // from chat:receive and chat:notify arriving for the same message)
+  final Set<int> _notifiedMessageIds = {};
+
   // WebSocket subscriptions
   final List<StreamSubscription> _wsSubscriptions = [];
   final ChatWebSocketService _chatWebSocket;
@@ -93,6 +100,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
   void _attachWebSocketListeners() {
     _wsSubscriptions.add(_chatWebSocket.onMessageReceived.listen(_onWsMessageReceived));
+    _wsSubscriptions.add(_chatWebSocket.onMessageNotify.listen(_onWsMessageNotify));
     _wsSubscriptions.add(_chatWebSocket.onMessageUpdated.listen(_onWsMessageUpdated));
     _wsSubscriptions.add(_chatWebSocket.onMessageDeleted.listen(_onWsMessageDeleted));
     _wsSubscriptions.add(_chatWebSocket.onMessageRead.listen(_onWsMessageRead));
@@ -133,6 +141,40 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
   void _onWsMessageReceived(Message message) {
     addMessageToChat(message);
+  }
+
+  /// Handles `chat:notify` — sent to the user's personal room so it arrives
+  /// even when the user hasn't joined the conversation room yet.
+  void _onWsMessageNotify(Message message) {
+    // Ignore own messages
+    if (_currentUserId != null && message.senderId == _currentUserId) return;
+
+    // Deduplicate with chat:receive
+    if (!_notifiedMessageIds.add(message.id)) return;
+
+    // Keep set bounded
+    if (_notifiedMessageIds.length > 200) {
+      final toRemove = _notifiedMessageIds.take(100).toList();
+      _notifiedMessageIds.removeAll(toRemove);
+    }
+
+    final conversationId = message.conversationId;
+
+    // If user is currently viewing this conversation, skip (chat:receive handles it)
+    if (_currentConversation?.id == conversationId) return;
+
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index != -1) {
+      // Known conversation — increment unread and update last message
+      _upsertConversationLastMessage(message, incrementUnread: true);
+      // Also join the conversation room if not already
+      joinConversationRoom(conversationId);
+      notifyListeners();
+    } else {
+      // Unknown/new conversation — reload conversations from API
+      joinConversationRoom(conversationId);
+      unawaited(loadConversations(refresh: true));
+    }
   }
 
   void _onWsMessageUpdated(MessageUpdateEvent event) {
@@ -265,6 +307,13 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     final convId = _currentConversation?.id;
     if (convId == null) return const [];
     return List.unmodifiable(_attachedProductsByConversation[convId] ?? []);
+  }
+
+  /// Returns attached products for a specific conversation (used by list screen).
+  List<AttachedProduct> attachedProductsForConversation(int conversationId) {
+    return List.unmodifiable(
+      _attachedProductsByConversation[conversationId] ?? [],
+    );
   }
 
   void addAttachedProduct(Product product) {
@@ -729,10 +778,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  // Add message to local list (for real-time updates)
+  // Add message to local list (for real-time updates via chat:receive)
   void addMessageToChat(Message message) {
-    final alreadyInThread = _messages.any((item) => item.id == message.id);
+    // If user is viewing this conversation, add message to thread
     if (_currentConversation?.id == message.conversationId) {
+      final alreadyInThread = _messages.any((item) => item.id == message.id);
       if (!alreadyInThread) {
         _messages.add(message);
       }
@@ -741,10 +791,24 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    if (!alreadyInThread) {
-      _upsertConversationLastMessage(message, incrementUnread: true);
+    // For other conversations, skip own messages (avoid self-incrementing unread)
+    if (_currentUserId != null && message.senderId == _currentUserId) {
+      _upsertConversationLastMessage(message);
       notifyListeners();
+      return;
     }
+
+    // If chat:notify already handled this message, skip incrementing again
+    if (_notifiedMessageIds.contains(message.id)) {
+      _upsertConversationLastMessage(message);
+      notifyListeners();
+      return;
+    }
+
+    // Increment unread for messages from others in non-active conversations
+    _notifiedMessageIds.add(message.id);
+    _upsertConversationLastMessage(message, incrementUnread: true);
+    notifyListeners();
   }
 
   Future<bool> deleteConversation(int conversationId) async {

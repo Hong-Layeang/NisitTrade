@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -31,6 +33,7 @@ class ConversationsListScreen extends StatefulWidget {
 
 class _ConversationsListScreenState extends State<ConversationsListScreen> {
   static const int _pageSize = 100;
+  static const Duration _purchaseWindow = Duration(days: 2);
 
   bool _hasInitialized = false;
   bool _isLoadingUsers = false;
@@ -38,16 +41,29 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   int? _openingUserId;
   List<UserProfile> _allUsers = [];
   String _searchQuery = '';
+  Timer? _countdownTimer;
+  DateTime _now = DateTime.now();
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_hasInitialized) return;
 
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _now = DateTime.now());
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refresh();
     });
     _hasInitialized = true;
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -429,6 +445,70 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
           )
           .toList(growable: false);
     });
+  }
+
+  /// Returns the first active (non-expired) attached product for a conversation,
+  /// or null if there is none.
+  AttachedProduct? _activeAttachedProduct(int conversationId) {
+    final chatVm = context.read<ChatRoomViewModel>();
+    final products = chatVm.attachedProductsForConversation(conversationId);
+    for (final ap in products) {
+      if (ap.countdownStartedAt == null) return ap; // awaiting
+      final expiresAt = ap.countdownStartedAt!.add(_purchaseWindow);
+      if (_now.isBefore(expiresAt)) return ap; // still active
+    }
+    return null;
+  }
+
+  String _countdownLabel(AttachedProduct ap) {
+    final startedAt = ap.countdownStartedAt;
+    if (startedAt == null) return 'Pending';
+
+    final remaining = startedAt.add(_purchaseWindow).difference(_now);
+    if (remaining.isNegative || remaining.inSeconds <= 0) return 'Expired';
+
+    final hours = remaining.inHours;
+    final minutes = remaining.inMinutes % 60;
+    if (hours >= 24) {
+      final days = hours ~/ 24;
+      final h = hours % 24;
+      return '${days}d ${h}h ${minutes}m left';
+    }
+    return '${hours}h ${minutes}m left';
+  }
+
+  Widget _buildPurchaseIndicator(AttachedProduct ap) {
+    final label = _countdownLabel(ap);
+    final isAwaiting = ap.countdownStartedAt == null;
+    final color = isAwaiting
+        ? AppColors.textSecondary
+        : const Color(0xFFE67E22);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isAwaiting
+              ? Icons.hourglass_empty_rounded
+              : Icons.timer_outlined,
+          size: 13,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            isAwaiting ? 'Purchase pending' : label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildEntryTrailing({
@@ -816,6 +896,11 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
           ? '$unreadCount new messages'
           : entry.subtitle;
 
+        // Active purchase countdown for this conversation
+        final activeAp = conversation != null
+            ? _activeAttachedProduct(conversation.id)
+            : null;
+
         return Column(
           key: ValueKey('chat_user_${entry.userId}'),
           mainAxisSize: MainAxisSize.min,
@@ -877,61 +962,71 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                   ],
                 ],
               ),
-              subtitle: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Flexible(
-                    fit: FlexFit.loose,
-                    child: Text(
-                      subtitleText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: hasUnread
-                            ? FontWeight.w700
-                            : FontWeight.w400,
-                        color: isBlocked
-                            ? AppColors.textSecondary
-                            : hasUnread
-                            ? const Color(0xFF1A1A1A)
-                            : AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  if (timestampLabel != null) ...[
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            '·',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: hasUnread
-                                  ? const Color(0xFF1A1A1A)
-                                  : AppColors.textSecondary.withValues(
-                                      alpha: 0.5,
-                                    ),
-                            ),
-                          ),
-                        ),
-                        Text(
-                          timestampLabel,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        fit: FlexFit.loose,
+                        child: Text(
+                          subtitleText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: hasUnread
                                 ? FontWeight.w700
                                 : FontWeight.w400,
-                            color: hasUnread
-                                ? AppColors.primary
+                            color: isBlocked
+                                ? AppColors.textSecondary
+                                : hasUnread
+                                ? const Color(0xFF1A1A1A)
                                 : AppColors.textSecondary,
                           ),
                         ),
+                      ),
+                      if (timestampLabel != null) ...[
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                '·',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: hasUnread
+                                      ? const Color(0xFF1A1A1A)
+                                      : AppColors.textSecondary.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              timestampLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                                color: hasUnread
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
-                    ),
+                    ],
+                  ),
+                  if (activeAp != null) ...[
+                    const SizedBox(height: 3),
+                    _buildPurchaseIndicator(activeAp),
                   ],
                 ],
               ),

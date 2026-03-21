@@ -41,13 +41,13 @@ class ChatBubble extends StatelessWidget {
     final hasImages = imageUrls.isNotEmpty;
     final bubblePadding = hasImages
         ? const EdgeInsets.fromLTRB(6, 6, 6, 8)
-        : const EdgeInsets.fromLTRB(12, 9, 12, 8);
+        : const EdgeInsets.fromLTRB(14, 11, 14, 9);
 
     return Align(
       alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.74,
+          maxWidth: MediaQuery.of(context).size.width * 0.80,
         ),
         child: GestureDetector(
           onLongPress: onLongPress,
@@ -123,13 +123,13 @@ class ChatBubble extends StatelessWidget {
             if (hasMessageText) const SizedBox(height: 8),
           ],
           if (hasMessageText)
-            Text(
+            SelectableText(
               message.messageText,
               style: TextStyle(
                 color: textColor,
                 fontSize: 15,
-                fontWeight: FontWeight.w500,
-                height: 1.32,
+                fontWeight: FontWeight.w400,
+                height: 1.5,
               ),
             ),
           SizedBox(height: hasMessageText ? 2 : 4),

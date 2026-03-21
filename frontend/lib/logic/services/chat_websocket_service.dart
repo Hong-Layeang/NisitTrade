@@ -17,6 +17,7 @@ class ChatWebSocketService {
 
   // Stream controllers for each event type
   final _messageReceivedController = StreamController<Message>.broadcast();
+  final _messageNotifyController = StreamController<Message>.broadcast();
   final _messageUpdatedController =
       StreamController<MessageUpdateEvent>.broadcast();
   final _messageDeletedController =
@@ -28,6 +29,7 @@ class ChatWebSocketService {
   bool get isConnected => _socket?.connected == true;
 
   Stream<Message> get onMessageReceived => _messageReceivedController.stream;
+  Stream<Message> get onMessageNotify => _messageNotifyController.stream;
   Stream<MessageUpdateEvent> get onMessageUpdated =>
       _messageUpdatedController.stream;
   Stream<MessageDeleteEvent> get onMessageDeleted =>
@@ -86,6 +88,17 @@ class ChatWebSocketService {
         }
       } catch (e) {
         debugPrint('[$_tag] Error parsing received message: $e');
+      }
+    });
+
+    socket.on('chat:notify', (data) {
+      try {
+        if (data is Map) {
+          final message = Message.fromJson(Map<String, dynamic>.from(data));
+          _messageNotifyController.add(message);
+        }
+      } catch (e) {
+        debugPrint('[$_tag] Error parsing notify message: $e');
       }
     });
 
@@ -231,6 +244,7 @@ class ChatWebSocketService {
   Future<void> dispose() async {
     await disconnect();
     await _messageReceivedController.close();
+    await _messageNotifyController.close();
     await _messageUpdatedController.close();
     await _messageDeletedController.close();
     await _messageReadController.close();

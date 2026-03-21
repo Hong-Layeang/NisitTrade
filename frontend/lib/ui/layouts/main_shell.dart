@@ -57,6 +57,7 @@ class _MainShellState extends State<MainShell> {
       }
 
       final chatProvider = context.read<ChatRoomViewModel>();
+      chatProvider.setCurrentUserId(userProvider.userId);
       if (chatProvider.conversations.isEmpty && !chatProvider.isLoadingConversations) {
         chatProvider.loadConversations(refresh: true);
       }
@@ -113,6 +114,14 @@ class _MainShellState extends State<MainShell> {
     final chatBadgeCount = context.select<ChatRoomViewModel, int>(
       (viewModel) => viewModel.totalUnreadCount,
     );
+
+    // Keep currentUserId in sync when profile loads
+    final userId = context.select<UserViewModel, int?>(
+      (vm) => vm.userId,
+    );
+    if (userId != null) {
+      context.read<ChatRoomViewModel>().setCurrentUserId(userId);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,

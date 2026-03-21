@@ -562,9 +562,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (hours >= 24) {
       final days = hours ~/ 24;
       final h = hours % 24;
-      return '${days}d ${h}h ${minutes}m';
+      return '${days}d ${h}h ${minutes}m left';
     }
-    return '${hours}h ${minutes}m ${seconds}s';
+    return '${hours}h ${minutes}m ${seconds}s left';
   }
 
   bool _isProductCountdownExpired(AttachedProduct ap) {
