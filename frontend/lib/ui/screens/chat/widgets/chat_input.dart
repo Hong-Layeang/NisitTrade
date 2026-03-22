@@ -153,7 +153,7 @@ class _ChatInputState extends State<ChatInput> {
                     child: Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFFF4F6F8),
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFDDE3EA)),
                       ),
                       child: TextField(

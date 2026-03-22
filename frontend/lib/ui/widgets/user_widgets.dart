@@ -246,6 +246,7 @@ class UserProfileListTile extends StatelessWidget {
   final String? subtitle;
   final bool showStatusDot;
   final Color? statusDotColor;
+  final double statusDotSize;
   final VoidCallback? onTap;
   final VoidCallback? onFollowTap;
 
@@ -258,6 +259,7 @@ class UserProfileListTile extends StatelessWidget {
     this.subtitle,
     this.showStatusDot = false,
     this.statusDotColor,
+    this.statusDotSize = 14,
     this.onTap,
     this.onFollowTap,
   });
@@ -284,6 +286,7 @@ class UserProfileListTile extends StatelessWidget {
               radius: 28,
               showStatusDot: showStatusDot,
               statusDotColor: statusDotColor ?? AppColors.textSecondary,
+              statusDotSize: statusDotSize,
             ),
             const SizedBox(width: 14),
             Expanded(

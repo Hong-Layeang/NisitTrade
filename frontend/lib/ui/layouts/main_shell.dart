@@ -100,9 +100,10 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  PreferredSizeWidget _buildAppBar(int chatBadgeCount) {
+  PreferredSizeWidget _buildAppBar(int chatBadgeCount, int pendingPurchaseBadgeCount) {
     return AppAppBar(
       chatBadgeCount: chatBadgeCount,
+      pendingPurchaseBadgeCount: pendingPurchaseBadgeCount,
       onFavoriteTap: () {
         Navigator.pushNamed(context, AppRoutes.saved);
       },
@@ -113,6 +114,9 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final chatBadgeCount = context.select<ChatRoomViewModel, int>(
       (viewModel) => viewModel.totalUnreadCount,
+    );
+    final pendingPurchaseBadgeCount = context.select<ChatRoomViewModel, int>(
+      (viewModel) => viewModel.pendingPurchaseCount,
     );
 
     // Keep currentUserId in sync when profile loads
@@ -125,7 +129,7 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(chatBadgeCount),
+      appBar: _buildAppBar(chatBadgeCount, pendingPurchaseBadgeCount),
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,

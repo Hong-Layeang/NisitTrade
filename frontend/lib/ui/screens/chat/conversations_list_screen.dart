@@ -33,7 +33,7 @@ class ConversationsListScreen extends StatefulWidget {
 
 class _ConversationsListScreenState extends State<ConversationsListScreen> {
   static const int _pageSize = 100;
-  static const Duration _purchaseWindow = Duration(days: 2);
+  static const Duration _purchaseWindow = purchaseDuration;
 
   bool _hasInitialized = false;
   bool _isLoadingUsers = false;
@@ -362,6 +362,11 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
 
   Future<void> _showEntryActions(_ChatListEntry entry) async {
     final conversation = entry.conversation;
+    final hasAttachments = conversation != null &&
+        context
+            .read<ChatRoomViewModel>()
+            .attachedProductsForConversation(conversation.id)
+            .isNotEmpty;
 
     await AppActionSheet.show(
       context,
@@ -381,7 +386,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             arguments: OtherProfileArgs(userId: entry.userId),
           ),
         ),
-        if (conversation?.product != null)
+        if (conversation?.product != null && hasAttachments)
           AppActionSheetItem(
             label: 'Open listing',
             icon: Icons.open_in_new_rounded,

@@ -9,6 +9,8 @@ import '../../data/models/product.dart';
 import '../../data/repositories/chat_repository.dart';
 import '../../logic/services/chat_websocket_service.dart';
 
+const purchaseDuration = Duration(days: 2);
+
 class AttachedProduct {
   final Product product;
   final DateTime? countdownStartedAt;
@@ -85,12 +87,12 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
   final Map<int, List<AttachedProduct>> _attachedProductsByConversation = {};
 
+  final Map<int, Set<int>> _resolvedProductsByConversation = {};
+
   // Multi-select state
   final Set<int> _selectedMessageIds = {};
   bool _isSelectionMode = false;
 
-  // Track message IDs already processed for unread counting (prevent double-count
-  // from chat:receive and chat:notify arriving for the same message)
   final Set<int> _notifiedMessageIds = {};
 
   // WebSocket subscriptions
@@ -331,6 +333,9 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     if (convId == null) return;
     _attachedProductsByConversation[convId]
         ?.removeWhere((ap) => ap.product.id == productId);
+    _resolvedProductsByConversation
+        .putIfAbsent(convId, () => {})
+        .add(productId);
     _saveAttachments();
     notifyListeners();
   }
@@ -339,6 +344,18 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     final convId = _currentConversation?.id;
     if (convId == null) return;
     _attachedProductsByConversation.remove(convId);
+    _saveAttachments();
+    notifyListeners();
+  }
+
+  void clearAttachedProductsForConversation(int conversationId) {
+    final ids = (_attachedProductsByConversation[conversationId] ?? [])
+        .map((ap) => ap.product.id)
+        .toSet();
+    _attachedProductsByConversation.remove(conversationId);
+    if (ids.isNotEmpty) {
+      _resolvedProductsByConversation[conversationId] = ids;
+    }
     _saveAttachments();
     notifyListeners();
   }
@@ -362,6 +379,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   static const _attachmentsKey = 'attached_products_v1';
+  static const _resolvedKey = 'resolved_products_v1';
 
   Future<void> _saveAttachments() async {
     final prefs = await SharedPreferences.getInstance();
@@ -371,24 +389,95 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
           entry.value.map((ap) => ap.toJson()).toList();
     }
     await prefs.setString(_attachmentsKey, jsonEncode(map));
+
+    final resolvedMap = <String, dynamic>{};
+    for (final entry in _resolvedProductsByConversation.entries) {
+      resolvedMap[entry.key.toString()] = entry.value.toList();
+    }
+    await prefs.setString(_resolvedKey, jsonEncode(resolvedMap));
   }
 
   Future<void> loadPersistedAttachments() async {
     final prefs = await SharedPreferences.getInstance();
+
     final raw = prefs.getString(_attachmentsKey);
-    if (raw == null) return;
-    try {
-      final map = jsonDecode(raw) as Map<String, dynamic>;
-      for (final entry in map.entries) {
-        final convId = int.tryParse(entry.key);
-        if (convId == null) continue;
-        final list = (entry.value as List)
-            .map((e) => AttachedProduct.fromJson(e as Map<String, dynamic>))
-            .toList();
-        _attachedProductsByConversation[convId] = list;
+    if (raw != null) {
+      try {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        for (final entry in map.entries) {
+          final convId = int.tryParse(entry.key);
+          if (convId == null) continue;
+          final list = (entry.value as List)
+              .map((e) => AttachedProduct.fromJson(e as Map<String, dynamic>))
+              .toList();
+          _attachedProductsByConversation[convId] = list;
+        }
+      } catch (_) {
+        // Corrupted data — ignore and start fresh
       }
-    } catch (_) {
-      // Corrupted data — ignore and start fresh
+    }
+
+    final resolvedRaw = prefs.getString(_resolvedKey);
+    if (resolvedRaw != null) {
+      try {
+        final resolvedMap = jsonDecode(resolvedRaw) as Map<String, dynamic>;
+        for (final entry in resolvedMap.entries) {
+          final convId = int.tryParse(entry.key);
+          if (convId == null) continue;
+          final ids = (entry.value as List)
+              .map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0)
+              .where((id) => id > 0)
+              .toSet();
+          _resolvedProductsByConversation[convId] = ids;
+        }
+      } catch (_) {
+        // Ignore corrupted resolved data
+      }
+    }
+  }
+
+  /// Syncs attached products from message history so that the recipient side
+  /// (e.g. the seller) sees the carousel even though they never called
+  /// [addAttachedProduct] themselves.
+  ///
+  /// Uses [message.sentAt] as the countdown start time (the timer begins when
+  /// the buyer sends the message that includes the product).
+  /// Products already resolved/dismissed by this user are skipped.
+  void _syncAttachedProductsFromMessages(
+    int conversationId,
+    List<Message> messages, {
+    bool save = false,
+  }) {
+    final resolved = _resolvedProductsByConversation[conversationId] ?? {};
+    bool changed = false;
+
+    for (final message in messages) {
+      final product = message.attachedProduct;
+      if (product == null) continue;
+      if (resolved.contains(product.id)) continue;
+
+      final list = _attachedProductsByConversation.putIfAbsent(
+          conversationId, () => []);
+      final existingIndex =
+          list.indexWhere((ap) => ap.product.id == product.id);
+
+      if (existingIndex == -1) {
+        // Recipient side: product not in list yet — add it with countdown.
+        list.add(AttachedProduct(
+          product: product,
+          countdownStartedAt: message.sentAt,
+        ));
+        changed = true;
+      } else if (list[existingIndex].countdownStartedAt == null) {
+        // Sender side: product was added locally but countdown not yet stamped.
+        list[existingIndex] =
+            list[existingIndex].copyWith(countdownStartedAt: message.sentAt);
+        changed = true;
+      }
+    }
+
+    if (changed && save) {
+      _saveAttachments();
     }
   }
 
@@ -413,6 +502,21 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         0,
         (sum, conversation) => sum + conversation.unreadCount,
       );
+
+  int get pendingPurchaseCount {
+    final now = DateTime.now();
+    int count = 0;
+    for (final list in _attachedProductsByConversation.values) {
+      final hasPending = list.any((ap) {
+        if (ap.countdownStartedAt == null) return false;
+        return now.isBefore(
+          ap.countdownStartedAt!.add(purchaseDuration),
+        );
+      });
+      if (hasPending) count++;
+    }
+    return count;
+  }
 
   bool hasProductAttachmentForMessage(int messageId) =>
       _messagesWithProductAttachment.contains(messageId);
@@ -651,6 +755,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         if ((response.data ?? []).length < _messagesPageSize) {
           _hasMoreMessages = false;
         }
+        _syncAttachedProductsFromMessages(
+          _currentConversation!.id,
+          _messages,
+          save: refresh,
+        );
       } else {
         _messagesError = response.error?.message ?? 'Failed to load messages';
       }
@@ -780,6 +889,14 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
   // Add message to local list (for real-time updates via chat:receive)
   void addMessageToChat(Message message) {
+    if (message.attachedProduct != null) {
+      _syncAttachedProductsFromMessages(
+        message.conversationId,
+        [message],
+        save: true,
+      );
+    }
+
     // If user is viewing this conversation, add message to thread
     if (_currentConversation?.id == message.conversationId) {
       final alreadyInThread = _messages.any((item) => item.id == message.id);
@@ -835,6 +952,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       _attachedProductsByConversation.remove(conversationId);
+      await _saveAttachments();
 
       if (_currentConversation?.id == conversationId) {
         _currentConversation = _currentConversation?.copyWith(

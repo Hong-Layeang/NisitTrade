@@ -21,7 +21,9 @@ import 'widgets/attachment_carousel.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input.dart';
 import '../../../data/providers/user_api_service.dart';
+import '../../../data/providers/product_api_service.dart';
 import 'widgets/chat_menu_helpers.dart';
+import 'widgets/purchase_rating_dialog.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   static const routeName = '/chat-room';
@@ -45,6 +47,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   bool _hasInitialized = false;
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
+  final Set<int> _expiredPromptedProductIds = {};
 
   @override
   void initState() {
@@ -56,6 +59,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       setState(() {
         _now = DateTime.now();
       });
+      _checkForNewlyExpiredAttachments();
     });
   }
 
@@ -103,8 +107,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
 
     _watchCurrentParticipantPresence();
-
     _scrollToBottom(animated: false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkForNewlyExpiredAttachments();
+    });
   }
 
   void _watchCurrentParticipantPresence() {
@@ -318,11 +325,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               }
               return AttachmentCarousel(
                 attachedProducts: vm.attachedProducts,
-                countdownLabelBuilder: _buildProductCountdownLabel,
+                countdownLabelBuilder: (ap) {
+                  final isOwner =
+                      ap.product.userId == _getCurrentUserId();
+                  return _buildProductCountdownLabel(ap, isOwner: isOwner);
+                },
                 isExpiredBuilder: _isProductCountdownExpired,
+                isOwnerBuilder: (product) =>
+                    product.userId == _getCurrentUserId(),
                 onTapProduct: (product) => _navigateToProduct(product),
                 onConfirmPurchase: (product) =>
-                    _navigateToProduct(product),
+                    _handleConfirmPurchase(product),
+                onMarkAsSold: (product) => _handleMarkAsSold(product),
                 onRemove: (product) =>
                     vm.removeAttachedProduct(product.id),
               );
@@ -543,16 +557,150 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
   }
 
-  String _buildProductCountdownLabel(AttachedProduct ap) {
-    final startedAt = ap.countdownStartedAt;
-    if (startedAt == null) {
-      return 'Awaiting purchase message';
+  void _checkForNewlyExpiredAttachments() {
+    final currentUserId = _getCurrentUserId();
+    for (final ap in List.of(_viewModel.attachedProducts)) {
+      if (!_isProductCountdownExpired(ap)) continue;
+      if (_expiredPromptedProductIds.contains(ap.product.id)) continue;
+
+      _expiredPromptedProductIds.add(ap.product.id);
+      final isOwner =
+          currentUserId != 0 && ap.product.userId == currentUserId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          if (isOwner) {
+            _promptSaleCompleteAsSeller(ap.product);
+          } else {
+            _promptDidBuy(ap.product);
+          }
+        }
+      });
+    }
+  }
+
+  Future<void> _promptDidBuy(Product product) async {
+    final didBuy = await showDidYouBuyPrompt(
+      context,
+      productTitle: product.title,
+    );
+    if (!mounted) return;
+
+    if (didBuy == true) {
+      await _handleConfirmPurchase(product);
+    } else {
+      _viewModel.removeAttachedProduct(product.id);
+    }
+  }
+
+  Future<void> _promptSaleCompleteAsSeller(Product product) async {
+    final didSell = await showDidYouSellPrompt(
+      context,
+      productTitle: product.title,
+    );
+    if (!mounted) return;
+
+    if (didSell == true) {
+      await _handleMarkAsSold(product);
+    } else {
+      _viewModel.removeAttachedProduct(product.id);
+    }
+  }
+
+  Future<void> _handleMarkAsSold(Product product) async {
+    final choice = await _showUpdateListingStatusDialog(product);
+    if (!mounted) return;
+
+    _viewModel.removeAttachedProduct(product.id);
+
+    if (choice == _ListingStatusChoice.markAsSold) {
+      final response = await ProductApiService.instance.updateProductStatus(
+        id: product.id,
+        status: 'sold',
+      );
+      if (!mounted) return;
+      if (response.isSuccess) {
+        AppSnackBar.success(context, 'Listing marked as sold and removed from feed');
+      } else {
+        AppSnackBar.error(
+          context,
+          response.error?.message ?? 'Could not update listing status',
+        );
+      }
+    }
+    // _ListingStatusChoice.keepActive: do nothing — listing stays on feed
+  }
+
+  Future<_ListingStatusChoice?> _showUpdateListingStatusDialog(
+      Product product) {
+    return showModalBottomSheet<_ListingStatusChoice>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (_) => _UpdateListingStatusSheet(product: product),
+    );
+  }
+
+  Future<void> _handleConfirmPurchase(Product product) async {
+    final conversation = _viewModel.currentConversation;
+    final sellerParticipant = conversation != null
+        ? _otherParticipant(conversation)
+        : null;
+    final sellerName = sellerParticipant?.user?.name ??
+        'Seller';
+
+    final result = await showPurchaseRatingDialog(
+      context,
+      sellerName: sellerName,
+      productTitle: product.title,
+    );
+
+    if (!mounted) return;
+
+    if (result == null) {
+      _viewModel.removeAttachedProduct(product.id);
+      return;
     }
 
-    final expiresAt = startedAt.add(const Duration(days: 2));
+    final sellerId = product.userId != 0
+        ? product.userId
+        : (sellerParticipant?.userId ?? 0);
+
+    if (sellerId == 0) {
+      _viewModel.removeAttachedProduct(product.id);
+      AppSnackBar.error(context, 'Could not identify seller to rate');
+      return;
+    }
+
+    final response = await UserApiService.instance.submitRating(
+      sellerId: sellerId,
+      productId: product.id,
+      rating: result.rating,
+      feedback: result.feedback,
+    );
+
+    if (!mounted) return;
+
+    _viewModel.removeAttachedProduct(product.id);
+
+    if (response.isSuccess) {
+      AppSnackBar.success(context, 'Review submitted — thank you!');
+    } else {
+      AppSnackBar.error(context, response.error?.message ?? 'Failed to submit review');
+    }
+  }
+
+  String _buildProductCountdownLabel(AttachedProduct ap,
+      {bool isOwner = false}) {
+    final startedAt = ap.countdownStartedAt;
+    if (startedAt == null) {
+      return isOwner ? 'Awaiting buyer' : 'Awaiting purchase message';
+    }
+
+    final expiresAt = startedAt.add(purchaseDuration);
     final remaining = expiresAt.difference(_now);
     if (remaining.isNegative || remaining.inSeconds <= 0) {
-      return 'Window ended';
+      return isOwner ? 'Sale window closed' : 'Purchase window expired';
     }
 
     final hours = remaining.inHours;
@@ -570,7 +718,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   bool _isProductCountdownExpired(AttachedProduct ap) {
     final startedAt = ap.countdownStartedAt;
     if (startedAt == null) return false;
-    final expiresAt = startedAt.add(const Duration(days: 2));
+    final expiresAt = startedAt.add(purchaseDuration);
     return _now.isAfter(expiresAt);
   }
 
@@ -813,6 +961,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _showChatActions(Conversation conversation) async {
     final participant = _otherParticipant(conversation);
+    final hasAttachments = _viewModel
+        .attachedProductsForConversation(conversation.id)
+        .isNotEmpty;
     await AppActionSheet.show(
       context,
       title: 'Conversation',
@@ -826,7 +977,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               arguments: OtherProfileArgs(userId: participant.userId),
             ),
           ),
-        if (conversation.product != null)
+        if (conversation.product != null && hasAttachments)
           AppActionSheetItem(
             label: 'Open listing',
             icon: Icons.open_in_new_rounded,
@@ -864,6 +1015,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     displayName: participant.user?.name ?? 'user',
                   ),
           ),
+        if (hasAttachments)
+          AppActionSheetItem(
+            label: 'Cancel pending purchase',
+            icon: Icons.shopping_bag_outlined,
+            isDestructive: true,
+            onTap: () => _cancelPendingPurchase(conversation),
+          ),
         AppActionSheetItem(
           label: 'Delete chat',
           icon: Icons.delete_outline_rounded,
@@ -872,6 +1030,34 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _cancelPendingPurchase(Conversation conversation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel pending purchase?'),
+        content: const Text(
+          'This will remove all pending products from this conversation. You can always re-attach them from the product listing.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD64545),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancel purchase'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    _viewModel.clearAttachedProductsForConversation(conversation.id);
+    AppSnackBar.show(context, 'Pending purchase removed');
   }
 
   Future<void> _reportUser({
@@ -941,6 +1127,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         isBlockedByMe: true,
         hasBlockedMe: conversation.hasBlockedMe,
       );
+      _viewModel.clearAttachedProductsForConversation(conversation.id);
     } else {
       AppSnackBar.error(
         context,
@@ -1101,6 +1288,175 @@ class _EditMessageDialogState extends State<_EditMessageDialog> {
           child: const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+enum _ListingStatusChoice { markAsSold, keepActive }
+
+class _UpdateListingStatusSheet extends StatelessWidget {
+  final Product product;
+
+  const _UpdateListingStatusSheet({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Column(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0FBA81).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0FBA81),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.check_rounded,
+                        color: Colors.white, size: 24),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sale Complete! 🎉',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  "Would you like to update this listing's status on the feed?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.sell_outlined,
+                          size: 13, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          product.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context)
+                        .pop(_ListingStatusChoice.markAsSold),
+                    icon: const Icon(Icons.remove_shopping_cart_outlined,
+                        size: 18),
+                    label: const Text('Mark as Sold — Remove from Feed'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context)
+                        .pop(_ListingStatusChoice.keepActive),
+                    icon: const Icon(Icons.layers_outlined, size: 18),
+                    label: const Text('Keep Listing Active'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      side: const BorderSide(color: AppColors.border),
+                      foregroundColor: AppColors.textSecondary,
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Choose "Keep Listing Active" if you have more of this item to sell.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary.withValues(alpha: 0.7),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

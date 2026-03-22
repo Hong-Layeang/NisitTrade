@@ -332,4 +332,29 @@ class UserApiService {
       );
     }
   }
+
+  /// Submit a purchase rating for a seller.
+  /// Idempotent — returns success even if the buyer already rated this product.
+  Future<ApiResponse<bool>> submitRating({
+    required int sellerId,
+    required int productId,
+    required int rating,
+    String? feedback,
+  }) async {
+    try {
+      await _dio.post('/ratings', data: {
+        'seller_id': sellerId,
+        'product_id': productId,
+        'rating': rating,
+        if (feedback != null && feedback.isNotEmpty) 'feedback': feedback,
+      });
+      return ApiResponse.success(true);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(
+        ApiException(message: 'Failed to submit rating: $e'),
+      );
+    }
+  }
 }
