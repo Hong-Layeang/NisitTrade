@@ -1,15 +1,15 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/utils/school_short_name.dart';
-import '../../../../data/models/comment.dart';
-import '../../../../domain/entities/university_entity.dart';
+import '../../../../data/dtos/comment_dto.dart';
+import '../../../../data/dtos/university_dto.dart';
 import '../../../../logic/view_models/user_view_model.dart';
 import '../../community/widgets/community_comment_item.dart';
 
 /// Widget to display a single comment with user info and actions
 class CommentItem extends StatelessWidget {
-  final Comment comment;
+  final CommentDto comment;
   final VoidCallback onUserTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
@@ -30,7 +30,7 @@ class CommentItem extends StatelessWidget {
         int? userId,
         String? profileImage,
         String? fullName,
-        UniversityEntity? university,
+        UniversityDto? university,
         String? email,
       })
     >(
@@ -51,8 +51,8 @@ class CommentItem extends StatelessWidget {
             ? (userData.fullName ?? comment.user?.fullName ?? 'User')
             : (comment.user?.fullName ?? 'User');
         final university = isCurrentUser
-            ? (userData.university ?? comment.user?.university?.toEntity())
-            : comment.user?.university?.toEntity();
+          ? (userData.university ?? comment.user?.university)
+          : comment.user?.university;
         final handle = buildSchoolShortName(
           universityName: university?.name,
           universityDomain: university?.domain,
@@ -75,3 +75,4 @@ class CommentItem extends StatelessWidget {
     );
   }
 }
+

@@ -1,14 +1,12 @@
 import '../../core/errors/api_response.dart';
-import '../../domain/repository_interfaces/i_product_comment_repository.dart';
-import '../providers/product_api_service.dart';
+import '../repository_interfaces/i_product_comment_repository.dart';
+import 'product_repository_impl.dart';
 
-/// Implementation of IProductCommentRepository
-/// Handles product comment operations
 class ProductCommentRepositoryImpl implements IProductCommentRepository {
-  ProductCommentRepositoryImpl({ProductApiService? apiService})
-      : _apiService = apiService ?? ProductApiService.instance;
+  ProductCommentRepositoryImpl({ProductRepositoryImpl? repository})
+      : _repository = repository ?? ProductRepositoryImpl();
 
-  final ProductApiService _apiService;
+  final ProductRepositoryImpl _repository;
 
   @override
   Future<ApiResponse<void>> addComment({
@@ -16,7 +14,7 @@ class ProductCommentRepositoryImpl implements IProductCommentRepository {
     required String content,
     int? rating,
   }) async {
-    return _apiService.addComment(
+    return _repository.addComment(
       productId: productId,
       content: content,
       rating: rating,
@@ -30,7 +28,7 @@ class ProductCommentRepositoryImpl implements IProductCommentRepository {
     required String content,
     int? rating,
   }) async {
-    return _apiService.updateComment(
+    return _repository.updateComment(
       productId: productId,
       commentId: commentId,
       content: content,
@@ -43,7 +41,7 @@ class ProductCommentRepositoryImpl implements IProductCommentRepository {
     required int productId,
     required int commentId,
   }) async {
-    return _apiService.deleteComment(
+    return _repository.deleteComment(
       productId: productId,
       commentId: commentId,
     );

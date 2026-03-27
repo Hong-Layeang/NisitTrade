@@ -46,15 +46,24 @@ class PresenceWebSocketService {
   String? _token;
   String _activeBaseUrl = AppConfig.baseUrl;
   bool _retryingFallback = false;
+  bool _isConnecting = false;
   final Set<int> _watchedUserIds = <int>{};
 
   bool get isConnected => _socket?.connected == true;
+  bool get isConnecting => _isConnecting;
   Stream<UserPresenceEvent> get events => _eventsController.stream;
 
   Future<void> connect({required String token}) async {
     _token = token;
 
-    if (_socket != null && _socket!.connected) {
+    if (_socket != null) {
+      if (_socket!.connected || _isConnecting) {
+        _emitWatchList();
+        return;
+      }
+
+      _isConnecting = true;
+      _socket!.connect();
       _emitWatchList();
       return;
     }
@@ -74,6 +83,7 @@ class PresenceWebSocketService {
     final socket = _socket;
     if (socket == null) return;
 
+    _isConnecting = false;
     socket.off('connect');
     socket.off('disconnect');
     socket.off('connect_error');
@@ -96,6 +106,7 @@ class PresenceWebSocketService {
       return;
     }
 
+    _isConnecting = true;
     _socket?.dispose();
 
     final socket = io.io(
@@ -111,15 +122,18 @@ class PresenceWebSocketService {
     );
 
     socket.onConnect((_) {
+      _isConnecting = false;
       debugPrint('[PresenceWebSocketService] Connected to $baseUrl');
       _emitWatchList();
     });
 
     socket.onDisconnect((reason) {
+      _isConnecting = false;
       debugPrint('[PresenceWebSocketService] Disconnected: $reason');
     });
 
     socket.onConnectError((error) {
+      _isConnecting = false;
       debugPrint('[PresenceWebSocketService] Connect error: $error');
       _handleConnectError();
     });

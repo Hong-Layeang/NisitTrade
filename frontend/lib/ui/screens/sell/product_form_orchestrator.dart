@@ -1,15 +1,15 @@
-import 'package:image_picker/image_picker.dart';
+﻿import 'package:image_picker/image_picker.dart';
 
 import '../../../core/errors/api_exception.dart';
-import '../../../domain/entities/product_entity.dart';
-import '../../../domain/repository_interfaces/i_product_image_repository.dart';
-import '../../../domain/repository_interfaces/i_product_repository.dart';
+import '../../../data/dtos/product_dto.dart';
+import '../../../data/repository_interfaces/i_product_image_repository.dart';
+import '../../../data/repository_interfaces/i_product_repository.dart';
 
 /// Result of a product form submission.
 class ProductSubmissionResult {
   final bool success;
   final String message;
-  final ProductEntity? product;
+  final ProductDto? product;
   final ApiException? error;
 
   const ProductSubmissionResult._({
@@ -19,7 +19,7 @@ class ProductSubmissionResult {
     this.error,
   });
 
-  factory ProductSubmissionResult.success(String message, ProductEntity product) {
+  factory ProductSubmissionResult.success(String message, ProductDto product) {
     return ProductSubmissionResult._(
       success: true,
       message: message,
@@ -153,3 +153,4 @@ class ProductFormOrchestrator {
     }
   }
 }
+

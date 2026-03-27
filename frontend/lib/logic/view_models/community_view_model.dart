@@ -1,18 +1,18 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../../core/errors/api_exception.dart';
-import '../../data/models/community_post.dart';
-import '../../data/repositories/community_repository_impl.dart';
+import '../../data/dtos/community_post_dto.dart';
+import '../../data/repository_interfaces/i_community_repository.dart';
 
 class CommunityViewModel extends ChangeNotifier {
-  CommunityViewModel({required CommunityRepository communityRepository})
+  CommunityViewModel({required ICommunityRepository communityRepository})
       : _repository = communityRepository;
 
-  final CommunityRepository _repository;
+  final ICommunityRepository _repository;
 
-  List<CommunityPost> _posts = [];
+  List<CommunityPostDto> _posts = [];
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _isPosting = false;
@@ -23,7 +23,7 @@ class CommunityViewModel extends ChangeNotifier {
   bool _hasMore = true;
   String _activeFeed = 'community';
 
-  List<CommunityPost> get posts => _posts;
+  List<CommunityPostDto> get posts => _posts;
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
   bool get isPosting => _isPosting;
@@ -126,7 +126,7 @@ class CommunityViewModel extends ChangeNotifier {
 
   Future<void> refresh() async => load(feed: _activeFeed);
 
-  Future<CommunityPost?> getPostDetail(int postId) async {
+  Future<CommunityPostDto?> getPostDetail(int postId) async {
     try {
       final response = await _repository.getPost(postId);
       if (!response.isSuccess) throw response.error!;
@@ -145,9 +145,9 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<CommunityPost?> toggleLike(int postId, {required bool shouldLike}) async {
+  Future<CommunityPostDto?> toggleLike(int postId, {required bool shouldLike}) async {
     final index = _posts.indexWhere((post) => post.id == postId);
-    CommunityPost? previousPost;
+    CommunityPostDto? previousPost;
 
     if (index >= 0) {
       previousPost = _posts[index];
@@ -189,7 +189,7 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<CommunityPost?> toggleSave(int postId, {required bool shouldSave}) async {
+  Future<CommunityPostDto?> toggleSave(int postId, {required bool shouldSave}) async {
     try {
       final response = shouldSave
           ? await _repository.savePost(postId)
@@ -207,7 +207,7 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<CommunityPost?> updatePost({
+  Future<CommunityPostDto?> updatePost({
     required int postId,
     required String content,
     List<String> imagePaths = const [],
@@ -275,7 +275,7 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<CommunityPost?> addComment({
+  Future<CommunityPostDto?> addComment({
     required int postId,
     required String content,
   }) async {
@@ -294,7 +294,7 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<CommunityPost?> updateComment({
+  Future<CommunityPostDto?> updateComment({
     required int postId,
     required int commentId,
     required String content,
@@ -318,7 +318,7 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<CommunityPost?> deleteComment({
+  Future<CommunityPostDto?> deleteComment({
     required int postId,
     required int commentId,
   }) async {
@@ -352,7 +352,7 @@ class CommunityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _replacePost(CommunityPost updatedPost) {
+  void _replacePost(CommunityPostDto updatedPost) {
     final index = _posts.indexWhere((post) => post.id == updatedPost.id);
     if (index < 0) {
       return;
@@ -363,9 +363,9 @@ class CommunityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  CommunityPost _withStableImageUrls({
-    required CommunityPost existing,
-    required CommunityPost incoming,
+  CommunityPostDto _withStableImageUrls({
+    required CommunityPostDto existing,
+    required CommunityPostDto incoming,
   }) {
     final existingImages = existing.orderedImages;
     final incomingImages = incoming.orderedImages;
@@ -386,7 +386,6 @@ class CommunityViewModel extends ChangeNotifier {
 
     return incoming.copyWith(
       imageUrls: existing.imageUrls,
-      imageUrl: existing.imageUrl,
     );
   }
 
@@ -401,3 +400,4 @@ class CommunityViewModel extends ChangeNotifier {
     return url;
   }
 }
+

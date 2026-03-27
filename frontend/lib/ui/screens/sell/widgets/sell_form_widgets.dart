@@ -1,7 +1,7 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
-import '../../../../data/models/category.dart';
+import '../../../../data/dtos/category_dto.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../widgets/app_buttons.dart';
 
@@ -196,7 +196,7 @@ class ProductFormFieldsSection extends StatelessWidget {
   final TextEditingController titleController;
   final TextEditingController descriptionController;
   final TextEditingController priceController;
-  final List<Category> categories;
+  final List<CategoryDto> categories;
   final int? selectedCategoryId;
   final ValueChanged<int?> onCategoryChanged;
   final Widget photoGrid;
@@ -442,3 +442,4 @@ class PhotoTile extends StatelessWidget {
       );
   }
 }
+

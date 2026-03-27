@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../core/config/app_config.dart';
-import '../../data/models/conversation.dart';
+import '../../data/dtos/conversation_dto.dart';
 
 class ChatWebSocketService {
   static const String _tag = 'ChatWebSocketService';
@@ -14,22 +14,23 @@ class ChatWebSocketService {
   String? _token;
   String _activeBaseUrl = AppConfig.baseUrl;
   bool _retryingFallback = false;
+  bool _isConnecting = false;
+  final Set<int> _joinedConversationIds = <int>{};
 
   // Stream controllers for each event type
-  final _messageReceivedController = StreamController<Message>.broadcast();
-  final _messageNotifyController = StreamController<Message>.broadcast();
+  final _messageReceivedController = StreamController<MessageDto>.broadcast();
+  final _messageNotifyController = StreamController<MessageDto>.broadcast();
   final _messageUpdatedController =
       StreamController<MessageUpdateEvent>.broadcast();
   final _messageDeletedController =
       StreamController<MessageDeleteEvent>.broadcast();
-  final _messageReadController =
-      StreamController<MessageReadEvent>.broadcast();
+  final _messageReadController = StreamController<MessageReadEvent>.broadcast();
   final _typingController = StreamController<TypingEvent>.broadcast();
 
   bool get isConnected => _socket?.connected == true;
 
-  Stream<Message> get onMessageReceived => _messageReceivedController.stream;
-  Stream<Message> get onMessageNotify => _messageNotifyController.stream;
+  Stream<MessageDto> get onMessageReceived => _messageReceivedController.stream;
+  Stream<MessageDto> get onMessageNotify => _messageNotifyController.stream;
   Stream<MessageUpdateEvent> get onMessageUpdated =>
       _messageUpdatedController.stream;
   Stream<MessageDeleteEvent> get onMessageDeleted =>
@@ -40,7 +41,13 @@ class ChatWebSocketService {
   Future<void> connect({required String token}) async {
     _token = token;
 
-    if (_socket != null && _socket!.connected) {
+    if (_socket != null) {
+      if (_socket!.connected || _isConnecting) {
+        return;
+      }
+
+      _isConnecting = true;
+      _socket!.connect();
       return;
     }
 
@@ -53,6 +60,7 @@ class ChatWebSocketService {
     final token = _token;
     if (token == null || token.isEmpty) return;
 
+    _isConnecting = true;
     _socket?.dispose();
 
     final socket = io.io(
@@ -68,14 +76,18 @@ class ChatWebSocketService {
     );
 
     socket.onConnect((_) {
+      _isConnecting = false;
       debugPrint('[$_tag] Connected to $baseUrl');
+      _rejoinTrackedConversations();
     });
 
     socket.onDisconnect((reason) {
+      _isConnecting = false;
       debugPrint('[$_tag] Disconnected: $reason');
     });
 
     socket.onConnectError((error) {
+      _isConnecting = false;
       debugPrint('[$_tag] Connect error: $error');
       _handleConnectError();
     });
@@ -83,7 +95,7 @@ class ChatWebSocketService {
     socket.on('chat:receive', (data) {
       try {
         if (data is Map) {
-          final message = Message.fromJson(Map<String, dynamic>.from(data));
+          final message = MessageDto.fromJson(Map<String, dynamic>.from(data));
           _messageReceivedController.add(message);
         }
       } catch (e) {
@@ -94,7 +106,7 @@ class ChatWebSocketService {
     socket.on('chat:notify', (data) {
       try {
         if (data is Map) {
-          final message = Message.fromJson(Map<String, dynamic>.from(data));
+          final message = MessageDto.fromJson(Map<String, dynamic>.from(data));
           _messageNotifyController.add(message);
         }
       } catch (e) {
@@ -105,8 +117,9 @@ class ChatWebSocketService {
     socket.on('chat:updated', (data) {
       try {
         if (data is Map) {
-          final event =
-              MessageUpdateEvent.fromJson(Map<String, dynamic>.from(data));
+          final event = MessageUpdateEvent.fromJson(
+            Map<String, dynamic>.from(data),
+          );
           _messageUpdatedController.add(event);
         }
       } catch (e) {
@@ -117,8 +130,9 @@ class ChatWebSocketService {
     socket.on('chat:deleted', (data) {
       try {
         if (data is Map) {
-          final event =
-              MessageDeleteEvent.fromJson(Map<String, dynamic>.from(data));
+          final event = MessageDeleteEvent.fromJson(
+            Map<String, dynamic>.from(data),
+          );
           _messageDeletedController.add(event);
         }
       } catch (e) {
@@ -129,8 +143,9 @@ class ChatWebSocketService {
     socket.on('chat:read', (data) {
       try {
         if (data is Map) {
-          final event =
-              MessageReadEvent.fromJson(Map<String, dynamic>.from(data));
+          final event = MessageReadEvent.fromJson(
+            Map<String, dynamic>.from(data),
+          );
           _messageReadController.add(event);
         }
       } catch (e) {
@@ -141,11 +156,13 @@ class ChatWebSocketService {
     socket.on('chat:typing', (data) {
       try {
         if (data is Map) {
-          _typingController.add(TypingEvent(
-            conversationId: _toInt(data['conversationId']),
-            userId: _toInt(data['userId']),
-            isTyping: true,
-          ));
+          _typingController.add(
+            TypingEvent(
+              conversationId: _toInt(data['conversationId']),
+              userId: _toInt(data['userId']),
+              isTyping: true,
+            ),
+          );
         }
       } catch (e) {
         debugPrint('[$_tag] Error parsing typing event: $e');
@@ -155,11 +172,13 @@ class ChatWebSocketService {
     socket.on('chat:stop_typing', (data) {
       try {
         if (data is Map) {
-          _typingController.add(TypingEvent(
-            conversationId: _toInt(data['conversationId']),
-            userId: _toInt(data['userId']),
-            isTyping: false,
-          ));
+          _typingController.add(
+            TypingEvent(
+              conversationId: _toInt(data['conversationId']),
+              userId: _toInt(data['userId']),
+              isTyping: false,
+            ),
+          );
         }
       } catch (e) {
         debugPrint('[$_tag] Error parsing stop typing event: $e');
@@ -178,17 +197,32 @@ class ChatWebSocketService {
   }
 
   void joinConversation(int conversationId) {
+    if (conversationId <= 0) {
+      return;
+    }
+
+    _joinedConversationIds.add(conversationId);
+    if (!isConnected) {
+      return;
+    }
+
     _socket?.emit('chat:join', {'conversationId': conversationId});
   }
 
   void leaveConversation(int conversationId) {
+    if (conversationId <= 0) {
+      return;
+    }
+
+    _joinedConversationIds.remove(conversationId);
+    if (!isConnected) {
+      return;
+    }
+
     _socket?.emit('chat:leave', {'conversationId': conversationId});
   }
 
-  void sendMessage({
-    required int conversationId,
-    required String messageText,
-  }) {
+  void sendMessage({required int conversationId, required String messageText}) {
     _socket?.emit('chat:send', {
       'conversationId': conversationId,
       'messageText': messageText,
@@ -207,10 +241,7 @@ class ChatWebSocketService {
     _socket?.emit('chat:stop_typing', {'conversationId': conversationId});
   }
 
-  void editMessage({
-    required int messageId,
-    required String messageText,
-  }) {
+  void editMessage({required int messageId, required String messageText}) {
     _socket?.emit('chat:edit', {
       'messageId': messageId,
       'messageText': messageText,
@@ -218,19 +249,19 @@ class ChatWebSocketService {
   }
 
   void deleteMessages(List<int> messageIds) {
-    _socket?.emit('chat:delete', {
-      'messageIds': messageIds,
-    });
+    _socket?.emit('chat:delete', {'messageIds': messageIds});
   }
 
   Future<void> disconnect() async {
     final socket = _socket;
     if (socket == null) return;
 
+    _isConnecting = false;
     socket.off('connect');
     socket.off('disconnect');
     socket.off('connect_error');
     socket.off('chat:receive');
+    socket.off('chat:notify');
     socket.off('chat:updated');
     socket.off('chat:deleted');
     socket.off('chat:read');
@@ -257,6 +288,17 @@ class ChatWebSocketService {
     if (value is String) return int.tryParse(value) ?? 0;
     return 0;
   }
+
+  void _rejoinTrackedConversations() {
+    final socket = _socket;
+    if (socket == null || !socket.connected || _joinedConversationIds.isEmpty) {
+      return;
+    }
+
+    for (final conversationId in _joinedConversationIds) {
+      socket.emit('chat:join', {'conversationId': conversationId});
+    }
+  }
 }
 
 class MessageUpdateEvent {
@@ -278,7 +320,8 @@ class MessageUpdateEvent {
       conversationId: ChatWebSocketService._toInt(json['conversationId']),
       messageText: (json['messageText'] ?? '') as String,
       editedAt: DateTime.parse(
-          json['editedAt'] ?? DateTime.now().toIso8601String()),
+        json['editedAt'] ?? DateTime.now().toIso8601String(),
+      ),
     );
   }
 }
@@ -323,7 +366,8 @@ class MessageReadEvent {
       conversationId: ChatWebSocketService._toInt(json['conversationId']),
       userId: ChatWebSocketService._toInt(json['userId']),
       readAt: DateTime.parse(
-          json['readAt'] ?? DateTime.now().toIso8601String()),
+        json['readAt'] ?? DateTime.now().toIso8601String(),
+      ),
     );
   }
 }

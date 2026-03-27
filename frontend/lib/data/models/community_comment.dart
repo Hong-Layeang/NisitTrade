@@ -1,3 +1,4 @@
+import '../dtos/community_comment_dto.dart';
 import 'seller.dart';
 
 class CommunityComment {
@@ -19,26 +20,15 @@ class CommunityComment {
     this.user,
   });
 
-  static DateTime _parseDate(dynamic value) {
-    if (value is DateTime) return value;
-    if (value is String && value.isNotEmpty) {
-      return DateTime.tryParse(value) ?? DateTime.now();
-    }
-    return DateTime.now();
-  }
-
-  factory CommunityComment.fromJson(Map<String, dynamic> json) {
+  factory CommunityComment.fromDto(CommunityCommentDto dto) {
     return CommunityComment(
-      id: json['id'] as int? ?? 0,
-      userId: (json['user_id'] ?? json['userId']) as int? ?? 0,
-      communityPostId:
-          (json['community_post_id'] ?? json['communityPostId']) as int? ?? 0,
-      content: (json['content'] ?? '') as String,
-      createdAt: _parseDate(json['created_at'] ?? json['createdAt']),
-      updatedAt: _parseDate(json['updated_at'] ?? json['updatedAt']),
-      user: json['User'] is Map<String, dynamic>
-          ? Seller.fromJson(json['User'] as Map<String, dynamic>)
-          : null,
+      id: dto.id,
+      userId: dto.userId,
+      communityPostId: dto.communityPostId,
+      content: dto.content,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      user: dto.user != null ? Seller.fromDto(dto.user!) : null,
     );
   }
 

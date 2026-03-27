@@ -1,4 +1,4 @@
-import '../../data/providers/auth_api.dart';
+import 'auth_api.dart';
 import 'auth_session.dart';
 import 'auth_token_store.dart';
 import 'microsoft_auth_service.dart';

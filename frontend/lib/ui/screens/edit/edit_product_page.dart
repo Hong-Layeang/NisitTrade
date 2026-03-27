@@ -1,17 +1,17 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get_it/get_it.dart';
-import 'package:frontend/domain/repository_interfaces/i_category_repository.dart';
-import 'package:frontend/domain/repository_interfaces/i_product_repository.dart';
-import 'package:frontend/domain/repository_interfaces/i_product_image_repository.dart';
+import 'package:frontend/data/repository_interfaces/i_category_repository.dart';
+import 'package:frontend/data/repository_interfaces/i_product_repository.dart';
+import 'package:frontend/data/repository_interfaces/i_product_image_repository.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 
 
-import '../../../data/models/product.dart';
-import '../../../data/models/category.dart';
+import '../../../data/dtos/product_dto.dart';
+import '../../../data/dtos/category_dto.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/app_limits.dart';
@@ -27,7 +27,7 @@ import '../sell/widgets/sell_form_widgets.dart';
 final getIt = GetIt.instance;
 
 class EditProductPage extends StatefulWidget {
-  final Product product;
+  final ProductDto product;
 
   const EditProductPage({super.key, required this.product});
 
@@ -43,7 +43,7 @@ class _EditProductPageState extends State<EditProductPage> {
   final TextEditingController _priceController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
 
-  List<Category> _categories = [];
+  List<CategoryDto> _categories = [];
   int? _selectedCategoryId;
   
   // Existing images from server (imageId -> imageUrl)
@@ -761,4 +761,5 @@ class EditPhotoTile extends StatelessWidget {
     );
   }
 }
+
 

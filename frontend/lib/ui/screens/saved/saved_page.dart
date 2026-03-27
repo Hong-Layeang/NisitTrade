@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 
-import '../../../data/models/community_post.dart';
-import '../../../data/models/product.dart';
-import '../../../domain/entities/product_entity.dart';
+import '../../../data/dtos/product_dto.dart';
+import '../../../data/dtos/community_post_dto.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
@@ -302,7 +301,7 @@ class _SavedListingsPageState extends State<SavedListingsPage>
   }
 
   Future<void> _removeSaved(
-    ProductEntity product, {
+    ProductDto product, {
     int? insertIndex,
   }) async {
     final vm = context.read<SavedListingsViewModel>();
@@ -339,7 +338,7 @@ class _SavedListingsPageState extends State<SavedListingsPage>
 
   Future<void> _removeSavedPost(
     int postId, {
-    required CommunityPost post,
+    required CommunityPostDto post,
     int? insertIndex,
   }) async {
     final vm = context.read<SavedListingsViewModel>();
@@ -374,17 +373,17 @@ class _SavedListingsPageState extends State<SavedListingsPage>
     );
   }
 
-  bool _isOwner(ProductEntity product) {
+  bool _isOwner(ProductDto product) {
     final userId = context.read<UserViewModel>().userId;
     if (userId == null) return false;
     return product.userId == userId;
   }
 
-  Future<void> _handleEditListing(ProductEntity product) async {
+  Future<void> _handleEditListing(ProductDto product) async {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProductPage(product: Product.fromEntity(product)),
+        builder: (context) => EditProductPage(product: product),
       ),
     );
 
@@ -394,7 +393,7 @@ class _SavedListingsPageState extends State<SavedListingsPage>
     }
   }
 
-  Future<void> _handleDeleteListing(ProductEntity product) async {
+  Future<void> _handleDeleteListing(ProductDto product) async {
     final savedListingsVm = context.read<SavedListingsViewModel>();
     final productFeedVm = context.read<ProductFeedViewModel>();
 
@@ -433,7 +432,7 @@ class _SavedListingsPageState extends State<SavedListingsPage>
     }
   }
 
-  void _showOwnerActions(ProductEntity product) {
+  void _showOwnerActions(ProductDto product) {
     if (!_isOwner(product)) return;
 
     AppActionSheet.show(
@@ -761,4 +760,5 @@ class _SavedListingsPageState extends State<SavedListingsPage>
     );
   }
 }
+
 

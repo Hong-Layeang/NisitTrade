@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../data/providers/api_client.dart';
+import '../network/api_client.dart';
 
 class MicrosoftAuthApiResponse {
   final bool isValid;

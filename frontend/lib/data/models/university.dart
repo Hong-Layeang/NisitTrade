@@ -1,4 +1,4 @@
-import '../../domain/entities/university_entity.dart';
+import '../dtos/university_dto.dart';
 
 class University {
   final int id;
@@ -15,49 +15,29 @@ class University {
     required this.updatedAt,
   });
 
-  factory University.fromJson(Map<String, dynamic> json) {
+  factory University.fromDto(UniversityDto dto) {
     return University(
-      id: json['id'] as int? ?? 0,
-      name: (json['name'] ?? '') as String,
-      domain: (json['domain'] ?? '') as String,
-      createdAt: (json['createdAt'] ?? json['created_at']) != null
-          ? DateTime.parse((json['createdAt'] ?? json['created_at']) as String)
-          : DateTime.now(),
-      updatedAt: (json['updatedAt'] ?? json['updated_at']) != null
-          ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
-          : DateTime.now(),
+      id: dto.id,
+      name: dto.name,
+      domain: dto.domain,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'domain': domain,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
-
-  /// Convert to domain entity
-  UniversityEntity toEntity() {
-    return UniversityEntity(
-      id: id,
-      name: name,
-      domain: domain,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
-    );
-  }
-
-  /// Create from domain entity
-  factory University.fromEntity(UniversityEntity entity) {
+  University copyWith({
+    int? id,
+    String? name,
+    String? domain,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
     return University(
-      id: entity.id,
-      name: entity.name,
-      domain: entity.domain,
-      createdAt: entity.createdAt,
-      updatedAt: entity.updatedAt,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      domain: domain ?? this.domain,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

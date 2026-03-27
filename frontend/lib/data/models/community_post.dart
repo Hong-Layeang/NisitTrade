@@ -1,5 +1,6 @@
-import 'seller.dart';
+import '../dtos/community_post_dto.dart';
 import 'community_comment.dart';
+import 'seller.dart';
 
 class CommunityPost {
   final int id;
@@ -38,44 +39,21 @@ class CommunityPost {
     return const [];
   }
 
-  static DateTime _parseDate(dynamic value) {
-    if (value is DateTime) return value;
-    if (value is String && value.isNotEmpty) {
-      return DateTime.tryParse(value) ?? DateTime.now();
-    }
-    return DateTime.now();
-  }
-
-  factory CommunityPost.fromJson(Map<String, dynamic> json) {
-    final userJson = json['User'] as Map<String, dynamic>? ?? {};
-    final rawList = json['image_urls'];
-    final parsedImages = rawList is List
-        ? rawList
-            .map((item) => item?.toString() ?? '')
-            .where((item) => item.isNotEmpty)
-            .toList()
-        : <String>[];
-    final parsedComments = json['comments'] is List
-      ? (json['comments'] as List)
-        .whereType<Map<String, dynamic>>()
-        .map(CommunityComment.fromJson)
-        .toList()
-      : <CommunityComment>[];
-
+  factory CommunityPost.fromDto(CommunityPostDto dto) {
     return CommunityPost(
-      id: json['id'] as int? ?? 0,
-      author: Seller.fromJson(userJson),
-      content: (json['content'] ?? '') as String,
-      imageUrl: json['image_url'] as String?,
-      imageUrls: parsedImages,
-      likesCount: json['likes_count'] as int? ?? 0,
-      commentsCount: json['comments_count'] as int? ?? 0,
-      isLikedByMe: json['is_liked_by_me'] == true,
-      myLikeId: json['my_like_id'] as int?,
-      isSavedByMe: json['is_saved_by_me'] == true,
-      mySavedId: json['my_saved_id'] as int?,
-      comments: parsedComments,
-      createdAt: _parseDate(json['created_at'] ?? json['createdAt']),
+      id: dto.id,
+      author: Seller.fromDto(dto.author),
+      content: dto.content,
+      imageUrl: dto.imageUrl,
+      imageUrls: dto.imageUrls,
+      likesCount: dto.likesCount,
+      commentsCount: dto.commentsCount,
+      isLikedByMe: dto.isLikedByMe,
+      myLikeId: dto.myLikeId,
+      isSavedByMe: dto.isSavedByMe,
+      mySavedId: dto.mySavedId,
+      comments: dto.comments.map(CommunityComment.fromDto).toList(growable: false),
+      createdAt: dto.createdAt,
     );
   }
 

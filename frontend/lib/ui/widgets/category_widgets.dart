@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/colors.dart';
-import '../../../domain/entities/category_entity.dart';
+import '../../../data/dtos/category_dto.dart';
 
 class CategoryCircle extends StatelessWidget {
-  final CategoryEntity category;
+  final CategoryDto category;
   final bool isSelected;
   final VoidCallback? onTap;
   final double size;
@@ -197,7 +197,7 @@ class SeeLessCircle extends StatelessWidget {
 
 /// A horizontal scrollable list of category circles with optional "See All" / "See Less" button
 class CategoryList extends StatelessWidget {
-  final List<CategoryEntity> categories;
+  final List<CategoryDto> categories;
   final int? selectedIndex;
   final ValueChanged<int?>? onCategorySelected;
   final VoidCallback? onSeeAllTap;

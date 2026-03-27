@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
-import '../../../domain/entities/category_entity.dart';
+﻿import 'package:flutter/material.dart';
+import '../../../data/dtos/category_dto.dart';
 import '../../../core/constants/colors.dart';
 import 'category_widgets.dart';
 
 /// Filter strip for selecting categories with animation
 class CategoryFilterStrip extends StatelessWidget {
-  final List<CategoryEntity> categories;
+  final List<CategoryDto> categories;
   final int? selectedIndex;
   final ValueChanged<int?> onCategorySelected;
   final bool isOpen;
@@ -131,3 +131,4 @@ class CategoryFilterStrip extends StatelessWidget {
     );
   }
 }
+

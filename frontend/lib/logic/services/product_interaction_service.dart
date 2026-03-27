@@ -1,9 +1,9 @@
-import '../../domain/entities/product_entity.dart';
-import '../../domain/repository_interfaces/i_product_comment_repository.dart';
-import '../../domain/repository_interfaces/i_product_like_repository.dart';
-import '../../domain/repository_interfaces/i_product_report_repository.dart';
-import '../../domain/repository_interfaces/i_product_repository.dart';
-import '../../domain/repository_interfaces/i_product_save_repository.dart';
+﻿import '../../data/dtos/product_dto.dart';
+import '../../data/repository_interfaces/i_product_comment_repository.dart';
+import '../../data/repository_interfaces/i_product_like_repository.dart';
+import '../../data/repository_interfaces/i_product_report_repository.dart';
+import '../../data/repository_interfaces/i_product_repository.dart';
+import '../../data/repository_interfaces/i_product_save_repository.dart';
 
 /// Encapsulates product interaction operations (likes, comments, saves, reports).
 class ProductInteractionService {
@@ -25,7 +25,7 @@ class ProductInteractionService {
   final IProductCommentRepository _commentRepository;
   final IProductReportRepository _reportRepository;
 
-  Future<ProductEntity?> refreshProduct(int productId) async {
+  Future<ProductDto?> refreshProduct(int productId) async {
     final response = await _productRepository.getProduct(productId);
     if (!response.isSuccess) {
       throw response.error!;
@@ -33,7 +33,7 @@ class ProductInteractionService {
     return response.data;
   }
 
-  Future<ProductEntity?> likeProduct(int productId) async {
+  Future<ProductDto?> likeProduct(int productId) async {
     final response = await _likeRepository.likeProduct(productId);
     if (!response.isSuccess) {
       final message = response.error?.message.toLowerCase() ?? '';
@@ -46,7 +46,7 @@ class ProductInteractionService {
     return refreshProduct(productId);
   }
 
-  Future<ProductEntity?> unlikeProduct({
+  Future<ProductDto?> unlikeProduct({
     required int productId,
     required int likeId,
   }) async {
@@ -60,7 +60,7 @@ class ProductInteractionService {
     return refreshProduct(productId);
   }
 
-  Future<ProductEntity?> addComment({
+  Future<ProductDto?> addComment({
     required int productId,
     required String content,
   }) async {
@@ -74,7 +74,7 @@ class ProductInteractionService {
     return refreshProduct(productId);
   }
 
-  Future<ProductEntity?> updateComment({
+  Future<ProductDto?> updateComment({
     required int productId,
     required int commentId,
     required String content,
@@ -90,7 +90,7 @@ class ProductInteractionService {
     return refreshProduct(productId);
   }
 
-  Future<ProductEntity?> deleteComment({
+  Future<ProductDto?> deleteComment({
     required int productId,
     required int commentId,
   }) async {
@@ -104,7 +104,7 @@ class ProductInteractionService {
     return refreshProduct(productId);
   }
 
-  Future<ProductEntity?> hideProduct(int productId) async {
+  Future<ProductDto?> hideProduct(int productId) async {
     final response = await _productRepository.hideProduct(productId);
     if (!response.isSuccess) {
       throw response.error!;
@@ -112,7 +112,7 @@ class ProductInteractionService {
     return response.data;
   }
 
-  Future<ProductEntity?> unhideProduct(int productId) async {
+  Future<ProductDto?> unhideProduct(int productId) async {
     final response = await _productRepository.unhideProduct(productId);
     if (!response.isSuccess) {
       throw response.error!;

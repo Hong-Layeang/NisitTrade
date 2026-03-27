@@ -1,14 +1,17 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/chat_timestamp_formatter.dart';
 import '../../../core/utils/school_short_name.dart';
 import '../../../core/utils/user_presence_formatter.dart';
-import '../../../data/models/conversation.dart';
-import '../../../data/models/product.dart';
+import '../../../data/dtos/conversation_dto.dart';
+import '../../../data/dtos/product_dto.dart';
+import '../../../data/repository_interfaces/i_product_repository.dart';
+import '../../../data/repository_interfaces/i_user_repository.dart';
 import '../../../logic/view_models/chat_view_model.dart';
 import '../../../logic/view_models/presence_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
@@ -20,8 +23,6 @@ import '../../../ui/widgets/user_widgets.dart';
 import 'widgets/attachment_carousel.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input.dart';
-import '../../../data/providers/user_api_service.dart';
-import '../../../data/providers/product_api_service.dart';
 import 'widgets/chat_menu_helpers.dart';
 import 'widgets/purchase_rating_dialog.dart';
 
@@ -40,11 +41,12 @@ class ChatRoomScreen extends StatefulWidget {
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
-
 class _ChatRoomScreenState extends State<ChatRoomScreen>
     with WidgetsBindingObserver {
   late ChatRoomViewModel _viewModel;
   late ScrollController _scrollController;
+  final IUserRepository _userRepository = getIt<IUserRepository>();
+  final IProductRepository _productRepository = getIt<IProductRepository>();
   bool _hasInitialized = false;
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
@@ -182,7 +184,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     presenceViewModel.watchUserIds([participant.userId]);
   }
 
-  bool _requiresConversationHydration(Conversation? conversation) {
+  bool _requiresConversationHydration(ConversationDto? conversation) {
     if (conversation == null) return true;
 
     final participants = conversation.participants;
@@ -417,7 +419,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     final messageId = viewModel.selectedMessageIds.first;
     final message = viewModel.messages.firstWhere(
       (m) => m.id == messageId,
-      orElse: () => Message(id: 0, messageText: '', senderId: 0, conversationId: 0, sentAt: DateTime.now()),
+      orElse: () => MessageDto(
+        id: 0,
+        messageText: '',
+        senderId: 0,
+        conversationId: 0,
+        sentAt: DateTime.now(),
+      ),
     );
     if (message.id == 0) return;
 
@@ -470,7 +478,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }
 
   Widget _buildAppBarTitle(
-    Conversation? conversation,
+    ConversationDto? conversation,
     PresenceViewModel presenceViewModel,
   ) {
     if (conversation == null) {
@@ -613,7 +621,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  void _navigateToProduct(Product product) {
+  void _navigateToProduct(ProductDto product) {
     Navigator.of(context).pushNamed(
       AppRoutes.productDetail,
       arguments: ProductDetailArgs(productId: product.id),
@@ -641,7 +649,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
   }
 
-  Future<void> _promptDidBuy(Product product) async {
+  Future<void> _promptDidBuy(ProductDto product) async {
     final didBuy = await showDidYouBuyPrompt(
       context,
       productTitle: product.title,
@@ -655,7 +663,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
   }
 
-  Future<void> _promptSaleCompleteAsSeller(Product product) async {
+  Future<void> _promptSaleCompleteAsSeller(ProductDto product) async {
     final didSell = await showDidYouSellPrompt(
       context,
       productTitle: product.title,
@@ -669,14 +677,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
   }
 
-  Future<void> _handleMarkAsSold(Product product) async {
+  Future<void> _handleMarkAsSold(ProductDto product) async {
     final choice = await _showUpdateListingStatusDialog(product);
     if (!mounted) return;
 
     _viewModel.removeAttachedProduct(product.id);
 
     if (choice == _ListingStatusChoice.markAsSold) {
-      final response = await ProductApiService.instance.updateProductStatus(
+      final response = await _productRepository.updateProductStatus(
         id: product.id,
         status: 'sold',
       );
@@ -690,11 +698,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         );
       }
     }
-    // _ListingStatusChoice.keepActive: do nothing — listing stays on feed
+    // _ListingStatusChoice.keepActive: do nothing - listing stays on feed
   }
 
-  Future<_ListingStatusChoice?> _showUpdateListingStatusDialog(
-      Product product) {
+    Future<_ListingStatusChoice?> _showUpdateListingStatusDialog(
+      ProductDto product) {
     return showModalBottomSheet<_ListingStatusChoice>(
       context: context,
       isScrollControlled: true,
@@ -704,7 +712,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Future<void> _handleConfirmPurchase(Product product) async {
+  Future<void> _handleConfirmPurchase(ProductDto product) async {
     final conversation = _viewModel.currentConversation;
     final sellerParticipant = conversation != null
         ? _otherParticipant(conversation)
@@ -735,7 +743,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       return;
     }
 
-    final response = await UserApiService.instance.submitRating(
+    final response = await _userRepository.submitRating(
       sellerId: sellerId,
       productId: product.id,
       rating: result.rating,
@@ -747,7 +755,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _viewModel.removeAttachedProduct(product.id);
 
     if (response.isSuccess) {
-      AppSnackBar.success(context, 'Review submitted — thank you!');
+      AppSnackBar.success(context, 'Review submitted - thank you!');
     } else {
       AppSnackBar.error(context, response.error?.message ?? 'Failed to submit review');
     }
@@ -935,7 +943,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Widget _buildBlockedComposerState(Conversation conversation) {
+  Widget _buildBlockedComposerState(ConversationDto conversation) {
     final title = conversation.isBlockedByMe
         ? 'Messaging paused'
         : 'Messaging unavailable';
@@ -1022,7 +1030,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Future<void> _showChatActions(Conversation conversation) async {
+  Future<void> _showChatActions(ConversationDto conversation) async {
     final participant = _otherParticipant(conversation);
     final hasAttachments = _viewModel
         .attachedProductsForConversation(conversation.id)
@@ -1095,7 +1103,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Future<void> _cancelPendingPurchase(Conversation conversation) async {
+  Future<void> _cancelPendingPurchase(ConversationDto conversation) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1133,7 +1141,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
     if (!mounted || reason == null) return;
 
-    final response = await UserApiService.instance.reportUser(
+    final response = await _userRepository.reportUser(
       userId: userId,
       reason: reason,
     );
@@ -1152,7 +1160,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }
 
   Future<void> _blockUser({
-    required Conversation conversation,
+    required ConversationDto conversation,
     required int userId,
     required String displayName,
   }) async {
@@ -1180,7 +1188,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
     if (!mounted || confirmed != true) return;
 
-    final response = await UserApiService.instance.blockUser(userId);
+    final response = await _userRepository.blockUser(userId);
     if (!mounted) return;
 
     if (response.isSuccess) {
@@ -1200,11 +1208,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }
 
   Future<void> _unblockUser({
-    required Conversation conversation,
+    required ConversationDto conversation,
     required int userId,
     required String displayName,
   }) async {
-    final response = await UserApiService.instance.unblockUser(userId);
+    final response = await _userRepository.unblockUser(userId);
     if (!mounted) return;
 
     if (response.isSuccess) {
@@ -1223,7 +1231,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Future<void> _deleteConversation(Conversation conversation) async {
+  Future<void> _deleteConversation(ConversationDto conversation) async {
     final confirmed = await showDeleteChatConfirmation(
       context,
       title: 'Delete chat',
@@ -1246,14 +1254,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  ConversationParticipant? _otherParticipant(Conversation conversation) {
+  ConversationParticipantDto? _otherParticipant(ConversationDto conversation) {
     final currentUserId = _getCurrentUserId();
     return conversation.participants?.firstWhere(
           (participant) =>
               participant.user != null &&
               participant.userId > 0 &&
               participant.userId != currentUserId,
-          orElse: () => ConversationParticipant(
+          orElse: () => ConversationParticipantDto(
             id: 0,
             conversationId: conversation.id,
             userId: 0,
@@ -1262,7 +1270,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         ) ??
         conversation.participants?.firstWhere(
           (participant) => participant.user != null && participant.userId > 0,
-          orElse: () => ConversationParticipant(
+          orElse: () => ConversationParticipantDto(
             id: 0,
             conversationId: conversation.id,
             userId: 0,
@@ -1280,7 +1288,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
 class _ChatTimelineItem {
   final String? dateLabel;
-  final Message? message;
+  final MessageDto? message;
 
   const _ChatTimelineItem._({this.dateLabel, this.message});
 
@@ -1288,16 +1296,13 @@ class _ChatTimelineItem {
     return _ChatTimelineItem._(dateLabel: label);
   }
 
-  factory _ChatTimelineItem.message(Message message) {
+  factory _ChatTimelineItem.message(MessageDto message) {
     return _ChatTimelineItem._(message: message);
   }
 
   bool get isDateDivider => dateLabel != null;
 }
 
-// Dialog that owns its TextEditingController so it is disposed at the correct
-// point in the widget lifecycle — avoiding the "used after dispose" crash that
-// occurs when the controller is disposed synchronously after showDialog returns.
 class _EditMessageDialog extends StatefulWidget {
   final String initialText;
 
@@ -1354,13 +1359,12 @@ class _EditMessageDialogState extends State<_EditMessageDialog> {
     );
   }
 }
-
 // ---------------------------------------------------------------------------
 
 enum _ListingStatusChoice { markAsSold, keepActive }
 
 class _UpdateListingStatusSheet extends StatelessWidget {
-  final Product product;
+  final ProductDto product;
 
   const _UpdateListingStatusSheet({required this.product});
 
@@ -1412,7 +1416,7 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Sale Complete! 🎉',
+                  'Sale Complete!',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -1467,7 +1471,7 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                         .pop(_ListingStatusChoice.markAsSold),
                     icon: const Icon(Icons.remove_shopping_cart_outlined,
                         size: 18),
-                    label: const Text('Mark as Sold — Remove from Feed'),
+                    label: const Text('Mark as Sold - Remove from Feed'),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                       backgroundColor: AppColors.primary,

@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/image_url_helper.dart';
-import '../../../../data/models/product.dart';
+import '../../../../data/dtos/product_dto.dart';
 import '../../../../logic/view_models/chat_view_model.dart';
 import '../../../../ui/widgets/s3_cached_network_image.dart';
 
@@ -10,11 +10,11 @@ class AttachmentCarousel extends StatefulWidget {
   final List<AttachedProduct> attachedProducts;
   final String Function(AttachedProduct ap) countdownLabelBuilder;
   final bool Function(AttachedProduct ap) isExpiredBuilder;
-  final bool Function(Product product) isOwnerBuilder;
-  final void Function(Product product) onTapProduct;
-  final void Function(Product product) onConfirmPurchase;
-  final void Function(Product product) onMarkAsSold;
-  final void Function(Product product) onRemove;
+  final bool Function(ProductDto product) isOwnerBuilder;
+  final void Function(ProductDto product) onTapProduct;
+  final void Function(ProductDto product) onConfirmPurchase;
+  final void Function(ProductDto product) onMarkAsSold;
+  final void Function(ProductDto product) onRemove;
 
   const AttachmentCarousel({
     super.key,
@@ -56,7 +56,7 @@ class _AttachmentCarouselState extends State<AttachmentCarousel> {
     super.dispose();
   }
 
-  Future<void> _confirmRemove(Product product, {required bool isOwner}) async {
+  Future<void> _confirmRemove(ProductDto product, {required bool isOwner}) async {
     final title = isOwner ? 'Remove Sale Tracking' : 'Cancel Purchase';
     final body = isOwner
         ? 'Stop tracking this sale for "${product.title}"?'
@@ -143,7 +143,7 @@ class _AttachmentCarouselState extends State<AttachmentCarousel> {
 }
 
 class _AttachmentCard extends StatelessWidget {
-  final Product product;
+  final ProductDto product;
   final String countdownLabel;
   final bool isExpired;
   final bool isOwner;
@@ -390,3 +390,4 @@ class _AttachmentCard extends StatelessWidget {
     );
   }
 }
+

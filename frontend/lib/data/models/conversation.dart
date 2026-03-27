@@ -1,3 +1,4 @@
+import '../dtos/conversation_dto.dart';
 import 'product.dart';
 import 'student.dart';
 
@@ -9,8 +10,6 @@ class Conversation {
   final int unreadCount;
   final bool isBlockedByMe;
   final bool hasBlockedMe;
-  
-  // Associated data
   final Product? product;
   final List<ConversationParticipant>? participants;
   final Message? lastMessage;
@@ -29,6 +28,21 @@ class Conversation {
   });
 
   bool get isMessagingBlocked => isBlockedByMe || hasBlockedMe;
+
+  factory Conversation.fromDto(ConversationDto dto) {
+    return Conversation(
+      id: dto.id,
+      productId: dto.productId,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      unreadCount: dto.unreadCount,
+      isBlockedByMe: dto.isBlockedByMe,
+      hasBlockedMe: dto.hasBlockedMe,
+      product: dto.product != null ? Product.fromDto(dto.product!) : null,
+      participants: dto.participants?.map(ConversationParticipant.fromDto).toList(growable: false),
+      lastMessage: dto.lastMessage != null ? Message.fromDto(dto.lastMessage!) : null,
+    );
+  }
 
   Conversation copyWith({
     int? unreadCount,
@@ -53,85 +67,6 @@ class Conversation {
       lastMessage: clearLastMessage ? null : lastMessage ?? this.lastMessage,
     );
   }
-
-  static int _toInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) {
-      return int.tryParse(value) ?? fallback;
-    }
-    return fallback;
-  }
-
-  factory Conversation.fromJson(Map<String, dynamic> json) {
-    final baseConversation =
-      (json['Conversation'] is Map<String, dynamic>) ? json['Conversation'] as Map<String, dynamic> : json;
-    final productJson =
-      baseConversation['Product'] ?? baseConversation['product'] ?? json['Product'] ?? json['product'];
-    final participantsJson =
-      json['ConversationParticipants'] ?? baseConversation['ConversationParticipants'] ?? json['participants'] ?? [];
-    final lastMessageJson =
-      json['last_message'] ?? json['lastMessage'] ?? baseConversation['last_message'] ?? baseConversation['lastMessage'];
-    
-    return Conversation(
-      id: _toInt(baseConversation['id'] ?? json['conversation_id'] ?? json['id']),
-      productId: (baseConversation['product_id'] ?? json['product_id']) != null
-          ? _toInt(baseConversation['product_id'] ?? json['product_id'])
-          : null,
-      createdAt: DateTime.parse(
-        baseConversation['createdAt'] ??
-            baseConversation['created_at'] ??
-            json['createdAt'] ??
-            json['created_at'] ??
-            DateTime.now().toIso8601String(),
-      ),
-      updatedAt: DateTime.parse(
-        baseConversation['updatedAt'] ??
-            baseConversation['updated_at'] ??
-            json['updatedAt'] ??
-            json['updated_at'] ??
-            DateTime.now().toIso8601String(),
-      ),
-      unreadCount: _toInt(
-        json['unread_count'] ??
-            json['unreadCount'] ??
-            baseConversation['unread_count'] ??
-            baseConversation['unreadCount'],
-        fallback: 0,
-      ),
-      isBlockedByMe: (json['is_blocked_by_me'] ??
-              json['isBlockedByMe'] ??
-              baseConversation['is_blocked_by_me'] ??
-              baseConversation['isBlockedByMe'] ??
-              false) ==
-          true,
-      hasBlockedMe: (json['has_blocked_me'] ??
-              json['hasBlockedMe'] ??
-              baseConversation['has_blocked_me'] ??
-              baseConversation['hasBlockedMe'] ??
-              false) ==
-          true,
-      product: productJson != null ? Product.fromJson(productJson as Map<String, dynamic>) : null,
-      participants: participantsJson is List
-          ? participantsJson
-              .map((p) => ConversationParticipant.fromJson(p as Map<String, dynamic>))
-              .toList()
-          : null,
-      lastMessage: lastMessageJson != null
-          ? Message.fromJson(lastMessageJson as Map<String, dynamic>)
-          : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'product_id': productId,
-    'createdAt': createdAt.toIso8601String(),
-    'updatedAt': updatedAt.toIso8601String(),
-    'unread_count': unreadCount,
-    'is_blocked_by_me': isBlockedByMe,
-    'has_blocked_me': hasBlockedMe,
-  };
 }
 
 class ConversationParticipant {
@@ -139,8 +74,6 @@ class ConversationParticipant {
   final int conversationId;
   final int userId;
   final DateTime joinedAt;
-  
-  // Associated data
   final Student? user;
 
   const ConversationParticipant({
@@ -151,24 +84,13 @@ class ConversationParticipant {
     this.user,
   });
 
-  static int _toInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) {
-      return int.tryParse(value) ?? fallback;
-    }
-    return fallback;
-  }
-
-  factory ConversationParticipant.fromJson(Map<String, dynamic> json) {
-    final userJson = json['User'] ?? json['user'];
-    
+  factory ConversationParticipant.fromDto(ConversationParticipantDto dto) {
     return ConversationParticipant(
-      id: _toInt(json['id']),
-      conversationId: _toInt(json['conversation_id'] ?? json['conversationId']),
-      userId: _toInt(json['user_id'] ?? json['userId']),
-      joinedAt: DateTime.parse(json['joined_at'] ?? json['joinedAt'] ?? DateTime.now().toIso8601String()),
-      user: userJson != null ? Student.fromJson(userJson as Map<String, dynamic>) : null,
+      id: dto.id,
+      conversationId: dto.conversationId,
+      userId: dto.userId,
+      joinedAt: dto.joinedAt,
+      user: dto.user != null ? Student.fromDto(dto.user!) : null,
     );
   }
 }
@@ -180,11 +102,9 @@ class Message {
   final int conversationId;
   final DateTime sentAt;
   final DateTime? editedAt;
-  final List<int> readBy; // List of user IDs who have read this message
+  final List<int> readBy;
   final List<String> imageUrls;
   final Product? attachedProduct;
-
-  // Associated data
   final Student? sender;
 
   const Message({
@@ -200,19 +120,24 @@ class Message {
     this.sender,
   });
 
-  static int _toInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) {
-      return int.tryParse(value) ?? fallback;
-    }
-    return fallback;
-  }
-
-  // Check if message is read by a specific user
   bool isReadBy(int userId) => readBy.contains(userId);
-
   bool get isEdited => editedAt != null;
+  bool get hasImages => imageUrls.isNotEmpty;
+
+  factory Message.fromDto(MessageDto dto) {
+    return Message(
+      id: dto.id,
+      messageText: dto.messageText,
+      senderId: dto.senderId,
+      conversationId: dto.conversationId,
+      sentAt: dto.sentAt,
+      editedAt: dto.editedAt,
+      readBy: dto.readBy,
+      imageUrls: dto.imageUrls,
+      attachedProduct: dto.attachedProduct != null ? Product.fromDto(dto.attachedProduct!) : null,
+      sender: dto.sender != null ? Student.fromDto(dto.sender!) : null,
+    );
+  }
 
   Message copyWith({
     String? messageText,
@@ -232,60 +157,4 @@ class Message {
       sender: sender,
     );
   }
-
-  factory Message.fromJson(Map<String, dynamic> json) {
-    final senderJson = json['User'] ?? json['user'];
-    final attachedProductJson = json['AttachedProduct'] ?? json['attached_product'];
-    final readByData = json['MessageReads'] ?? json['message_reads'] ?? [];
-    
-    List<int> readByList = [];
-    if (readByData is List) {
-      readByList = readByData
-          .map((read) {
-            final userId = read is Map ? read['user_id'] ?? read['userId'] : read;
-            return _toInt(userId);
-          })
-          .where((id) => id > 0)
-          .toList();
-    }
-
-    final imageUrlsData = json['image_urls'] ?? json['imageUrls'] ?? [];
-    final parsedImageUrls = imageUrlsData is List
-        ? imageUrlsData
-            .map((item) => item?.toString() ?? '')
-            .where((item) => item.trim().isNotEmpty)
-            .toList(growable: false)
-        : const <String>[];
-
-    final rawEditedAt = json['edited_at'] ?? json['editedAt'];
-
-    return Message(
-      id: _toInt(json['id']),
-      messageText: (json['message_text'] ?? json['messageText'] ?? '') as String,
-      senderId: _toInt(json['sender_id'] ?? json['senderId']),
-      conversationId: _toInt(json['conversation_id'] ?? json['conversationId']),
-      sentAt: DateTime.parse(json['sent_at'] ?? json['sentAt'] ?? DateTime.now().toIso8601String()),
-      editedAt: rawEditedAt is String && rawEditedAt.isNotEmpty
-          ? DateTime.tryParse(rawEditedAt)
-          : null,
-      readBy: readByList,
-      imageUrls: parsedImageUrls,
-      attachedProduct: attachedProductJson != null
-          ? Product.fromJson(attachedProductJson as Map<String, dynamic>)
-          : null,
-      sender: senderJson != null ? Student.fromJson(senderJson as Map<String, dynamic>) : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'message_text': messageText,
-    'sender_id': senderId,
-    'conversation_id': conversationId,
-    'sent_at': sentAt.toIso8601String(),
-    'edited_at': editedAt?.toIso8601String(),
-    'image_urls': imageUrls,
-  };
-
-  bool get hasImages => imageUrls.isNotEmpty;
 }

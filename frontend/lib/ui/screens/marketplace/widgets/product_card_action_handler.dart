@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
-import '../../../../domain/entities/product_entity.dart';
+﻿import 'package:flutter/material.dart';
+import '../../../../data/dtos/product_dto.dart';
 import '../../../widgets/app_action_sheet.dart';
 import '../../../widgets/app_snack_bar.dart';
 
 /// Helper class to generate and manage product action sheet items.
 class ProductCardActionHandler {
   final BuildContext context;
-  final ProductEntity product;
+  final ProductDto product;
   final bool isOwner;
   final bool isSaved;
   final Future<void> Function() onEditProduct;
@@ -106,3 +106,4 @@ extension ActionHandlerExtension on State {
     }
   }
 }
+

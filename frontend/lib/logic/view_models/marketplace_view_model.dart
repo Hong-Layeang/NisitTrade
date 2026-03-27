@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/errors/api_exception.dart';
-import '../../domain/entities/category_entity.dart';
-import '../../domain/repository_interfaces/i_category_repository.dart';
+import '../../data/dtos/category_dto.dart';
+import '../../data/repository_interfaces/i_category_repository.dart';
 
 /// ViewModel for managing marketplace state and category filtering.
 class MarketplaceViewModel extends ChangeNotifier {
@@ -12,13 +12,13 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   final ICategoryRepository _categoryRepository;
 
-  List<CategoryEntity> _categories = [];
+  List<CategoryDto> _categories = [];
   bool _isLoading = false;
   String? _error;
   int? _selectedCategoryIndex;
   bool _showCategoryFilter = false;
 
-  List<CategoryEntity> get categories => _categories;
+  List<CategoryDto> get categories => _categories;
   bool get isLoading => _isLoading;
   String? get error => _error;
   int? get selectedCategoryIndex => _selectedCategoryIndex;
@@ -81,3 +81,4 @@ class MarketplaceViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
+

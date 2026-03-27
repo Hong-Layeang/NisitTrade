@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_durations.dart';
 import '../../../core/navigation/app_routes.dart';
-import '../../../domain/entities/category_entity.dart';
-import '../../../domain/entities/product_entity.dart';
+import '../../../data/dtos/category_dto.dart';
+import '../../../data/dtos/product_dto.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/marketplace_view_model.dart';
 import '../../widgets/app_refresh_indicator.dart';
@@ -134,12 +134,12 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
     
     return Selector2<MarketplaceViewModel, ProductFeedViewModel,
         ({
-          List<CategoryEntity> categories,
+          List<CategoryDto> categories,
           int? selectedCategoryIndex,
           bool isLoading,
           String? error,
           bool showCategoryFilter,
-          List<ProductEntity> products,
+          List<ProductDto> products,
           bool productsLoading,
           String? productsError,
         })>(
@@ -182,13 +182,13 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
 
   Widget _buildContent(
     BuildContext context,
-    List<CategoryEntity> categories,
+    List<CategoryDto> categories,
     int? selectedCategoryIndex,
     bool showCategoryFilter,
     bool isLoading,
     bool productsLoading,
     String? effectiveError,
-    List<ProductEntity> filteredProducts,
+    List<ProductDto> filteredProducts,
   ) {
 
     return LoadingErrorBuilder(
@@ -283,3 +283,4 @@ class MarketplacePageState extends State<MarketplacePage> with AutomaticKeepAliv
     );
   }
 }
+

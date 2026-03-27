@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,9 +8,10 @@ import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/school_short_name.dart';
 import '../../../core/utils/chat_timestamp_formatter.dart';
 import '../../../core/utils/user_presence_formatter.dart';
-import '../../../data/models/conversation.dart';
-import '../../../data/models/user_profile.dart';
-import '../../../data/providers/user_api_service.dart';
+import '../../../data/dtos/user_profile_dto.dart';
+import '../../../data/dtos/conversation_dto.dart';
+import '../../../data/repository_interfaces/i_user_repository.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../logic/view_models/chat_view_model.dart';
 import '../../../logic/view_models/presence_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
@@ -18,7 +19,7 @@ import '../marketplace/product_detail_page.dart';
 import '../../../ui/widgets/app_action_sheet.dart';
 import '../../../ui/widgets/app_snack_bar.dart';
 import '../../../ui/widgets/user_widgets.dart';
-import '../profile/other_profile_page.dart';
+import '../profile/other_profile_page.dart' hide getIt;
 import 'widgets/chat_menu_helpers.dart';
 
 class ConversationsListScreen extends StatefulWidget {
@@ -39,10 +40,11 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   bool _isLoadingUsers = false;
   String? _usersError;
   int? _openingUserId;
-  List<UserProfile> _allUsers = [];
+  List<UserProfileDto> _allUsers = [];
   String _searchQuery = '';
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
+  final IUserRepository _userRepository = getIt<IUserRepository>();
 
   @override
   void didChangeDependencies() {
@@ -84,12 +86,12 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     });
 
     try {
-      final loadedUsers = <UserProfile>[];
+      final loadedUsers = <UserProfileDto>[];
       final seenIds = <int>{};
       var offset = 0;
 
       while (true) {
-        final response = await UserApiService.instance.getAllUsers(
+        final response = await _userRepository.getAllUsers(
           limit: _pageSize,
           offset: offset,
         );
@@ -103,7 +105,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
           return;
         }
 
-        final batch = response.data ?? const <UserProfile>[];
+        final batch = response.data ?? const <UserProfileDto>[];
         for (final user in batch) {
           if (user.id <= 0 || seenIds.contains(user.id)) continue;
           seenIds.add(user.id);
@@ -131,8 +133,8 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     }
   }
 
-  ConversationParticipant? _otherParticipant(
-    Conversation conversation,
+  ConversationParticipantDto? _otherParticipant(
+    ConversationDto conversation,
     int currentUserId,
   ) {
     return conversation.participants?.firstWhere(
@@ -140,7 +142,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
               participant.user != null &&
               participant.userId > 0 &&
               participant.userId != currentUserId,
-          orElse: () => ConversationParticipant(
+          orElse: () => ConversationParticipantDto(
             id: 0,
             conversationId: conversation.id,
             userId: 0,
@@ -149,7 +151,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         ) ??
         conversation.participants?.firstWhere(
           (participant) => participant.user != null && participant.userId > 0,
-          orElse: () => ConversationParticipant(
+          orElse: () => ConversationParticipantDto(
             id: 0,
             conversationId: conversation.id,
             userId: 0,
@@ -158,22 +160,76 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         );
   }
 
+  bool _hasActiveAttachedProduct(
+    ChatRoomViewModel chatViewModel,
+    int conversationId,
+  ) {
+    return _activeAttachedProduct(
+          conversationId,
+          chatViewModel: chatViewModel,
+        ) !=
+        null;
+  }
+
+  DateTime _conversationActivityAt(
+    ConversationDto conversation,
+    ChatRoomViewModel chatViewModel,
+  ) {
+    final latestActivity = <DateTime>[
+      conversation.updatedAt,
+      if (conversation.lastMessage != null) conversation.lastMessage!.sentAt,
+    ];
+
+    final activeAttachment = _activeAttachedProduct(
+      conversation.id,
+      chatViewModel: chatViewModel,
+    );
+    if (activeAttachment?.countdownStartedAt != null) {
+      latestActivity.add(activeAttachment!.countdownStartedAt!);
+    }
+
+    latestActivity.sort();
+    return latestActivity.last;
+  }
+
+  int _compareConversationPriority(
+    ConversationDto a,
+    ConversationDto b,
+    ChatRoomViewModel chatViewModel,
+  ) {
+    final aHasActiveAttachment = _hasActiveAttachedProduct(chatViewModel, a.id);
+    final bHasActiveAttachment = _hasActiveAttachedProduct(chatViewModel, b.id);
+    if (aHasActiveAttachment != bHasActiveAttachment) {
+      return aHasActiveAttachment ? -1 : 1;
+    }
+
+    final activityComparison = _conversationActivityAt(
+      b,
+      chatViewModel,
+    ).compareTo(_conversationActivityAt(a, chatViewModel));
+    if (activityComparison != 0) {
+      return activityComparison;
+    }
+
+    final aHasRecentActivity = a.lastMessage != null;
+    final bHasRecentActivity = b.lastMessage != null;
+    if (aHasRecentActivity != bHasRecentActivity) {
+      return bHasRecentActivity ? 1 : -1;
+    }
+
+    return b.id.compareTo(a.id);
+  }
+
   List<_ChatListEntry> _buildEntries(
-    List<Conversation> conversations,
+    ChatRoomViewModel chatViewModel,
+    List<ConversationDto> conversations,
     int currentUserId,
   ) {
     final entries = <_ChatListEntry>[];
     final seenUserIds = <int>{};
 
     final sortedConversations = [...conversations]
-      ..sort((a, b) {
-        final aHasRecentActivity = a.lastMessage != null;
-        final bHasRecentActivity = b.lastMessage != null;
-        if (aHasRecentActivity != bHasRecentActivity) {
-          return bHasRecentActivity ? 1 : -1;
-        }
-        return b.updatedAt.compareTo(a.updatedAt);
-      });
+      ..sort((a, b) => _compareConversationPriority(a, b, chatViewModel));
 
     for (final conversation in sortedConversations) {
       final participant = _otherParticipant(conversation, currentUserId);
@@ -245,7 +301,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     return entries;
   }
 
-  String _conversationSubtitle(Conversation conversation, String fallback) {
+  String _conversationSubtitle(ConversationDto conversation, String fallback) {
     if (conversation.isBlockedByMe) {
       return 'You blocked this account';
     }
@@ -393,7 +449,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             onTap: () => Navigator.of(context).pushNamed(
               AppRoutes.productDetail,
               arguments: ProductDetailArgs(
-                productId: conversation!.product!.id,
+                productId: conversation.product!.id,
               ),
             ),
           ),
@@ -454,8 +510,11 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
 
   /// Returns the first active (non-expired) attached product for a conversation,
   /// or null if there is none.
-  AttachedProduct? _activeAttachedProduct(int conversationId) {
-    final chatVm = context.read<ChatRoomViewModel>();
+  AttachedProduct? _activeAttachedProduct(
+    int conversationId, {
+    ChatRoomViewModel? chatViewModel,
+  }) {
+    final chatVm = chatViewModel ?? context.read<ChatRoomViewModel>();
     final products = chatVm.attachedProductsForConversation(conversationId);
     for (final ap in products) {
       if (ap.countdownStartedAt == null) return ap; // awaiting
@@ -518,7 +577,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
 
   Widget _buildEntryTrailing({
     required _ChatListEntry entry,
-    required Conversation? conversation,
+    required ConversationDto? conversation,
     required bool isOpening,
   }) {
     return Row(
@@ -564,7 +623,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   Future<void> _blockUser({
     required int userId,
     required String displayName,
-    Conversation? conversation,
+    ConversationDto? conversation,
   }) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -590,7 +649,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     );
     if (!mounted || confirmed != true) return;
 
-    final response = await UserApiService.instance.blockUser(userId);
+    final response = await _userRepository.blockUser(userId);
     if (!mounted) return;
 
     if (response.isSuccess) {
@@ -614,9 +673,9 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   Future<void> _unblockUser({
     required int userId,
     required String displayName,
-    Conversation? conversation,
+    ConversationDto? conversation,
   }) async {
-    final response = await UserApiService.instance.unblockUser(userId);
+    final response = await _userRepository.unblockUser(userId);
     if (!mounted) return;
 
     if (response.isSuccess) {
@@ -648,7 +707,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     );
     if (!mounted || reason == null) return;
 
-    final response = await UserApiService.instance.reportUser(
+    final response = await _userRepository.reportUser(
       userId: userId,
       reason: reason,
     );
@@ -664,7 +723,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     }
   }
 
-  Future<void> _deleteConversation(Conversation conversation) async {
+  Future<void> _deleteConversation(ConversationDto conversation) async {
     final confirmed = await showDeleteChatConfirmation(
       context,
       title: 'Delete chat',
@@ -693,7 +752,11 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     return Consumer2<ChatRoomViewModel, PresenceViewModel>(
       builder: (context, chatViewModel, presenceViewModel, child) {
         final entries =
-            _buildEntries(chatViewModel.conversations, currentUserId).where((
+            _buildEntries(
+              chatViewModel,
+              chatViewModel.conversations,
+              currentUserId,
+            ).where((
               entry,
             ) {
               final query = _searchQuery.trim().toLowerCase();
@@ -994,37 +1057,18 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                         ),
                       ),
                       if (timestampLabel != null) ...[
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: Text(
-                                '·',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: hasUnread
-                                      ? const Color(0xFF1A1A1A)
-                                      : AppColors.textSecondary.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                ),
-                              ),
-                            ),
-                            Text(
-                              timestampLabel,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: hasUnread
-                                    ? FontWeight.w700
-                                    : FontWeight.w400,
-                                color: hasUnread
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(width: 8),
+                        Text(
+                          timestampLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: hasUnread
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            color: hasUnread
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ],
@@ -1078,7 +1122,7 @@ class _ChatListEntry {
   final String subtitle;
   final String? schoolShortName;
   final String? avatarUrl;
-  final Conversation? conversation;
+  final ConversationDto? conversation;
   final bool isBlockedByMe;
   final bool hasBlockedMe;
   final bool isOnline;

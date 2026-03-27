@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/errors/api_exception.dart';
-import '../../data/models/community_post.dart';
-import '../../data/repositories/community_repository_impl.dart';
-import '../../domain/entities/product_entity.dart';
-import '../../domain/repository_interfaces/i_product_repository.dart';
-import '../../domain/repository_interfaces/i_product_save_repository.dart';
-import '../../domain/repository_interfaces/i_user_repository.dart';
+import '../../data/dtos/community_post_dto.dart';
+import '../../data/dtos/product_dto.dart';
+import '../../data/repository_interfaces/i_community_repository.dart';
+import '../../data/repository_interfaces/i_product_repository.dart';
+import '../../data/repository_interfaces/i_product_save_repository.dart';
+import '../../data/repository_interfaces/i_user_repository.dart';
 
 /// ViewModel for managing saved listings state and actions.
 class SavedListingsViewModel extends ChangeNotifier {
@@ -14,7 +14,7 @@ class SavedListingsViewModel extends ChangeNotifier {
     required IUserRepository userRepository,
     required IProductRepository productRepository,
     required IProductSaveRepository productSaveRepository,
-    required CommunityRepository communityRepository,
+    required ICommunityRepository communityRepository,
   })  : _userRepository = userRepository,
         _productRepository = productRepository,
         _productSaveRepository = productSaveRepository,
@@ -23,10 +23,10 @@ class SavedListingsViewModel extends ChangeNotifier {
   final IUserRepository _userRepository;
   final IProductRepository _productRepository;
   final IProductSaveRepository _productSaveRepository;
-  final CommunityRepository _communityRepository;
+  final ICommunityRepository _communityRepository;
 
-  List<ProductEntity> _savedProducts = [];
-  List<CommunityPost> _savedPosts = [];
+  List<ProductDto> _savedProducts = [];
+  List<CommunityPostDto> _savedPosts = [];
   bool _isLoading = false;
   bool _isRefreshing = false;
   bool _isActionLoading = false;
@@ -35,8 +35,8 @@ class SavedListingsViewModel extends ChangeNotifier {
   int? _lastUserId;
   bool _hasLoadedForCurrentUser = false;
 
-  List<ProductEntity> get savedProducts => _savedProducts;
-  List<CommunityPost> get savedPosts => _savedPosts;
+  List<ProductDto> get savedProducts => _savedProducts;
+  List<CommunityPostDto> get savedPosts => _savedPosts;
   bool get isLoading => _isLoading;
   bool get isRefreshing => _isRefreshing;
   bool get isActionLoading => _isActionLoading;
@@ -168,7 +168,7 @@ class SavedListingsViewModel extends ChangeNotifier {
   }
 
   Future<bool> restoreSavedListing({
-    required ProductEntity product,
+    required ProductDto product,
     int? insertIndex,
   }) async {
     if (_isActionLoading) return false;
@@ -203,7 +203,7 @@ class SavedListingsViewModel extends ChangeNotifier {
   }
 
   Future<bool> restoreSavedPost({
-    required CommunityPost post,
+    required CommunityPostDto post,
     int? insertIndex,
   }) async {
     if (_isActionLoading) return false;
@@ -266,7 +266,7 @@ class SavedListingsViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addSavedProductLocally(ProductEntity product) {
+  void addSavedProductLocally(ProductDto product) {
     if (_savedProducts.any((item) => item.id == product.id)) {
       return;
     }
@@ -280,7 +280,7 @@ class SavedListingsViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addSavedPostLocally(CommunityPost post) {
+  void addSavedPostLocally(CommunityPostDto post) {
     if (_savedPosts.any((item) => item.id == post.id)) {
       return;
     }
@@ -294,7 +294,7 @@ class SavedListingsViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<ProductEntity> _mergeSavedProducts(List<ProductEntity> incomingProducts) {
+  List<ProductDto> _mergeSavedProducts(List<ProductDto> incomingProducts) {
     final existingById = {
       for (final product in _savedProducts) product.id: product,
     };
@@ -307,9 +307,9 @@ class SavedListingsViewModel extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  ProductEntity _withStableImageUrls({
-    required ProductEntity? existing,
-    required ProductEntity incoming,
+  ProductDto _withStableImageUrls({
+    required ProductDto? existing,
+    required ProductDto incoming,
   }) {
     if (existing == null) return incoming;
     if (existing.imageUrls.isEmpty || incoming.imageUrls.isEmpty) return incoming;
@@ -322,25 +322,7 @@ class SavedListingsViewModel extends ChangeNotifier {
 
     if (!sameUnderlyingImages) return incoming;
 
-    return ProductEntity(
-      id: incoming.id,
-      title: incoming.title,
-      description: incoming.description,
-      price: incoming.price,
-      status: incoming.status,
-      userId: incoming.userId,
-      categoryId: incoming.categoryId,
-      createdAt: incoming.createdAt,
-      updatedAt: incoming.updatedAt,
-      seller: incoming.seller,
-      category: incoming.category,
-      imageUrls: existing.imageUrls,
-      likes: incoming.likes,
-      comments: incoming.comments,
-      likeCount: incoming.likeCount,
-      commentCount: incoming.commentCount,
-      isLiked: incoming.isLiked,
-    );
+    return incoming.copyWith(productImages: existing.productImages);
   }
 
   bool _hasSameUnderlyingImageSet(

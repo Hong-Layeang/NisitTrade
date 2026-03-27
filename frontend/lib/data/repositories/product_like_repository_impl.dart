@@ -1,18 +1,16 @@
 import '../../core/errors/api_response.dart';
-import '../../domain/repository_interfaces/i_product_like_repository.dart';
-import '../providers/product_api_service.dart';
+import '../repository_interfaces/i_product_like_repository.dart';
+import 'product_repository_impl.dart';
 
-/// Implementation of IProductLikeRepository
-/// Handles product like/unlike operations
 class ProductLikeRepositoryImpl implements IProductLikeRepository {
-  ProductLikeRepositoryImpl({ProductApiService? apiService})
-      : _apiService = apiService ?? ProductApiService.instance;
+  ProductLikeRepositoryImpl({ProductRepositoryImpl? repository})
+      : _repository = repository ?? ProductRepositoryImpl();
 
-  final ProductApiService _apiService;
+  final ProductRepositoryImpl _repository;
 
   @override
   Future<ApiResponse<void>> likeProduct(int productId) async {
-    return _apiService.likeProduct(productId);
+    return _repository.likeProduct(productId);
   }
 
   @override
@@ -20,7 +18,7 @@ class ProductLikeRepositoryImpl implements IProductLikeRepository {
     required int productId,
     required int likeId,
   }) async {
-    return _apiService.unlikeProduct(
+    return _repository.unlikeProduct(
       productId: productId,
       likeId: likeId,
     );

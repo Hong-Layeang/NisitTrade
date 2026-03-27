@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
-import '../../../../domain/entities/product_entity.dart';
+import '../../../../data/dtos/product_dto.dart';
 import '../../../../core/constants/colors.dart';
 
 /// Displays product information in the product card
 class ProductCardInfo extends StatelessWidget {
-  final ProductEntity product;
+  final ProductDto product;
 
   const ProductCardInfo({super.key, required this.product});
 
@@ -51,3 +51,4 @@ class ProductCardInfo extends StatelessWidget {
     );
   }
 }
+

@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
-import '../../../../data/models/community_post.dart';
+import '../../../../data/dtos/community_post_dto.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/school_short_name.dart';
@@ -11,7 +11,7 @@ import '../../../widgets/app_action_chip.dart';
 import '../../../widgets/user_widgets.dart';
 
 class CommunityPostCard extends StatefulWidget {
-  final CommunityPost post;
+  final CommunityPostDto post;
   final bool isLiked;
   final VoidCallback? onTap;
   final ValueChanged<int>? onImageTap;
@@ -383,3 +383,4 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     );
   }
 }
+

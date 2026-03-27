@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/colors.dart';
-import '../../../../domain/entities/university_entity.dart';
+import '../../../../data/dtos/university_dto.dart';
 
 class ProfileUtils {
   ProfileUtils._();
 
   /// Extract a short school abbreviation from the university's name.
-  static String getSchoolShortName(UniversityEntity? university) {
+  static String getSchoolShortName(UniversityDto? university) {
     if (university == null) return 'N/A';
 
     // Try abbreviation from name first (first letter of each significant word)
@@ -642,3 +642,4 @@ class ProfileHeaderSection extends StatelessWidget {
     );
   }
 }
+

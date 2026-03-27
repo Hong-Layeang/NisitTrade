@@ -1,22 +1,20 @@
 import '../../core/errors/api_response.dart';
-import '../../domain/repository_interfaces/i_product_save_repository.dart';
-import '../providers/product_api_service.dart';
+import '../repository_interfaces/i_product_save_repository.dart';
+import 'product_repository_impl.dart';
 
-/// Implementation of IProductSaveRepository
-/// Handles save/unsave product operations
 class ProductSaveRepositoryImpl implements IProductSaveRepository {
-  ProductSaveRepositoryImpl({ProductApiService? apiService})
-      : _apiService = apiService ?? ProductApiService.instance;
+  ProductSaveRepositoryImpl({ProductRepositoryImpl? repository})
+      : _repository = repository ?? ProductRepositoryImpl();
 
-  final ProductApiService _apiService;
+  final ProductRepositoryImpl _repository;
 
   @override
   Future<ApiResponse<void>> saveListing(int productId) async {
-    return _apiService.saveListing(productId);
+    return _repository.saveListing(productId);
   }
 
   @override
   Future<ApiResponse<void>> unsaveListing(int productId) async {
-    return _apiService.unsaveListing(productId);
+    return _repository.unsaveListing(productId);
   }
 }

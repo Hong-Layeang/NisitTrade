@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
-import '../../core/config/app_config.dart';
-import '../../core/navigation/app_navigator.dart';
-import '../../core/navigation/app_routes.dart';
-import '../../core/auth/auth_token_store.dart';
+import '../config/app_config.dart';
+import '../navigation/app_navigator.dart';
+import '../navigation/app_routes.dart';
+import '../auth/auth_token_store.dart';
 
 class ApiClient {
   ApiClient._() {
@@ -22,8 +22,8 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           if (options.data is FormData) {
-            options.headers.remove(Headers.contentTypeHeader); // 'content-type'
-            options.headers.remove('Content-Type'); // mixed-case variant
+            options.headers.remove(Headers.contentTypeHeader);
+            options.headers.remove('Content-Type');
           }
           if (!options.headers.containsKey('Authorization')) {
             final token = await _tokenStore.readToken();
@@ -63,7 +63,6 @@ class ApiClient {
             }
           }
 
-          // Auto-logout on 401 (stale/invalid token)
           if (error.response?.statusCode == 401) {
             await _tokenStore.clearToken();
             final nav = appNavigatorKey.currentState;

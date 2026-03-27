@@ -1,9 +1,9 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/core/errors/api_exception.dart';
 import 'package:frontend/core/errors/api_response.dart';
-import 'package:frontend/domain/entities/category_entity.dart';
-import 'package:frontend/domain/repository_interfaces/i_category_repository.dart';
+import 'package:frontend/data/dtos/category_dto.dart';
+import 'package:frontend/data/repository_interfaces/i_category_repository.dart';
 import 'package:frontend/ui/screens/sell/product_form_shared.dart';
 
 void main() {
@@ -87,7 +87,7 @@ void main() {
       final now = DateTime(2026, 3, 9);
       final repo = _FakeCategoryRepository(
         response: ApiResponse.success([
-          CategoryEntity(
+          CategoryDto(
             id: 1,
             name: 'Electronics',
             imageUrl: null,
@@ -122,25 +122,25 @@ void main() {
 class _FakeCategoryRepository implements ICategoryRepository {
   _FakeCategoryRepository({required this.response});
 
-  final ApiResponse<List<CategoryEntity>> response;
+  final ApiResponse<List<CategoryDto>> response;
 
   @override
-  Future<ApiResponse<List<CategoryEntity>>> getCategories() async {
+  Future<ApiResponse<List<CategoryDto>>> getCategories() async {
     return response;
   }
 
   @override
-  Future<ApiResponse<CategoryEntity>> getCategory(int id) {
+  Future<ApiResponse<CategoryDto>> getCategory(int id) {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<CategoryEntity>> createCategory({required String name}) {
+  Future<ApiResponse<CategoryDto>> createCategory({required String name}) {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<CategoryEntity>> updateCategory({required int id, required String name}) {
+  Future<ApiResponse<CategoryDto>> updateCategory({required int id, required String name}) {
     throw UnimplementedError();
   }
 
@@ -149,3 +149,4 @@ class _FakeCategoryRepository implements ICategoryRepository {
     throw UnimplementedError();
   }
 }
+

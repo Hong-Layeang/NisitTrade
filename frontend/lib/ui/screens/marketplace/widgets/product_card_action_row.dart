@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
-import '../../../../domain/entities/product_entity.dart';
+﻿import 'package:flutter/material.dart';
+import '../../../../data/dtos/product_dto.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../widgets/app_action_chip.dart';
 
 /// Displays action row with like, comment, chat buttons
 class ProductCardActionRow extends StatelessWidget {
-  final ProductEntity product;
+  final ProductDto product;
   final bool isLiked;
   final bool isLoading;
   final AnimationController likeAnimationController;
@@ -72,8 +72,11 @@ class ProductCardActionRow extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  '💰',
-                  style: TextStyle(fontSize: 13),
+                  '\u{1F4B0}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1,
+                  ),
                 ),
                 const SizedBox(width: 3),
                 Text(

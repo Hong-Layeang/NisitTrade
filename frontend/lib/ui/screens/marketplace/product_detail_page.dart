@@ -1,12 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 
-import '../../../data/models/comment.dart';
-import '../../../data/models/like.dart';
-import '../../../data/models/product.dart';
-import '../../../domain/entities/product_entity.dart';
-import '../../../domain/repository_interfaces/i_product_repository.dart';
+import '../../../data/dtos/comment_dto.dart';
+import '../../../data/dtos/like_dto.dart';
+import '../../../data/dtos/product_dto.dart';
+import '../../../data/repository_interfaces/i_product_repository.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
@@ -34,7 +33,7 @@ import '../../../logic/services/share_service.dart';
 class ProductDetailArgs {
   final int productId;
   final bool focusComments;
-  final ProductEntity? initialProduct;
+  final ProductDto? initialProduct;
 
   const ProductDetailArgs({
     required this.productId,
@@ -46,7 +45,7 @@ class ProductDetailArgs {
 class ProductDetailPage extends StatefulWidget {
   final int productId;
   final bool focusComments;
-  final ProductEntity? initialProduct;
+  final ProductDto? initialProduct;
 
   const ProductDetailPage({
     super.key,
@@ -80,7 +79,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   late AnimationController _likeAnimationController;
   late IProductRepository _productRepository;
 
-  Product? _product;
+  ProductDto? _product;
   String? _error;
   bool _isLoading = false;
   bool _isSubmittingComment = false;
@@ -100,14 +99,14 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
     // Use initial product if provided, or check cache
     if (widget.initialProduct != null) {
-      _product = Product.fromEntity(widget.initialProduct!);
+      _product = widget.initialProduct!;
       _loadData(silent: true);
     } else {
       final cachedProduct = context
           .read<ProductFeedViewModel>()
           .getCachedProduct(widget.productId);
       if (cachedProduct != null) {
-        _product = Product.fromEntity(cachedProduct);
+        _product = cachedProduct;
         _loadData(silent: true);
       } else {
         _loadData();
@@ -149,7 +148,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     });
   }
 
-  Future<void> _openChatWithSeller(Product product) async {
+  Future<void> _openChatWithSeller(ProductDto product) async {
     final userId = context.read<UserViewModel>().userId;
     if (userId == null) {
       AppSnackBar.error(context, 'Please sign in to start chatting.');
@@ -231,7 +230,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
       if (mounted) {
         setState(() {
-          _product = Product.fromEntity(product);
+          _product = product;
           if (!silent) {
             _isLoading = false;
           }
@@ -258,7 +257,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         widget.productId,
       );
       if (mounted && product != null) {
-        setState(() => _product = Product.fromEntity(product));
+        setState(() => _product = product);
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -289,7 +288,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         : product.copyWith(
             likes: [
               ...product.likes,
-              Like(
+              LikeDto(
                 id: -DateTime.now().microsecondsSinceEpoch,
                 userId: userId,
                 productId: product.id,
@@ -314,7 +313,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
               likeId: likeId,
             );
       if (mounted && updatedProduct != null) {
-        setState(() => _product = Product.fromEntity(updatedProduct));
+        setState(() => _product = updatedProduct);
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -340,7 +339,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           .addComment(productId: widget.productId, content: content);
       _commentController.clear();
       if (mounted && updatedProduct != null) {
-        setState(() => _product = Product.fromEntity(updatedProduct));
+        setState(() => _product = updatedProduct);
         _scrollToLatestComment();
       }
     } on ApiException catch (e) {
@@ -354,7 +353,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
   }
 
-  Future<void> _editComment(Comment comment) async {
+  Future<void> _editComment(CommentDto comment) async {
     final newContent = await EditCommentDialog.show(
       context,
       initialContent: comment.content,
@@ -373,7 +372,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
             content: newContent,
           );
       if (mounted && updatedProduct != null) {
-        setState(() => _product = Product.fromEntity(updatedProduct));
+        setState(() => _product = updatedProduct);
         AppSnackBar.success(context, 'Comment updated successfully');
       }
     } on ApiException catch (e) {
@@ -383,7 +382,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
   }
 
-  Future<void> _deleteComment(Comment comment) async {
+  Future<void> _deleteComment(CommentDto comment) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -412,7 +411,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           .read<ProductFeedViewModel>()
           .deleteComment(productId: widget.productId, commentId: comment.id);
       if (mounted && updatedProduct != null) {
-        setState(() => _product = Product.fromEntity(updatedProduct));
+        setState(() => _product = updatedProduct);
         AppSnackBar.success(context, 'Comment deleted successfully');
       }
     } on ApiException catch (e) {
@@ -468,7 +467,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
                 await context.read<ProductFeedViewModel>().saveListing(
                   widget.productId,
                 );
-                savedListingsVm.addSavedProductLocally(product.toEntity());
+                savedListingsVm.addSavedProductLocally(product);
               } catch (_) {
                 if (!mounted) return;
                 AppSnackBar.error(context, 'Failed to undo unsave product.');
@@ -480,7 +479,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         await context.read<ProductFeedViewModel>().saveListing(
           widget.productId,
         );
-        savedListingsVm.addSavedProductLocally(product.toEntity());
+        savedListingsVm.addSavedProductLocally(product);
 
         if (mounted) {
           AppSnackBar.showUndo(
@@ -591,7 +590,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
           : await provider.hideProduct(widget.productId);
 
       if (updated != null && mounted) {
-        setState(() => _product = Product.fromEntity(updated));
+        setState(() => _product = updated);
         AppSnackBar.success(
           context,
           product.isHidden ? 'Product unhidden.' : 'Product hidden.',
@@ -733,7 +732,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
     final handler = ProductCardActionHandler(
       context: context,
-      product: product.toEntity(),
+      product: product,
       isOwner: _isOwner(),
       isSaved: _isSavedProduct(),
       onEditProduct: _handleEditProduct,
@@ -833,7 +832,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
-  Widget _buildImageSection(Product product) {
+  Widget _buildImageSection(ProductDto product) {
     final images = product.imageUrls;
     if (images.isEmpty) {
       return AspectRatio(
@@ -874,7 +873,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
-  Widget _buildHeader(Product product) {
+  Widget _buildHeader(ProductDto product) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -957,7 +956,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
   }
 
-  Widget _buildSellerRow(Product product) {
+  Widget _buildSellerRow(ProductDto product) {
     return Selector<UserViewModel, ({int? userId, String? profileImage})>(
       selector: (_, vm) =>
           (userId: vm.userId, profileImage: vm.profile?.profileImage),
@@ -974,7 +973,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
   }
 
   Widget _buildSellerRowContent(
-    Product product,
+    ProductDto product,
     bool isCurrentUser,
     String? avatarUrl,
   ) {
@@ -1049,7 +1048,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
-  Widget _buildActions(Product product) {
+  Widget _buildActions(ProductDto product) {
     final userId = context.read<UserViewModel>().userId;
     final isLiked =
         userId != null && product.likes.any((like) => like.userId == userId);
@@ -1089,7 +1088,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
-  Widget _buildDescription(Product product) {
+  Widget _buildDescription(ProductDto product) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1110,7 +1109,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
-  Widget _buildCommentsHeader(Product product) {
+  Widget _buildCommentsHeader(ProductDto product) {
     return Row(
       children: [
         const Text(
@@ -1133,7 +1132,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
-  Widget _buildComments(List<Comment> comments) {
+  Widget _buildComments(List<CommentDto> comments) {
     if (comments.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
@@ -1175,3 +1174,4 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 }
+

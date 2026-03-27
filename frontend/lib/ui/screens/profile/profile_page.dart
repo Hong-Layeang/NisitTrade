@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:get_it/get_it.dart';
-import '../../../domain/repository_interfaces/i_user_repository.dart';
-import '../../../data/models/community_post.dart';
-import '../../../data/repositories/community_repository_impl.dart';
-import '../../../domain/entities/user_entity.dart';
-import '../../../data/models/product.dart';
+import '../../../data/repository_interfaces/i_user_repository.dart';
+import '../../../data/dtos/product_dto.dart';
+import '../../../data/dtos/user_profile_dto.dart';
+import '../../../data/dtos/community_post_dto.dart';
+import '../../../data/repository_interfaces/i_community_repository.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
@@ -45,10 +45,10 @@ class ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin, RouteAware {
   late final TabController _tabController;
   late final IUserRepository _userRepository;
-  late final CommunityRepository _communityRepository;
+  late final ICommunityRepository _communityRepository;
 
-  List<Product> _products = [];
-  List<CommunityPost> _posts = [];
+  List<ProductDto> _products = [];
+  List<CommunityPostDto> _posts = [];
   bool _isLoading = false;
   bool _isUploadingCover = false;
   bool _isUploadingAvatar = false;
@@ -166,7 +166,7 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   /// Build overlay for cover image (edit button, upload spinner, menu)
-  Widget _buildCoverOverlay(UserEntity profile) {
+  Widget _buildCoverOverlay(UserProfileDto profile) {
     final coverUrl = profile.coverImage;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
 
@@ -504,18 +504,18 @@ class ProfilePageState extends State<ProfilePage>
     );
   }
 
-  void _openProduct(Product product) {
+  void _openProduct(ProductDto product) {
     Navigator.pushNamed(
       context,
       AppRoutes.productDetail,
       arguments: ProductDetailArgs(
         productId: product.id,
-        initialProduct: product.toEntity(),
+        initialProduct: product,
       ),
     );
   }
 
-  void _openPost(CommunityPost post) {
+  void _openPost(CommunityPostDto post) {
     Navigator.pushNamed(
       context,
       AppRoutes.communityDetail,
@@ -527,7 +527,7 @@ class ProfilePageState extends State<ProfilePage>
   void initState() {
     super.initState();
     _userRepository = getIt<IUserRepository>();
-    _communityRepository = getIt<CommunityRepository>();
+    _communityRepository = getIt<ICommunityRepository>();
     _tabController = TabController(length: 2, vsync: this);
   }
 
@@ -768,7 +768,7 @@ class ProfilePageState extends State<ProfilePage>
       }
 
       setStateIfMounted(() {
-        _products = (productsResponse.data ?? []).toModels();
+        _products = productsResponse.data ?? [];
         _posts = (postsResponse.data ?? [])
             .where((post) => post.orderedImages.isNotEmpty)
             .toList();
@@ -828,7 +828,7 @@ class _EditProfileResult {
 class _EditProfileDialog extends StatefulWidget {
   const _EditProfileDialog({required this.profile});
 
-  final UserEntity profile;
+  final UserProfileDto profile;
 
   @override
   State<_EditProfileDialog> createState() => _EditProfileDialogState();
@@ -931,3 +931,4 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     );
   }
 }
+

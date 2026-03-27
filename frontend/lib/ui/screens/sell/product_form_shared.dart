@@ -1,6 +1,6 @@
-import '../../../core/errors/api_exception.dart';
-import '../../../data/models/category.dart';
-import '../../../domain/repository_interfaces/i_category_repository.dart';
+﻿import '../../../core/errors/api_exception.dart';
+import '../../../data/dtos/category_dto.dart';
+import '../../../data/repository_interfaces/i_category_repository.dart';
 
 class ProductFormValidationResult {
   final String title;
@@ -21,7 +21,7 @@ class ProductFormValidationResult {
 class ProductFormShared {
   const ProductFormShared._();
 
-  static Future<List<Category>> loadCategories(
+  static Future<List<CategoryDto>> loadCategories(
     ICategoryRepository categoryRepository,
   ) async {
     final response = await categoryRepository.getCategories();
@@ -30,9 +30,7 @@ class ProductFormShared {
           ApiException(message: 'Failed to load product categories.');
     }
 
-    return (response.data ?? [])
-        .map((entity) => Category.fromEntity(entity))
-        .toList();
+    return response.data ?? [];
   }
 
   static ProductFormValidationResult validateSubmission({

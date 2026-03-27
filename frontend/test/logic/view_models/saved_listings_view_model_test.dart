@@ -1,21 +1,21 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/core/errors/api_exception.dart';
 import 'package:frontend/core/errors/api_response.dart';
-import 'package:frontend/data/models/community_post.dart';
-import 'package:frontend/data/repositories/community_repository_impl.dart';
-import 'package:frontend/domain/entities/product_entity.dart';
-import 'package:frontend/domain/entities/user_entity.dart';
-import 'package:frontend/domain/repository_interfaces/i_product_repository.dart';
-import 'package:frontend/domain/repository_interfaces/i_product_save_repository.dart';
-import 'package:frontend/domain/repository_interfaces/i_user_repository.dart';
+import 'package:frontend/data/dtos/community_post_dto.dart';
+import 'package:frontend/data/dtos/product_dto.dart';
+import 'package:frontend/data/dtos/user_profile_dto.dart';
+import 'package:frontend/data/repository_interfaces/i_community_repository.dart';
+import 'package:frontend/data/repository_interfaces/i_product_repository.dart';
+import 'package:frontend/data/repository_interfaces/i_product_save_repository.dart';
+import 'package:frontend/data/repository_interfaces/i_user_repository.dart';
 import 'package:frontend/logic/view_models/saved_listings_view_model.dart';
 
 void main() {
   group('SavedListingsViewModel', () {
     test('loadSavedListings populates products on success', () async {
       final userRepo = _FakeUserRepository(
-        savedListingsResponse: ApiResponse.success([_sampleProductEntity(id: 1)]),
+        savedListingsResponse: ApiResponse.success([_sampleProduct(id: 1)]),
       );
       final productRepo = _FakeProductRepository();
       final saveRepo = _FakeProductSaveRepository();
@@ -39,8 +39,8 @@ void main() {
     test('removeSavedListing removes item when unsave succeeds', () async {
       final userRepo = _FakeUserRepository(
         savedListingsResponse: ApiResponse.success([
-          _sampleProductEntity(id: 1),
-          _sampleProductEntity(id: 2),
+          _sampleProduct(id: 1),
+          _sampleProduct(id: 2),
         ]),
       );
       final productRepo = _FakeProductRepository();
@@ -67,7 +67,7 @@ void main() {
 
     test('deleteListing returns false and exposes error when API fails', () async {
       final userRepo = _FakeUserRepository(
-        savedListingsResponse: ApiResponse.success([_sampleProductEntity(id: 1)]),
+        savedListingsResponse: ApiResponse.success([_sampleProduct(id: 1)]),
       );
       final productRepo = _FakeProductRepository(
         deleteResponse: ApiResponse.error(
@@ -94,35 +94,43 @@ void main() {
   });
 }
 
-ProductEntity _sampleProductEntity({required int id}) {
+ProductDto _sampleProduct({required int id}) {
   final now = DateTime(2026, 1, 1);
-  return ProductEntity(
+  return ProductDto(
     id: id,
     title: 'Product $id',
     description: 'Description $id',
     price: 10.0,
-    status: ProductStatus.available,
+    status: 'available',
     userId: 7,
     categoryId: 3,
     createdAt: now,
     updatedAt: now,
-    imageUrls: const ['https://example.com/item.jpg'],
+    productImages: [
+      ProductImageDto(
+        id: 1,
+        imageUrl: 'https://example.com/item.jpg',
+        productId: 0,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      ),
+    ],
   );
 }
 
 class _FakeUserRepository implements IUserRepository {
   _FakeUserRepository({
     required this.savedListingsResponse,
-    ApiResponse<List<CommunityPost>>? savedPostsResponse,
+    ApiResponse<List<CommunityPostDto>>? savedPostsResponse,
   }) : _savedPostsResponse = savedPostsResponse ?? ApiResponse.success(const []);
 
-  final ApiResponse<List<CommunityPost>> _savedPostsResponse;
+  final ApiResponse<List<CommunityPostDto>> _savedPostsResponse;
 
-  final ApiResponse<List<ProductEntity>> savedListingsResponse;
+  final ApiResponse<List<ProductDto>> savedListingsResponse;
   int? lastSavedListingsUserId;
 
   @override
-  Future<ApiResponse<List<ProductEntity>>> getUserSavedListings({
+  Future<ApiResponse<List<ProductDto>>> getUserSavedListings({
     required int userId,
     int? limit,
     int? offset,
@@ -132,17 +140,17 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<UserEntity>> getCurrentUser() {
+  Future<ApiResponse<UserProfileDto>> getCurrentUser() {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<UserEntity>> getUserById(int userId) {
+  Future<ApiResponse<UserProfileDto>> getUserById(int userId) {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<List<ProductEntity>>> getUserProducts({
+  Future<ApiResponse<List<ProductDto>>> getUserProducts({
     required int userId,
     int? limit,
     int? offset,
@@ -151,7 +159,7 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<List<UserEntity>>> getAllUsers({
+  Future<ApiResponse<List<UserProfileDto>>> getAllUsers({
     String? search,
     int? limit,
     int? offset,
@@ -186,7 +194,7 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
+  Future<ApiResponse<List<CommunityPostDto>>> getUserSavedPosts({
     required int userId,
     int? limit,
     int? offset,
@@ -195,11 +203,40 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<UserEntity>> updateProfile({
+  Future<ApiResponse<UserProfileDto>> updateProfile({
     required int userId,
     required String fullName,
     String? bio,
     String? major,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<void>> reportUser({
+    required int userId,
+    required String reason,
+    String? details,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<bool>> blockUser(int userId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<bool>> unblockUser(int userId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<bool>> submitRating({
+    required int sellerId,
+    required int productId,
+    required int rating,
+    String? feedback,
   }) {
     throw UnimplementedError();
   }
@@ -220,7 +257,7 @@ class _FakeProductRepository implements IProductRepository {
   }
 
   @override
-  Future<ApiResponse<List<ProductEntity>>> getProducts({
+  Future<ApiResponse<List<ProductDto>>> getProducts({
     int? categoryId,
     String? status,
     String? search,
@@ -231,12 +268,12 @@ class _FakeProductRepository implements IProductRepository {
   }
 
   @override
-  Future<ApiResponse<ProductEntity>> getProduct(int id) {
+  Future<ApiResponse<ProductDto>> getProduct(int id) {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<ProductEntity>> createProduct({
+  Future<ApiResponse<ProductDto>> createProduct({
     required String title,
     String? description,
     required double price,
@@ -246,7 +283,7 @@ class _FakeProductRepository implements IProductRepository {
   }
 
   @override
-  Future<ApiResponse<ProductEntity>> updateProduct({
+  Future<ApiResponse<ProductDto>> updateProduct({
     required int id,
     String? title,
     String? description,
@@ -257,7 +294,7 @@ class _FakeProductRepository implements IProductRepository {
   }
 
   @override
-  Future<ApiResponse<ProductEntity>> updateProductStatus({
+  Future<ApiResponse<ProductDto>> updateProductStatus({
     required int id,
     required String status,
   }) {
@@ -265,12 +302,12 @@ class _FakeProductRepository implements IProductRepository {
   }
 
   @override
-  Future<ApiResponse<ProductEntity>> hideProduct(int productId) {
+  Future<ApiResponse<ProductDto>> hideProduct(int productId) {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<ProductEntity>> unhideProduct(int productId) {
+  Future<ApiResponse<ProductDto>> unhideProduct(int productId) {
     throw UnimplementedError();
   }
 
@@ -303,7 +340,7 @@ class _FakeProductSaveRepository implements IProductSaveRepository {
   }
 }
 
-class _FakeCommunityRepository implements CommunityRepository {
+class _FakeCommunityRepository implements ICommunityRepository {
   _FakeCommunityRepository({
     ApiResponse<void>? unsaveResponse,
   }) : _unsaveResponse = unsaveResponse ?? ApiResponse.success(null);
@@ -319,7 +356,7 @@ class _FakeCommunityRepository implements CommunityRepository {
   }
 
   @override
-  Future<ApiResponse<CommunityPost>> createPost({required String content, List<String> imagePaths = const []}) {
+  Future<ApiResponse<CommunityPostDto>> createPost({required String content, List<String> imagePaths = const []}) {
     throw UnimplementedError();
   }
 
@@ -334,12 +371,12 @@ class _FakeCommunityRepository implements CommunityRepository {
   }
 
   @override
-  Future<ApiResponse<CommunityPost>> getPost(int postId) {
+  Future<ApiResponse<CommunityPostDto>> getPost(int postId) {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<List<CommunityPost>>> getPosts({
+  Future<ApiResponse<List<CommunityPostDto>>> getPosts({
     String feed = 'community',
     int limit = 20,
     int offset = 0,

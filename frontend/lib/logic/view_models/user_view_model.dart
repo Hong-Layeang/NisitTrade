@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/errors/api_exception.dart';
-import '../../domain/entities/user_entity.dart';
-import '../../domain/repository_interfaces/i_user_repository.dart';
+import '../../data/dtos/user_profile_dto.dart';
+import '../../data/repository_interfaces/i_user_repository.dart';
 
 /// ViewModel for managing user profile state
 /// Uses domain entities and repository interfaces
@@ -13,11 +13,11 @@ class UserViewModel extends ChangeNotifier {
 
   final IUserRepository _userRepository;
 
-  UserEntity? _profile;
+  UserProfileDto? _profile;
   bool _isLoading = false;
   String? _error;
 
-  UserEntity? get profile => _profile;
+  UserProfileDto? get profile => _profile;
   bool get isLoading => _isLoading;
   String? get error => _error;
   int? get userId => _profile?.id;
@@ -174,9 +174,9 @@ class UserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  UserEntity? _withStableImageUrls({
-    required UserEntity? existing,
-    required UserEntity? incoming,
+  UserProfileDto? _withStableImageUrls({
+    required UserProfileDto? existing,
+    required UserProfileDto? incoming,
   }) {
     if (existing == null || incoming == null) return incoming;
 
@@ -214,3 +214,4 @@ class UserViewModel extends ChangeNotifier {
     return url;
   }
 }
+

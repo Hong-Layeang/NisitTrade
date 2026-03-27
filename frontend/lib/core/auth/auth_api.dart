@@ -1,20 +1,20 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import 'api_client.dart';
+import '../network/api_client.dart';
 
 class AuthApiResponse {
-  final bool isValid;
-  final String? token;
-  final Map<String, dynamic>? user;
-  final String? message;
-
   const AuthApiResponse({
     required this.isValid,
     required this.token,
     required this.user,
     required this.message,
   });
+
+  final bool isValid;
+  final String? token;
+  final Map<String, dynamic>? user;
+  final String? message;
 
   factory AuthApiResponse.fromResponse(Response<Map<String, dynamic>> response) {
     final data = response.data ?? const <String, dynamic>{};

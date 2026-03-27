@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -6,10 +6,10 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_limits.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
-import '../../../data/models/category.dart';
-import '../../../domain/repository_interfaces/i_category_repository.dart';
-import '../../../domain/repository_interfaces/i_product_image_repository.dart';
-import '../../../domain/repository_interfaces/i_product_repository.dart';
+import '../../../data/dtos/category_dto.dart';
+import '../../../data/repository_interfaces/i_category_repository.dart';
+import '../../../data/repository_interfaces/i_product_image_repository.dart';
+import '../../../data/repository_interfaces/i_product_repository.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../widgets/app_snack_bar.dart';
 import 'product_form_image_picker.dart';
@@ -39,7 +39,7 @@ class _SellPageState extends State<SellPage> {
   final TextEditingController _priceController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
 
-  List<Category> _categories = [];
+  List<CategoryDto> _categories = [];
   int? _selectedCategoryId;
   List<XFile> _selectedImages = [];
 
@@ -238,3 +238,4 @@ class _SellPageState extends State<SellPage> {
     );
   }
 }
+

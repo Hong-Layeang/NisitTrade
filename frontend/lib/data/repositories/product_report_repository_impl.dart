@@ -1,14 +1,12 @@
 import '../../core/errors/api_response.dart';
-import '../../domain/repository_interfaces/i_product_report_repository.dart';
-import '../providers/product_api_service.dart';
+import '../repository_interfaces/i_product_report_repository.dart';
+import 'product_repository_impl.dart';
 
-/// Implementation of IProductReportRepository
-/// Handles product report operations
 class ProductReportRepositoryImpl implements IProductReportRepository {
-  ProductReportRepositoryImpl({ProductApiService? apiService})
-      : _apiService = apiService ?? ProductApiService.instance;
+  ProductReportRepositoryImpl({ProductRepositoryImpl? repository})
+      : _repository = repository ?? ProductRepositoryImpl();
 
-  final ProductApiService _apiService;
+  final ProductRepositoryImpl _repository;
 
   @override
   Future<ApiResponse<void>> reportProduct({
@@ -16,7 +14,7 @@ class ProductReportRepositoryImpl implements IProductReportRepository {
     required String reason,
     String? details,
   }) async {
-    return _apiService.reportProduct(
+    return _repository.reportProduct(
       productId: productId,
       reason: reason,
       details: details,

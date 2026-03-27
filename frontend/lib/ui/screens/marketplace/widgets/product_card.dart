@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/core/constants/colors.dart';
 import 'package:frontend/core/constants/app_durations.dart';
 import 'package:provider/provider.dart';
-import '../../../../data/models/product.dart';
-import '../../../../domain/entities/product_entity.dart';
+import '../../../../data/dtos/like_dto.dart';
+import '../../../../data/dtos/product_dto.dart';
 import 'package:get_it/get_it.dart';
 import '../../../../logic/helpers/product_like_helpers.dart';
 import '../../../../logic/view_models/product_feed_view_model.dart';
@@ -12,7 +12,7 @@ import '../../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../../logic/view_models/chat_view_model.dart';
 
 import '../../../../logic/view_models/user_view_model.dart';
-import '../../../../domain/repository_interfaces/i_product_repository.dart';
+import '../../../../data/repository_interfaces/i_product_repository.dart';
 import '../../edit/edit_product_page.dart';
 import '../product_detail_page.dart';
 import '../../profile/other_profile_page.dart';
@@ -29,9 +29,9 @@ final getIt = GetIt.instance;
 
 /// ProductCard displays a product in the marketplace feed.
 class ProductCard extends StatefulWidget {
-  final ProductEntity product;
+  final ProductDto product;
   final VoidCallback? onTap;
-  final Function(ProductEntity)? onProductUpdated;
+  final Function(ProductDto)? onProductUpdated;
 
   const ProductCard({
     super.key,
@@ -58,7 +58,7 @@ class _ProductCardState extends State<ProductCard>
   int _currentImageIndex = 0;
   late PageController _pageController;
   late AnimationController _likeAnimationController;
-  late ProductEntity _product;
+  late ProductDto _product;
   bool _isLoading = false;
   bool _isActionLoading = false;
   late IProductRepository _productRepository;
@@ -128,7 +128,6 @@ class _ProductCardState extends State<ProductCard>
     }
 
     final chatViewModel = context.read<ChatRoomViewModel>();
-    final productModel = _product.toModel();
 
     // Prefer existing conversation for this product, else any chat with seller
     final existingConversation =
@@ -136,7 +135,7 @@ class _ProductCardState extends State<ProductCard>
         chatViewModel.findConversationWithUser(_product.userId);
     if (existingConversation != null) {
       chatViewModel.selectConversation(existingConversation);
-      chatViewModel.addAttachedProduct(productModel);
+      chatViewModel.addAttachedProduct(_product);
       if (!mounted) return;
       await Navigator.pushNamed(
         context,
@@ -160,7 +159,7 @@ class _ProductCardState extends State<ProductCard>
       return;
     }
 
-    chatViewModel.addAttachedProduct(productModel);
+    chatViewModel.addAttachedProduct(_product);
     await Navigator.pushNamed(
       context,
       AppRoutes.chatRoom,
@@ -264,7 +263,7 @@ class _ProductCardState extends State<ProductCard>
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProductPage(product: Product.fromEntity(_product)),
+        builder: (context) => EditProductPage(product: _product),
       ),
     );
 
@@ -468,63 +467,34 @@ class _ProductCardState extends State<ProductCard>
     handler.showActionSheet();
   }
 
-  ProductEntity _optimisticallyLikeProduct(ProductEntity product, int userId) {
+  ProductDto _optimisticallyLikeProduct(ProductDto product, int userId) {
     if (ProductLikeHelpers.isLikedByUser(product: product, userId: userId)) {
       return product;
     }
 
     final optimisticLikeId = -DateTime.now().microsecondsSinceEpoch;
-    return ProductEntity(
-      id: product.id,
-      title: product.title,
-      description: product.description,
-      price: product.price,
-      status: product.status,
-      userId: product.userId,
-      categoryId: product.categoryId,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
-      seller: product.seller,
-      category: product.category,
-      imageUrls: product.imageUrls,
+    return product.copyWith(
       likes: [
         ...product.likes,
-        ProductLikeEntity(id: optimisticLikeId, userId: userId),
+        LikeDto(
+          id: optimisticLikeId,
+          userId: userId,
+          productId: product.id,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
       ],
-      comments: product.comments,
-      likeCount: product.likeCount + 1,
-      commentCount: product.commentCount,
-      isLiked: true,
     );
   }
 
-  ProductEntity _optimisticallyUnlikeProduct(ProductEntity product, int userId) {
+  ProductDto _optimisticallyUnlikeProduct(ProductDto product, int userId) {
     if (!ProductLikeHelpers.isLikedByUser(product: product, userId: userId)) {
       return product;
     }
 
     final updatedLikes = [...product.likes]..removeWhere((like) => like.userId == userId);
-    final nextLikeCount = product.likeCount > 0 ? product.likeCount - 1 : 0;
 
-    return ProductEntity(
-      id: product.id,
-      title: product.title,
-      description: product.description,
-      price: product.price,
-      status: product.status,
-      userId: product.userId,
-      categoryId: product.categoryId,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
-      seller: product.seller,
-      category: product.category,
-      imageUrls: product.imageUrls,
-      likes: updatedLikes,
-      comments: product.comments,
-      likeCount: nextLikeCount,
-      commentCount: product.commentCount,
-      isLiked: false,
-    );
+    return product.copyWith(likes: updatedLikes);
   }
 
   Future<void> _handleLikeTap() async {
@@ -563,7 +533,7 @@ class _ProductCardState extends State<ProductCard>
     try {
       final provider = context.read<ProductFeedViewModel>();
 
-      ProductEntity? updatedProduct;
+      ProductDto? updatedProduct;
 
       if (isCurrentlyLiked) {
         var likeId = unlikeLikeId;
@@ -680,7 +650,7 @@ class _ProductCardState extends State<ProductCard>
 
 /// Separate widget for action row to prevent image carousel rebuilds
 class _ProductCardActionSection extends StatelessWidget {
-  final ProductEntity product;
+  final ProductDto product;
   final bool isLiked;
   final AnimationController likeAnimationController;
   final VoidCallback onLikeTap;
@@ -708,4 +678,5 @@ class _ProductCardActionSection extends StatelessWidget {
     );
   }
 }
+
 

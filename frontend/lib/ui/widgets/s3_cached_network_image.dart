@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import '../../data/providers/s3_presigned_url_service.dart';
+import '../../logic/services/s3_presigned_url_service.dart';
 
 /// Widget to display S3 images with automatic presigned URL refresh on 403 errors
 class S3CachedNetworkImage extends StatefulWidget {

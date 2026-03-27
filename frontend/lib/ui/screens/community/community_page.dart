@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
@@ -7,10 +7,10 @@ import '../../../core/constants/colors.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/school_short_name.dart';
+import '../../../data/dtos/community_post_dto.dart';
 import '../../../logic/view_models/community_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
-import '../../../data/models/community_post.dart';
 import '../../widgets/app_action_sheet.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../profile/other_profile_page.dart';
@@ -159,7 +159,7 @@ class CommunityPageState extends State<CommunityPage>
   }
 
   Future<void> _openPostDetail(
-    CommunityPost post, {
+    CommunityPostDto post, {
     bool focusComments = false,
   }) async {
     await Navigator.pushNamed(
@@ -173,7 +173,7 @@ class CommunityPageState extends State<CommunityPage>
     );
   }
 
-  Future<void> _toggleLike(CommunityPost post) async {
+  Future<void> _toggleLike(CommunityPostDto post) async {
     final vm = context.read<CommunityViewModel>();
     final updated = await vm.toggleLike(post.id, shouldLike: !post.isLikedByMe);
     if (!mounted || updated != null) return;
@@ -193,7 +193,7 @@ class CommunityPageState extends State<CommunityPage>
     );
   }
 
-  Future<void> _sharePost(CommunityPost post) async {
+  Future<void> _sharePost(CommunityPostDto post) async {
     final shareLink = 'https://nisittrade.app/community/${post.id}';
     await ShareService.sharePost(
       url: shareLink,
@@ -201,12 +201,12 @@ class CommunityPageState extends State<CommunityPage>
     );
   }
 
-  bool _isOwner(CommunityPost post) {
+  bool _isOwner(CommunityPostDto post) {
     final userId = context.read<UserViewModel>().userId;
     return userId != null && userId == post.author.id;
   }
 
-  Future<void> _editPost(CommunityPost post) async {
+  Future<void> _editPost(CommunityPostDto post) async {
     if (mounted) FocusScope.of(context).unfocus();
     final retainedImageUrls = List<String>.from(post.orderedImages);
     final newImagePaths = <String>[];
@@ -409,7 +409,7 @@ class CommunityPageState extends State<CommunityPage>
     AppSnackBar.success(context, 'Post updated.');
   }
 
-  Future<void> _deletePost(CommunityPost post) async {
+  Future<void> _deletePost(CommunityPostDto post) async {
     if (mounted) FocusScope.of(context).unfocus();
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -444,7 +444,7 @@ class CommunityPageState extends State<CommunityPage>
     AppSnackBar.success(context, 'Post deleted.');
   }
 
-  Future<void> _reportPost(CommunityPost post) async {
+  Future<void> _reportPost(CommunityPostDto post) async {
     if (mounted) FocusScope.of(context).unfocus();
     var selectedReason = _reportReasonOptions.first;
     final detailsController = TextEditingController();
@@ -520,7 +520,7 @@ class CommunityPageState extends State<CommunityPage>
     AppSnackBar.success(context, 'Report submitted.');
   }
 
-  Future<void> _toggleSavePost(CommunityPost post) async {
+  Future<void> _toggleSavePost(CommunityPostDto post) async {
     final vm = context.read<CommunityViewModel>();
     final savedListingsVm = context.read<SavedListingsViewModel>();
     final isSaved = post.isSavedByMe;
@@ -564,7 +564,7 @@ class CommunityPageState extends State<CommunityPage>
     );
   }
 
-  Future<void> _showPostActions(CommunityPost post) async {
+  Future<void> _showPostActions(CommunityPostDto post) async {
     if (!mounted) return;
     FocusScope.of(context).unfocus();
     final effectivePost = post;
@@ -801,3 +801,4 @@ class CommunityPageState extends State<CommunityPage>
     );
   }
 }
+

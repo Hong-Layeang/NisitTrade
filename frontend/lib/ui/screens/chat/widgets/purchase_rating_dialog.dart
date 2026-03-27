@@ -457,7 +457,7 @@ class _PurchaseRatingSheetState extends State<_PurchaseRatingSheet>
       if (_feedbackController.text.trim().isNotEmpty)
         _feedbackController.text.trim(),
     ];
-    final feedback = parts.isNotEmpty ? parts.join(' · ') : null;
+    final feedback = parts.isNotEmpty ? parts.join(' \u00B7 ') : null;
 
     Navigator.of(context).pop(
       PurchaseRatingResult(rating: _selectedRating, feedback: feedback),

@@ -1,19 +1,19 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import 'package:frontend/core/constants/colors.dart';
 import 'package:frontend/core/utils/chat_timestamp_formatter.dart';
 import 'package:frontend/core/utils/image_url_helper.dart';
-import 'package:frontend/data/models/conversation.dart';
-import 'package:frontend/data/models/product.dart';
+import 'package:frontend/data/dtos/conversation_dto.dart';
+import 'package:frontend/data/dtos/product_dto.dart';
 import 'package:frontend/ui/widgets/full_screen_image_viewer.dart';
 import 'package:frontend/ui/widgets/s3_cached_network_image.dart';
 
 class ChatBubble extends StatelessWidget {
-  final Message message;
+  final MessageDto message;
   final bool isCurrentUser;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
-  final Product? attachedProduct;
+  final ProductDto? attachedProduct;
   final bool isSelected;
   final bool isSelectionMode;
 
@@ -492,3 +492,4 @@ class ChatBubble extends StatelessWidget {
     );
   }
 }
+

@@ -4,15 +4,15 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/auth/auth_token_store.dart';
-import '../../data/models/conversation.dart';
-import '../../data/models/product.dart';
-import '../../data/repositories/chat_repository.dart';
+import '../../data/dtos/product_dto.dart';
+import '../../data/dtos/conversation_dto.dart';
+import '../../data/repository_interfaces/i_chat_repository.dart';
 import '../../logic/services/chat_websocket_service.dart';
 
 const purchaseDuration = Duration(days: 2);
 
 class AttachedProduct {
-  final Product product;
+  final ProductDto product;
   final DateTime? countdownStartedAt;
 
   const AttachedProduct({required this.product, this.countdownStartedAt});
@@ -25,14 +25,14 @@ class AttachedProduct {
   }
 
   Map<String, dynamic> toJson() => {
-        'product': product.toJson(),
-        if (countdownStartedAt != null)
-          'countdownStartedAt': countdownStartedAt!.toIso8601String(),
-      };
+    'product': product.toJson(),
+    if (countdownStartedAt != null)
+      'countdownStartedAt': countdownStartedAt!.toIso8601String(),
+  };
 
   factory AttachedProduct.fromJson(Map<String, dynamic> json) {
     return AttachedProduct(
-      product: Product.fromJson(json['product'] as Map<String, dynamic>),
+      product: ProductDto.fromJson(json['product'] as Map<String, dynamic>),
       countdownStartedAt: json['countdownStartedAt'] != null
           ? DateTime.parse(json['countdownStartedAt'] as String)
           : null,
@@ -42,25 +42,25 @@ class AttachedProduct {
 
 class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   ChatRoomViewModel({
-    required ChatRepository chatRepository,
+    required IChatRepository chatRepository,
     required ChatWebSocketService chatWebSocket,
     AuthTokenStore? tokenStore,
-  })  : _chatRepository = chatRepository,
-        _chatWebSocket = chatWebSocket,
-        _tokenStore = tokenStore ?? AuthTokenStore.instance {
+  }) : _chatRepository = chatRepository,
+       _chatWebSocket = chatWebSocket,
+       _tokenStore = tokenStore ?? AuthTokenStore.instance {
     WidgetsBinding.instance.addObserver(this);
     _attachWebSocketListeners();
     unawaited(ensureWebSocketConnected());
   }
 
-  final ChatRepository _chatRepository;
+  final IChatRepository _chatRepository;
   final AuthTokenStore _tokenStore;
 
   int? _currentUserId;
   void setCurrentUserId(int? id) => _currentUserId = id;
 
   // Conversations list state
-  List<Conversation> _conversations = [];
+  List<ConversationDto> _conversations = [];
   bool _isLoadingConversations = false;
   String? _conversationsError;
   int _conversationOffset = 0;
@@ -68,12 +68,12 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   static const int _conversationPageSize = 20;
 
   // Current conversation state
-  Conversation? _currentConversation;
+  ConversationDto? _currentConversation;
   bool _isLoadingCurrentConversation = false;
   String? _currentConversationError;
 
   // Messages state
-  List<Message> _messages = [];
+  List<MessageDto> _messages = [];
   bool _isLoadingMessages = false;
   String? _messagesError;
   int _messageOffset = 0;
@@ -101,10 +101,18 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   bool _isConnecting = false;
 
   void _attachWebSocketListeners() {
-    _wsSubscriptions.add(_chatWebSocket.onMessageReceived.listen(_onWsMessageReceived));
-    _wsSubscriptions.add(_chatWebSocket.onMessageNotify.listen(_onWsMessageNotify));
-    _wsSubscriptions.add(_chatWebSocket.onMessageUpdated.listen(_onWsMessageUpdated));
-    _wsSubscriptions.add(_chatWebSocket.onMessageDeleted.listen(_onWsMessageDeleted));
+    _wsSubscriptions.add(
+      _chatWebSocket.onMessageReceived.listen(_onWsMessageReceived),
+    );
+    _wsSubscriptions.add(
+      _chatWebSocket.onMessageNotify.listen(_onWsMessageNotify),
+    );
+    _wsSubscriptions.add(
+      _chatWebSocket.onMessageUpdated.listen(_onWsMessageUpdated),
+    );
+    _wsSubscriptions.add(
+      _chatWebSocket.onMessageDeleted.listen(_onWsMessageDeleted),
+    );
     _wsSubscriptions.add(_chatWebSocket.onMessageRead.listen(_onWsMessageRead));
   }
 
@@ -124,6 +132,9 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void joinConversationRoom(int conversationId) {
+    if (conversationId <= 0) {
+      return;
+    }
     _chatWebSocket.joinConversation(conversationId);
   }
 
@@ -142,11 +153,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void _onWsMessageReceived(Message message) {
+  void _onWsMessageReceived(MessageDto message) {
     addMessageToChat(message);
   }
 
-  void _onWsMessageNotify(Message message) {
+  void _onWsMessageNotify(MessageDto message) {
     // Ignore own messages
     if (_currentUserId != null && message.senderId == _currentUserId) return;
 
@@ -161,7 +172,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
     final conversationId = message.conversationId;
 
-    if (_currentConversation?.id == conversationId) return;
+    if (_currentConversation?.id == conversationId) {
+      joinConversationRoom(conversationId);
+      addMessageToChat(message);
+      return;
+    }
 
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index != -1) {
@@ -241,7 +256,13 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     if (_selectedMessageIds.length != 1) return false;
     final msg = _messages.firstWhere(
       (m) => m.id == _selectedMessageIds.first,
-      orElse: () => Message(id: 0, messageText: '', senderId: 0, conversationId: 0, sentAt: DateTime.now()),
+      orElse: () => MessageDto(
+        id: 0,
+        messageText: '',
+        senderId: 0,
+        conversationId: 0,
+        sentAt: DateTime.now(),
+      ),
     );
     return msg.senderId == userId && msg.imageUrls.isEmpty;
   }
@@ -313,7 +334,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  void addAttachedProduct(Product product) {
+  void addAttachedProduct(ProductDto product) {
     final convId = _currentConversation?.id;
     if (convId == null) return;
     final list = _attachedProductsByConversation.putIfAbsent(convId, () => []);
@@ -326,8 +347,9 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   void removeAttachedProduct(int productId) {
     final convId = _currentConversation?.id;
     if (convId == null) return;
-    _attachedProductsByConversation[convId]
-        ?.removeWhere((ap) => ap.product.id == productId);
+    _attachedProductsByConversation[convId]?.removeWhere(
+      (ap) => ap.product.id == productId,
+    );
     _resolvedProductsByConversation
         .putIfAbsent(convId, () => {})
         .add(productId);
@@ -380,8 +402,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final map = <String, dynamic>{};
     for (final entry in _attachedProductsByConversation.entries) {
-      map[entry.key.toString()] =
-          entry.value.map((ap) => ap.toJson()).toList();
+      map[entry.key.toString()] = entry.value.map((ap) => ap.toJson()).toList();
     }
     await prefs.setString(_attachmentsKey, jsonEncode(map));
 
@@ -408,7 +429,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
           _attachedProductsByConversation[convId] = list;
         }
       } catch (_) {
-        // Corrupted data — ignore and start fresh
+        // Corrupted data - ignore and start fresh
       }
     }
 
@@ -433,7 +454,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
   void _syncAttachedProductsFromMessages(
     int conversationId,
-    List<Message> messages, {
+    List<MessageDto> messages, {
     bool save = false,
   }) {
     final resolved = _resolvedProductsByConversation[conversationId] ?? {};
@@ -445,19 +466,22 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       if (resolved.contains(product.id)) continue;
 
       final list = _attachedProductsByConversation.putIfAbsent(
-          conversationId, () => []);
-      final existingIndex =
-          list.indexWhere((ap) => ap.product.id == product.id);
+        conversationId,
+        () => [],
+      );
+      final existingIndex = list.indexWhere(
+        (ap) => ap.product.id == product.id,
+      );
 
       if (existingIndex == -1) {
-        list.add(AttachedProduct(
-          product: product,
-          countdownStartedAt: message.sentAt,
-        ));
+        list.add(
+          AttachedProduct(product: product, countdownStartedAt: message.sentAt),
+        );
         changed = true;
       } else if (list[existingIndex].countdownStartedAt == null) {
-        list[existingIndex] =
-            list[existingIndex].copyWith(countdownStartedAt: message.sentAt);
+        list[existingIndex] = list[existingIndex].copyWith(
+          countdownStartedAt: message.sentAt,
+        );
         changed = true;
       }
     }
@@ -468,16 +492,16 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // Getters
-  List<Conversation> get conversations => _conversations;
+  List<ConversationDto> get conversations => _conversations;
   bool get isLoadingConversations => _isLoadingConversations;
   String? get conversationsError => _conversationsError;
   bool get hasMoreConversations => _hasMoreConversations;
 
-  Conversation? get currentConversation => _currentConversation;
+  ConversationDto? get currentConversation => _currentConversation;
   bool get isLoadingCurrentConversation => _isLoadingCurrentConversation;
   String? get currentConversationError => _currentConversationError;
 
-  List<Message> get messages => _messages;
+  List<MessageDto> get messages => _messages;
   bool get isLoadingMessages => _isLoadingMessages;
   String? get messagesError => _messagesError;
   bool get hasMoreMessages => _hasMoreMessages;
@@ -485,9 +509,9 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   bool get isSendingMessage => _isSendingMessage;
   String? get sendMessageError => _sendMessageError;
   int get totalUnreadCount => _conversations.fold<int>(
-        0,
-        (sum, conversation) => sum + conversation.unreadCount,
-      );
+    0,
+    (sum, conversation) => sum + conversation.unreadCount,
+  );
 
   int get pendingPurchaseCount {
     final now = DateTime.now();
@@ -495,9 +519,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     for (final list in _attachedProductsByConversation.values) {
       final hasPending = list.any((ap) {
         if (ap.countdownStartedAt == null) return false;
-        return now.isBefore(
-          ap.countdownStartedAt!.add(purchaseDuration),
-        );
+        return now.isBefore(ap.countdownStartedAt!.add(purchaseDuration));
       });
       if (hasPending) count++;
     }
@@ -507,7 +529,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   bool hasProductAttachmentForMessage(int messageId) =>
       _messagesWithProductAttachment.contains(messageId);
 
-  Conversation? findConversationWithUser(int userId) {
+  ConversationDto? findConversationWithUser(int userId) {
     for (final conversation in _conversations) {
       final participants = conversation.participants;
       if (participants == null) {
@@ -525,7 +547,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     return null;
   }
 
-  Conversation? findConversationForProduct(int productId) {
+  ConversationDto? findConversationForProduct(int productId) {
     for (final conversation in _conversations) {
       if (conversation.productId == productId) {
         return conversation;
@@ -564,7 +586,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> loadConversations({bool refresh = false}) async {
     if (_isLoadingConversations) return;
 
-    final previousConversations = List<Conversation>.from(_conversations);
+    final previousConversations = List<ConversationDto>.from(_conversations);
     if (refresh) {
       _hasMoreConversations = true;
       _conversationOffset = 0;
@@ -587,6 +609,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         } else {
           _conversations.addAll(fetchedConversations);
         }
+        _syncConversationRoomSubscriptions();
         _conversationOffset = refresh
             ? fetchedConversations.length
             : _conversationOffset + fetchedConversations.length;
@@ -597,7 +620,8 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         if (refresh) {
           _conversations = previousConversations;
         }
-        _conversationsError = response.error?.message ?? 'Failed to load conversations';
+        _conversationsError =
+            response.error?.message ?? 'Failed to load conversations';
       }
     } catch (e) {
       if (refresh) {
@@ -630,20 +654,25 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         _currentConversation = response.data;
         _messagesWithProductAttachment.clear();
         if (response.data != null) {
+          joinConversationRoom(response.data!.id);
+        }
+        if (response.data != null) {
           final existingIndex = _conversations.indexWhere(
             (conversation) => conversation.id == response.data!.id,
           );
           if (existingIndex != -1) {
-            _conversations[existingIndex] = _conversations[existingIndex].copyWith(
-              participants: response.data!.participants,
-              product: response.data!.product,
-              isBlockedByMe: response.data!.isBlockedByMe,
-              hasBlockedMe: response.data!.hasBlockedMe,
-            );
+            _conversations[existingIndex] = _conversations[existingIndex]
+                .copyWith(
+                  participants: response.data!.participants,
+                  product: response.data!.product,
+                  isBlockedByMe: response.data!.isBlockedByMe,
+                  hasBlockedMe: response.data!.hasBlockedMe,
+                );
           }
         }
       } else {
-        _currentConversationError = response.error?.message ?? 'Failed to load conversation';
+        _currentConversationError =
+            response.error?.message ?? 'Failed to load conversation';
       }
     } catch (e) {
       _currentConversationError = 'Error: ${e.toString()}';
@@ -654,7 +683,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // Create a conversation for a product
-  Future<Conversation?> createConversation(int productId) async {
+  Future<ConversationDto?> createConversation(int productId) async {
     _isLoadingCurrentConversation = true;
     _currentConversationError = null;
     notifyListeners();
@@ -665,10 +694,12 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         _currentConversation = response.data;
         if (response.data != null) {
           _upsertConversation(response.data!);
+          joinConversationRoom(response.data!.id);
         }
         return response.data;
       } else {
-        _currentConversationError = response.error?.message ?? 'Failed to create conversation';
+        _currentConversationError =
+            response.error?.message ?? 'Failed to create conversation';
         return null;
       }
     } catch (e) {
@@ -681,7 +712,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // Create a conversation with a user
-  Future<Conversation?> createConversationWithUser(int userId) async {
+  Future<ConversationDto?> createConversationWithUser(int userId) async {
     _isLoadingCurrentConversation = true;
     _currentConversationError = null;
     notifyListeners();
@@ -692,10 +723,12 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         _currentConversation = response.data;
         if (response.data != null) {
           _upsertConversation(response.data!);
+          joinConversationRoom(response.data!.id);
         }
         return response.data;
       } else {
-        _currentConversationError = response.error?.message ?? 'Failed to create conversation';
+        _currentConversationError =
+            response.error?.message ?? 'Failed to create conversation';
         return null;
       }
     } catch (e) {
@@ -775,11 +808,9 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       return false;
     }
 
-    if (
-      normalizedMessageText.isEmpty &&
-      imagePaths.isEmpty &&
-      !attachConversationProduct
-    ) {
+    if (normalizedMessageText.isEmpty &&
+        imagePaths.isEmpty &&
+        !attachConversationProduct) {
       return false;
     }
 
@@ -803,10 +834,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         if (!_messages.any((m) => m.id == msg.id)) {
           _messages.add(msg);
         }
-        _upsertConversationLastMessage(
-          msg,
-          unreadCount: 0,
-        );
+        _upsertConversationLastMessage(msg, unreadCount: 0);
         if (attachConversationProduct) {
           _messagesWithProductAttachment.add(msg.id);
         }
@@ -833,7 +861,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   // Mark message as read
   Future<void> markMessageAsRead(int messageId) async {
     try {
-      _chatWebSocket?.markMessageRead(messageId);
+      _chatWebSocket.markMessageRead(messageId);
       final response = await _chatRepository.markMessageAsRead(messageId);
       if (response.isSuccess) {
         // Update message in local cache
@@ -848,10 +876,13 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // Set current conversation (without fetching)
-  void selectConversation(Conversation conversation) {
+  void selectConversation(ConversationDto conversation) {
     _currentConversation = conversation.copyWith(unreadCount: 0);
+    joinConversationRoom(conversation.id);
 
-    final index = _conversations.indexWhere((item) => item.id == conversation.id);
+    final index = _conversations.indexWhere(
+      (item) => item.id == conversation.id,
+    );
     if (index != -1) {
       _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
     }
@@ -874,13 +905,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // Add message to local list (for real-time updates via chat:receive)
-  void addMessageToChat(Message message) {
+  void addMessageToChat(MessageDto message) {
     if (message.attachedProduct != null) {
-      _syncAttachedProductsFromMessages(
-        message.conversationId,
-        [message],
-        save: true,
-      );
+      _syncAttachedProductsFromMessages(message.conversationId, [
+        message,
+      ], save: true);
     }
 
     // If user is viewing this conversation, add message to thread
@@ -964,24 +993,29 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void _upsertConversation(Conversation conversation) {
+  void _upsertConversation(ConversationDto conversation) {
     _conversations.removeWhere((item) => item.id == conversation.id);
     _conversations.insert(0, conversation);
+    joinConversationRoom(conversation.id);
   }
 
   void _upsertConversationLastMessage(
-    Message message, {
+    MessageDto message, {
     int? unreadCount,
     bool incrementUnread = false,
   }) {
     final conversationId = message.conversationId;
-    final index = _conversations.indexWhere((item) => item.id == conversationId);
+    final index = _conversations.indexWhere(
+      (item) => item.id == conversationId,
+    );
     if (index == -1) {
       return;
     }
 
     final existing = _conversations[index];
-    final nextUnreadCount = unreadCount ?? (incrementUnread ? existing.unreadCount + 1 : existing.unreadCount);
+    final nextUnreadCount =
+        unreadCount ??
+        (incrementUnread ? existing.unreadCount + 1 : existing.unreadCount);
     final updatedConversation = existing.copyWith(
       lastMessage: message,
       unreadCount: nextUnreadCount,
@@ -997,6 +1031,12 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         unreadCount: nextUnreadCount,
         updatedAt: message.sentAt,
       );
+    }
+  }
+
+  void _syncConversationRoomSubscriptions() {
+    for (final conversation in _conversations) {
+      joinConversationRoom(conversation.id);
     }
   }
 

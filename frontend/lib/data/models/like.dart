@@ -1,3 +1,4 @@
+import '../dtos/like_dto.dart';
 import 'seller.dart';
 
 class Like {
@@ -6,8 +7,6 @@ class Like {
   final int productId;
   final DateTime createdAt;
   final DateTime updatedAt;
-  
-  // Associated data
   final Seller? user;
 
   const Like({
@@ -19,30 +18,15 @@ class Like {
     this.user,
   });
 
-  factory Like.fromJson(Map<String, dynamic> json) {
+  factory Like.fromDto(LikeDto dto) {
     return Like(
-      id: json['id'] as int? ?? 0,
-      userId: json['user_id'] as int? ?? 0,
-      productId: json['product_id'] as int? ?? 0,
-      createdAt: (json['createdAt'] ?? json['created_at']) != null 
-          ? DateTime.parse((json['createdAt'] ?? json['created_at']) as String)
-          : DateTime.now(),
-      updatedAt: (json['updatedAt'] ?? json['updated_at']) != null 
-          ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
-          : DateTime.now(),
-      user: json['User'] != null ? Seller.fromJson(json['User'] as Map<String, dynamic>) : null,
+      id: dto.id,
+      userId: dto.userId,
+      productId: dto.productId,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      user: dto.user != null ? Seller.fromDto(dto.user!) : null,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'user_id': userId,
-      'product_id': productId,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      if (user != null) 'User': user!.toJson(),
-    };
   }
 
   Like copyWith({
@@ -65,10 +49,7 @@ class Like {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Like &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      identical(this, other) || other is Like && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;

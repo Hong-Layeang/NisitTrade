@@ -1,59 +1,83 @@
+﻿import 'package:dio/dio.dart';
+
+import '../../core/errors/api_exception.dart';
 import '../../core/errors/api_response.dart';
-import '../../domain/entities/category_entity.dart';
-import '../../domain/repository_interfaces/i_category_repository.dart';
-import '../providers/category_api_service.dart';
+import '../../core/network/api_client.dart';
+import '../dtos/category_dto.dart';
+import '../repository_interfaces/i_category_repository.dart';
 
-/// Implementation of ICategoryRepository using the API service
 class CategoryRepositoryImpl implements ICategoryRepository {
-  CategoryRepositoryImpl({CategoryApiService? apiService})
-      : _apiService = apiService ?? CategoryApiService.instance;
+  CategoryRepositoryImpl({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
-  final CategoryApiService _apiService;
+  final Dio _dio;
 
   @override
-  Future<ApiResponse<List<CategoryEntity>>> getCategories() async {
-    final response = await _apiService.getCategories();
-    if (response.isSuccess && response.data != null) {
-      final entities = response.data!.map((model) => model.toEntity()).toList();
-      return ApiResponse.success(entities);
+  Future<ApiResponse<List<CategoryDto>>> getCategories() async {
+    try {
+      final response = await _dio.get('/categories');
+      final categories = (response.data as List)
+          .map((json) => CategoryDto.fromJson(json as Map<String, dynamic>))
+          .toList();
+      return ApiResponse.success(categories);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to fetch categories: $e'));
     }
-    return ApiResponse.error(response.error!);
   }
 
   @override
-  Future<ApiResponse<CategoryEntity>> getCategory(int id) async {
-    final response = await _apiService.getCategory(id);
-    if (response.isSuccess && response.data != null) {
-      return ApiResponse.success(response.data!.toEntity());
+  Future<ApiResponse<CategoryDto>> getCategory(int id) async {
+    try {
+      final response = await _dio.get('/categories/$id');
+      final category = CategoryDto.fromJson(response.data as Map<String, dynamic>);
+      return ApiResponse.success(category);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to fetch category: $e'));
     }
-    return ApiResponse.error(response.error!);
   }
 
   @override
-  Future<ApiResponse<CategoryEntity>> createCategory({
-    required String name,
-  }) async {
-    final response = await _apiService.createCategory(name: name);
-    if (response.isSuccess && response.data != null) {
-      return ApiResponse.success(response.data!.toEntity());
+  Future<ApiResponse<CategoryDto>> createCategory({required String name}) async {
+    try {
+      final response = await _dio.post('/categories', data: {'name': name});
+      final category = CategoryDto.fromJson(response.data as Map<String, dynamic>);
+      return ApiResponse.success(category);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to create category: $e'));
     }
-    return ApiResponse.error(response.error!);
   }
 
   @override
-  Future<ApiResponse<CategoryEntity>> updateCategory({
+  Future<ApiResponse<CategoryDto>> updateCategory({
     required int id,
     required String name,
   }) async {
-    final response = await _apiService.updateCategory(id: id, name: name);
-    if (response.isSuccess && response.data != null) {
-      return ApiResponse.success(response.data!.toEntity());
+    try {
+      final response = await _dio.put('/categories/$id', data: {'name': name});
+      final category = CategoryDto.fromJson(response.data as Map<String, dynamic>);
+      return ApiResponse.success(category);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to update category: $e'));
     }
-    return ApiResponse.error(response.error!);
   }
 
   @override
   Future<ApiResponse<void>> deleteCategory(int id) async {
-    return _apiService.deleteCategory(id);
+    try {
+      await _dio.delete('/categories/$id');
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to delete category: $e'));
+    }
   }
 }
+

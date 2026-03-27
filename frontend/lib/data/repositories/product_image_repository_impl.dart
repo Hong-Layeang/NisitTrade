@@ -1,25 +1,22 @@
 import '../../core/errors/api_response.dart';
-import '../../domain/repository_interfaces/i_product_image_repository.dart';
-import '../providers/product_api_service.dart';
+import '../repository_interfaces/i_product_image_repository.dart';
+import 'product_repository_impl.dart';
 
-/// Implementation of IProductImageRepository
-/// Handles product image management operations
 class ProductImageRepositoryImpl implements IProductImageRepository {
-  ProductImageRepositoryImpl({ProductApiService? apiService})
-      : _apiService = apiService ?? ProductApiService.instance;
+  ProductImageRepositoryImpl({ProductRepositoryImpl? repository})
+      : _repository = repository ?? ProductRepositoryImpl();
 
-  final ProductApiService _apiService;
+  final ProductRepositoryImpl _repository;
 
   @override
   Future<ApiResponse<void>> addProductImages({
     required int productId,
     required List<String> imagePaths,
   }) async {
-    final response = await _apiService.addProductImages(
+    final response = await _repository.addProductImages(
       id: productId,
       imagePaths: imagePaths,
     );
-    // API returns product, but we just need void
     if (response.isSuccess) {
       return ApiResponse.success(null);
     }
@@ -31,7 +28,7 @@ class ProductImageRepositoryImpl implements IProductImageRepository {
     required int productId,
     required int imageId,
   }) async {
-    return _apiService.deleteProductImage(
+    return _repository.deleteProductImage(
       productId: productId,
       imageId: imageId,
     );

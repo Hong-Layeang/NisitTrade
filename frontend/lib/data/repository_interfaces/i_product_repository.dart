@@ -1,9 +1,8 @@
-import '../entities/product_entity.dart';
+﻿import '../../data/dtos/product_dto.dart';
 import '../../core/errors/api_response.dart';
 
-/// Repository interface for managing product data
 abstract class IProductRepository {
-  Future<ApiResponse<List<ProductEntity>>> getProducts({
+  Future<ApiResponse<List<ProductDto>>> getProducts({
     int? categoryId,
     String? status,
     String? search,
@@ -11,16 +10,16 @@ abstract class IProductRepository {
     int? offset,
   });
 
-  Future<ApiResponse<ProductEntity>> getProduct(int id);
+  Future<ApiResponse<ProductDto>> getProduct(int id);
 
-  Future<ApiResponse<ProductEntity>> createProduct({
+  Future<ApiResponse<ProductDto>> createProduct({
     required String title,
     String? description,
     required double price,
     required int categoryId,
   });
 
-  Future<ApiResponse<ProductEntity>> updateProduct({
+  Future<ApiResponse<ProductDto>> updateProduct({
     required int id,
     String? title,
     String? description,
@@ -30,14 +29,15 @@ abstract class IProductRepository {
 
   Future<ApiResponse<void>> deleteProduct(int id);
 
-  Future<ApiResponse<ProductEntity>> updateProductStatus({
+  Future<ApiResponse<ProductDto>> updateProductStatus({
     required int id,
     required String status,
   });
 
-  Future<ApiResponse<ProductEntity>> hideProduct(int productId);
+  Future<ApiResponse<ProductDto>> hideProduct(int productId);
   
-  Future<ApiResponse<ProductEntity>> unhideProduct(int productId);
+  Future<ApiResponse<ProductDto>> unhideProduct(int productId);
 
   Future<ApiResponse<String>> shareProduct(int productId);
 }
+

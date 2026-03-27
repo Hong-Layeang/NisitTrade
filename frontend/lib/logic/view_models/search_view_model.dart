@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/errors/app_error_messages.dart';
 import '../../core/errors/api_exception.dart';
-import '../../domain/entities/category_entity.dart';
-import '../../domain/entities/user_entity.dart';
-import '../../domain/repository_interfaces/i_category_repository.dart';
-import '../../domain/repository_interfaces/i_user_repository.dart';
+import '../../data/dtos/category_dto.dart';
+import '../../data/dtos/user_profile_dto.dart';
+import '../../data/repository_interfaces/i_category_repository.dart';
+import '../../data/repository_interfaces/i_user_repository.dart';
 
 /// ViewModel for managing search state and filtering logic.
 class SearchViewModel extends ChangeNotifier {
@@ -17,8 +17,8 @@ class SearchViewModel extends ChangeNotifier {
   final ICategoryRepository _categoryRepository;
   final IUserRepository _userRepository;
 
-  List<CategoryEntity> _categories = [];
-  List<UserEntity> _users = [];
+  List<CategoryDto> _categories = [];
+  List<UserProfileDto> _users = [];
   final Set<int> _updatingFollowUserIds = <int>{};
   bool _isLoading = false;
   bool _isLoadingUsers = false;
@@ -31,8 +31,8 @@ class SearchViewModel extends ChangeNotifier {
   bool _showUserSearch = false;
   bool _showCategoryFilter = false;
 
-  List<CategoryEntity> get categories => _categories;
-  List<UserEntity> get users => _users;
+  List<CategoryDto> get categories => _categories;
+  List<UserProfileDto> get users => _users;
   bool get isLoading => _isLoading;
   bool get isLoadingUsers => _isLoadingUsers;
   Set<int> get updatingFollowUserIds => _updatingFollowUserIds;
@@ -86,7 +86,7 @@ class SearchViewModel extends ChangeNotifier {
         throw response.error!;
       }
 
-      _users = (response.data ?? []).cast<UserEntity>();
+      _users = response.data ?? [];
     } on ApiException catch (e) {
       _loadError = e.message;
     } finally {
@@ -215,3 +215,4 @@ class SearchViewModel extends ChangeNotifier {
     _showCategoryFilter = false;
   }
 }
+

@@ -1,4 +1,4 @@
-import '../../domain/entities/seller_entity.dart';
+import '../dtos/seller_dto.dart';
 import 'university.dart';
 
 class Seller {
@@ -32,50 +32,22 @@ class Seller {
     this.lastSeenAt,
   });
 
-  factory Seller.fromJson(Map<String, dynamic> json) {
-    final universityJson = json['University'] ?? json['university'];
-    
+  factory Seller.fromDto(SellerDto dto) {
     return Seller(
-      id: json['id'] as int? ?? 0,
-      fullName: (json['full_name'] ?? '') as String,
-      email: (json['email'] ?? '') as String,
-      profileImage: json['profile_image'] as String?,
-      provider: json['provider'] as String?,
-      role: (json['role'] ?? 'user') as String,
-      universityId: json['university_id'] as int?,
-      major: json['major'] as String?,
-      createdAt: (json['createdAt'] ?? json['created_at']) != null
-          ? DateTime.parse((json['createdAt'] ?? json['created_at']) as String)
-          : DateTime.now(),
-      updatedAt: (json['updatedAt'] ?? json['updated_at']) != null
-          ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
-          : DateTime.now(),
-      university: universityJson is Map<String, dynamic>
-          ? University.fromJson(universityJson)
-          : null,
-        isOnline: json['is_online'] as bool? ?? false,
-        lastSeenAt: (json['last_seen_at'] ?? json['lastSeenAt']) is String
-          ? DateTime.tryParse((json['last_seen_at'] ?? json['lastSeenAt']) as String)
-          : null,
+      id: dto.id,
+      fullName: dto.fullName,
+      email: dto.email,
+      profileImage: dto.profileImage,
+      provider: dto.provider,
+      role: dto.role,
+      universityId: dto.universityId,
+      major: dto.major,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      university: dto.university != null ? University.fromDto(dto.university!) : null,
+      isOnline: dto.isOnline,
+      lastSeenAt: dto.lastSeenAt,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'full_name': fullName,
-      'email': email,
-      'profile_image': profileImage,
-      'provider': provider,
-      if (university != null) 'University': university!.toJson(),
-      'role': role,
-      'university_id': universityId,
-      'major': major,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      'is_online': isOnline,
-      'last_seen_at': lastSeenAt?.toIso8601String(),
-    };
   }
 
   Seller copyWith({
@@ -107,37 +79,6 @@ class Seller {
       university: university ?? this.university,
       isOnline: isOnline ?? this.isOnline,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
-    );
-  }
-
-  /// Convert to domain entity
-  SellerEntity toEntity() {
-    return SellerEntity(
-      id: id,
-      fullName: fullName,
-      email: email,
-      profileImage: profileImage,
-      major: major,
-      university: university?.toEntity(),
-    );
-  }
-
-  /// Create from domain entity
-  factory Seller.fromEntity(SellerEntity entity) {
-    return Seller(
-      id: entity.id,
-      fullName: entity.fullName,
-      email: entity.email,
-      profileImage: entity.profileImage,
-      role: 'user', // Default
-      university: entity.university != null
-          ? University.fromEntity(entity.university!)
-          : null,
-      major: entity.major,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      isOnline: false,
-      lastSeenAt: null,
     );
   }
 }

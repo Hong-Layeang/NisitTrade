@@ -1,3 +1,4 @@
+import '../dtos/comment_dto.dart';
 import 'seller.dart';
 
 class Comment {
@@ -8,8 +9,6 @@ class Comment {
   final int productId;
   final DateTime createdAt;
   final DateTime updatedAt;
-  
-  // Associated data
   final Seller? user;
 
   const Comment({
@@ -23,52 +22,17 @@ class Comment {
     this.user,
   });
 
-  static int _toInt(dynamic value, {int fallback = 0}) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) {
-      return int.tryParse(value) ?? fallback;
-    }
-    return fallback;
-  }
-
-  factory Comment.fromJson(Map<String, dynamic> json) {
-    final createdRaw = json['createdAt'] ?? json['created_at'];
-    final updatedRaw = json['updatedAt'] ?? json['updated_at'];
-    final userJson = json['User'] ?? json['user'];
-    final parsedUserId = _toInt(
-      json['user_id'] ?? json['userId'] ?? (userJson is Map<String, dynamic> ? userJson['id'] : null),
-    );
-
+  factory Comment.fromDto(CommentDto dto) {
     return Comment(
-      id: _toInt(json['id']),
-      content: (json['content'] ?? '') as String,
-      rating: json['rating'] is int
-        ? json['rating'] as int
-        : (json['rating'] is String ? int.tryParse(json['rating'] as String) : null),
-      userId: parsedUserId,
-      productId: _toInt(json['product_id'] ?? json['productId']),
-      createdAt: createdRaw != null
-        ? DateTime.parse(createdRaw as String)
-          : DateTime.now(),
-      updatedAt: updatedRaw != null
-        ? DateTime.parse(updatedRaw as String)
-          : DateTime.now(),
-      user: userJson is Map<String, dynamic> ? Seller.fromJson(userJson) : null,
+      id: dto.id,
+      content: dto.content,
+      rating: dto.rating,
+      userId: dto.userId,
+      productId: dto.productId,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      user: dto.user != null ? Seller.fromDto(dto.user!) : null,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'content': content,
-      if (rating != null) 'rating': rating,
-      'user_id': userId,
-      'product_id': productId,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      if (user != null) 'User': user!.toJson(),
-    };
   }
 
   Comment copyWith({
@@ -95,10 +59,7 @@ class Comment {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Comment &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      identical(this, other) || other is Comment && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;

@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/utils/image_url_helper.dart';
-import '../../../domain/entities/product_entity.dart';
+import '../../../data/dtos/product_dto.dart';
 import 's3_cached_network_image.dart';
 
 /// Grid card for displaying products in a grid layout
 class ProductGridCard extends StatelessWidget {
-  final ProductEntity product;
+  final ProductDto product;
   final bool isLiked;
   final VoidCallback? onTap;
   final VoidCallback? onLikeTap;
@@ -208,3 +208,4 @@ class LikeButton extends StatelessWidget {
     );
   }
 }
+

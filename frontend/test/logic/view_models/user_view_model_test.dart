@@ -1,11 +1,11 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/core/errors/api_exception.dart';
 import 'package:frontend/core/errors/api_response.dart';
-import 'package:frontend/data/models/community_post.dart';
-import 'package:frontend/domain/entities/product_entity.dart';
-import 'package:frontend/domain/entities/user_entity.dart';
-import 'package:frontend/domain/repository_interfaces/i_user_repository.dart';
+import 'package:frontend/data/dtos/community_post_dto.dart';
+import 'package:frontend/data/dtos/product_dto.dart';
+import 'package:frontend/data/dtos/user_profile_dto.dart';
+import 'package:frontend/data/repository_interfaces/i_user_repository.dart';
 import 'package:frontend/logic/view_models/user_view_model.dart';
 
 void main() {
@@ -67,7 +67,7 @@ class _FakeUserRepository implements IUserRepository {
   })  : _updateAvatarResponse = updateAvatarResponse ?? ApiResponse.success(''),
         _updateCoverResponse = updateCoverResponse ?? ApiResponse.success('');
 
-  final ApiResponse<UserEntity> currentUserResponse;
+    final ApiResponse<UserProfileDto> currentUserResponse;
   final ApiResponse<String> _updateAvatarResponse;
   final ApiResponse<String> _updateCoverResponse;
 
@@ -76,7 +76,7 @@ class _FakeUserRepository implements IUserRepository {
   String? lastAvatarPath;
 
   @override
-  Future<ApiResponse<UserEntity>> getCurrentUser() async {
+  Future<ApiResponse<UserProfileDto>> getCurrentUser() async {
     getCurrentUserCalls += 1;
     return currentUserResponse;
   }
@@ -100,12 +100,12 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<UserEntity>> getUserById(int userId) {
+  Future<ApiResponse<UserProfileDto>> getUserById(int userId) {
     throw UnimplementedError();
   }
 
   @override
-  Future<ApiResponse<List<ProductEntity>>> getUserProducts({
+  Future<ApiResponse<List<ProductDto>>> getUserProducts({
     required int userId,
     int? limit,
     int? offset,
@@ -114,7 +114,7 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<List<ProductEntity>>> getUserSavedListings({
+  Future<ApiResponse<List<ProductDto>>> getUserSavedListings({
     required int userId,
     int? limit,
     int? offset,
@@ -123,7 +123,7 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<List<UserEntity>>> getAllUsers({
+  Future<ApiResponse<List<UserProfileDto>>> getAllUsers({
     String? search,
     int? limit,
     int? offset,
@@ -142,7 +142,7 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<List<CommunityPost>>> getUserSavedPosts({
+  Future<ApiResponse<List<CommunityPostDto>>> getUserSavedPosts({
     required int userId,
     int? limit,
     int? offset,
@@ -151,7 +151,7 @@ class _FakeUserRepository implements IUserRepository {
   }
 
   @override
-  Future<ApiResponse<UserEntity>> updateProfile({
+  Future<ApiResponse<UserProfileDto>> updateProfile({
     required int userId,
     required String fullName,
     String? bio,
@@ -159,16 +159,46 @@ class _FakeUserRepository implements IUserRepository {
   }) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<ApiResponse<void>> reportUser({
+    required int userId,
+    required String reason,
+    String? details,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<bool>> blockUser(int userId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<bool>> unblockUser(int userId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponse<bool>> submitRating({
+    required int sellerId,
+    required int productId,
+    required int rating,
+    String? feedback,
+  }) {
+    throw UnimplementedError();
+  }
 }
 
-UserEntity _sampleUser({required int id}) {
+UserProfileDto _sampleUser({required int id}) {
   final now = DateTime(2026, 3, 9);
-  return UserEntity(
+  return UserProfileDto(
     id: id,
     fullName: 'Test User',
     email: 'test@example.com',
-    role: UserRole.user,
+    role: 'user',
     createdAt: now,
     updatedAt: now,
   );
 }
+

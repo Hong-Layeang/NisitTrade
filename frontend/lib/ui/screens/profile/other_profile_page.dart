@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+﻿import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
@@ -10,11 +10,11 @@ import '../../../core/errors/app_error_messages.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/extensions/state_extensions.dart';
 import '../../../core/utils/user_presence_formatter.dart';
-import '../../../data/models/community_post.dart';
-import '../../../data/models/product.dart';
-import '../../../data/models/user_profile.dart';
-import '../../../data/repositories/community_repository_impl.dart';
-import '../../../domain/repository_interfaces/i_user_repository.dart';
+import '../../../data/dtos/product_dto.dart';
+import '../../../data/dtos/user_profile_dto.dart';
+import '../../../data/dtos/community_post_dto.dart';
+import '../../../data/repository_interfaces/i_community_repository.dart';
+import '../../../data/repository_interfaces/i_user_repository.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../widgets/empty_state.dart';
 import '../community/community_detail_page.dart';
@@ -45,11 +45,11 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final IUserRepository _userRepository;
-  late final CommunityRepository _communityRepository;
+  late final ICommunityRepository _communityRepository;
 
-  UserProfile? _profile;
-  List<Product> _products = [];
-  List<CommunityPost> _posts = [];
+  UserProfileDto? _profile;
+  List<ProductDto> _products = [];
+  List<CommunityPostDto> _posts = [];
   bool _isLoading = false;
   String? _error;
   bool _isFollowing = false;
@@ -58,7 +58,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
   void initState() {
     super.initState();
     _userRepository = getIt<IUserRepository>();
-    _communityRepository = getIt<CommunityRepository>();
+    _communityRepository = getIt<ICommunityRepository>();
     _tabController = TabController(length: 2, vsync: this);
     _loadProfile();
   }
@@ -102,8 +102,8 @@ class _OtherProfilePageState extends State<OtherProfilePage>
       }
 
       setStateIfMounted(() {
-        _profile = UserProfile.fromEntity(profile);
-        _products = (productsResponse.data ?? []).toModels();
+        _profile = profile;
+        _products = productsResponse.data ?? [];
         _posts = (postsResponse.data ?? [])
             .where((post) => post.orderedImages.isNotEmpty)
             .toList();
@@ -261,7 +261,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     );
   }
 
-  Widget _buildAvatarPresenceDot(UserProfile profile) {
+  Widget _buildAvatarPresenceDot(UserProfileDto profile) {
     return Consumer<PresenceViewModel>(
       builder: (context, presenceViewModel, _) {
         final realtimePresence = presenceViewModel.presenceForUser(profile.id);
@@ -286,7 +286,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     );
   }
 
-  Widget _buildActionButtons(UserProfile profile) {
+  Widget _buildActionButtons(UserProfileDto profile) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -450,7 +450,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     );
   }
 
-  Widget _buildProductGrid(UserProfile profile) {
+  Widget _buildProductGrid(UserProfileDto profile) {
     if (_products.isEmpty) {
       return const CustomScrollView(
         slivers: [
@@ -520,18 +520,18 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     );
   }
 
-  void _openProduct(Product product) {
+  void _openProduct(ProductDto product) {
     Navigator.pushNamed(
       context,
       AppRoutes.productDetail,
       arguments: ProductDetailArgs(
         productId: product.id,
-        initialProduct: product.toEntity(),
+        initialProduct: product,
       ),
     );
   }
 
-  void _openPost(CommunityPost post) {
+  void _openPost(CommunityPostDto post) {
     Navigator.pushNamed(
       context,
       AppRoutes.communityDetail,
@@ -539,7 +539,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
     );
   }
 
-  Future<void> _openDirectChat(UserProfile profile) async {
+  Future<void> _openDirectChat(UserProfileDto profile) async {
     final currentUserId = context.read<UserViewModel>().userId;
     if (currentUserId == null) {
       return;
@@ -624,3 +624,4 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
         postCount != oldDelegate.postCount;
   }
 }
+

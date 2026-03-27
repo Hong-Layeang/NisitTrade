@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../data/providers/api_client.dart';
+import '../network/api_client.dart';
 import 'auth_token_store.dart';
 
 class AuthSession {
@@ -47,7 +47,7 @@ class AuthSession {
         _lastKnownValidSession = false;
         return false;
       }
-      // Network errors — allow through so the app doesn't block on offline.
+      // Network errors - allow through so the app doesn't block on offline.
     }
 
     _lastKnownValidSession = true;

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../domain/entities/product_entity.dart';
+import '../../../../data/dtos/product_dto.dart';
 import '../../../../logic/view_models/user_view_model.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/school_short_name.dart';
@@ -8,7 +8,7 @@ import '../../../widgets/user_widgets.dart';
 
 /// Displays the seller information in a product card.
 class ProductCardSellerHeader extends StatelessWidget {
-  final ProductEntity product;
+  final ProductDto product;
   final VoidCallback? onMoreTap;
   final VoidCallback? onSellerTap;
 
@@ -21,13 +21,13 @@ class ProductCardSellerHeader extends StatelessWidget {
 
   String _sellerHandle() {
     final fromUniversity = buildSchoolShortName(
-      universityName: product.seller?.university?.name,
-      universityDomain: product.seller?.university?.domain,
+      universityName: product.user?.university?.name,
+      universityDomain: product.user?.university?.domain,
       fallback: '',
     );
     if (fromUniversity.isNotEmpty) return '@$fromUniversity';
 
-    final email = product.seller?.email ?? '';
+    final email = product.user?.email ?? '';
     final domainParts = email.split('@');
     final universityDomain = domainParts.length > 1 ? domainParts[1] : null;
     final handle = buildSchoolShortName(universityDomain: universityDomain, fallback: '');
@@ -48,7 +48,7 @@ class ProductCardSellerHeader extends StatelessWidget {
             product.userId == userData.userId;
         final avatarUrl = isCurrentUser
             ? userData.profileImage
-            : product.seller?.profileImage;
+          : product.user?.profileImage;
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -62,7 +62,7 @@ class ProductCardSellerHeader extends StatelessWidget {
                       child: UserAvatar(
                         key: ValueKey('seller_avatar_${product.userId}_${avatarUrl ?? "default"}'),
                         imageUrl: avatarUrl ?? '',
-                        displayName: product.seller?.fullName,
+                        displayName: product.user?.fullName,
                         radius: 20,
                       ),
                     ),
@@ -71,7 +71,7 @@ class ProductCardSellerHeader extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          product.seller?.fullName ?? 'Unknown Seller',
+                          product.user?.fullName ?? 'Unknown Seller',
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
@@ -104,4 +104,5 @@ class ProductCardSellerHeader extends StatelessWidget {
     );
   }
 }
+
 

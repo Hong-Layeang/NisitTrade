@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
@@ -7,8 +7,8 @@ import '../../../core/constants/colors.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/utils/school_short_name.dart';
-import '../../../data/models/community_comment.dart';
-import '../../../data/models/community_post.dart';
+import '../../../data/dtos/community_comment_dto.dart';
+import '../../../data/dtos/community_post_dto.dart';
 import '../../../logic/view_models/community_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
@@ -24,7 +24,7 @@ import '../../../logic/services/share_service.dart';
 class CommunityDetailArgs {
   final int postId;
   final bool focusComments;
-  final CommunityPost? initialPost;
+  final CommunityPostDto? initialPost;
 
   const CommunityDetailArgs({
     required this.postId,
@@ -36,7 +36,7 @@ class CommunityDetailArgs {
 class CommunityDetailPage extends StatefulWidget {
   final int postId;
   final bool focusComments;
-  final CommunityPost? initialPost;
+  final CommunityPostDto? initialPost;
 
   const CommunityDetailPage({
     super.key,
@@ -64,7 +64,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   final FocusNode _commentFocusNode = FocusNode();
   final GlobalKey _commentsKey = GlobalKey();
 
-  CommunityPost? _post;
+  CommunityPostDto? _post;
   String? _error;
   bool _isLoading = false;
   bool _isTogglingLike = false;
@@ -202,7 +202,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     _scrollToComments();
   }
 
-  Future<void> _editComment(CommunityComment comment) async {
+  Future<void> _editComment(CommunityCommentDto comment) async {
     final controller = TextEditingController(text: comment.content);
     final newContent = await showDialog<String>(
       context: context,
@@ -258,7 +258,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     setState(() => _post = updated);
   }
 
-  Future<void> _deleteComment(CommunityComment comment) async {
+  Future<void> _deleteComment(CommunityCommentDto comment) async {
     final vm = context.read<CommunityViewModel>();
 
     final shouldDelete = await showDialog<bool>(
@@ -318,12 +318,12 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     );
   }
 
-  bool _isOwner(CommunityPost post) {
+  bool _isOwner(CommunityPostDto post) {
     final userId = context.read<UserViewModel>().userId;
     return userId != null && userId == post.author.id;
   }
 
-  Future<void> _editPost(CommunityPost post) async {
+  Future<void> _editPost(CommunityPostDto post) async {
     final retainedImageUrls = List<String>.from(post.orderedImages);
     final newImagePaths = <String>[];
     final controller = TextEditingController(text: post.content);
@@ -526,7 +526,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     AppSnackBar.success(context, 'Post updated.');
   }
 
-  Future<void> _deletePost(CommunityPost post) async {
+  Future<void> _deletePost(CommunityPostDto post) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -560,7 +560,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     Navigator.of(context).pop();
   }
 
-  Future<void> _reportPost(CommunityPost post) async {
+  Future<void> _reportPost(CommunityPostDto post) async {
     var selectedReason = _reportReasonOptions.first;
     final detailsController = TextEditingController();
 
@@ -686,7 +686,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     );
   }
 
-  Future<void> _toggleSavePost(CommunityPost post) async {
+  Future<void> _toggleSavePost(CommunityPostDto post) async {
     final vm = context.read<CommunityViewModel>();
     final savedListingsVm = context.read<SavedListingsViewModel>();
     final isSaved = post.isSavedByMe;
@@ -831,7 +831,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   }
 
   Widget _buildComments() {
-    final comments = _post?.comments ?? const <CommunityComment>[];
+    final comments = _post?.comments ?? const <CommunityCommentDto>[];
     final userId = context.read<UserViewModel>().userId;
 
     if (comments.isEmpty) {
@@ -886,3 +886,4 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   }
 
 }
+

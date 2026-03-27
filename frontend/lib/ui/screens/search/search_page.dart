@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_durations.dart';
-import '../../../domain/entities/category_entity.dart';
-import '../../../domain/entities/user_entity.dart';
-import '../../../domain/entities/product_entity.dart';
+import '../../../data/dtos/category_dto.dart';
+import '../../../data/dtos/user_profile_dto.dart';
+import '../../../data/dtos/product_dto.dart';
 import '../../../logic/helpers/product_like_helpers.dart';
 import '../../../logic/view_models/search_view_model.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
@@ -29,7 +29,6 @@ class SearchPage extends StatefulWidget {
   @override
   State<SearchPage> createState() => SearchPageState();
 }
-
 class SearchPageState extends State<SearchPage>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
@@ -175,7 +174,7 @@ class SearchPageState extends State<SearchPage>
   }
 
   /// Effective like status considering optimistic overrides
-  bool _isLiked(ProductEntity product) {
+  bool _isLiked(ProductDto product) {
     if (_optimisticallyLikedIds.contains(product.id)) return true;
     if (_optimisticallyUnlikedIds.contains(product.id)) return false;
     return ProductLikeHelpers.isLikedByUser(
@@ -188,13 +187,13 @@ class SearchPageState extends State<SearchPage>
     context.read<SearchViewModel>().setSearchQuery(_searchController.text);
   }
 
-  List<ProductEntity> _getFilteredProductsFromData(
-    List<ProductEntity> allProducts,
+  List<ProductDto> _getFilteredProductsFromData(
+    List<ProductDto> allProducts,
     String searchQuery,
     int? selectedCategoryIndex,
-    List<CategoryEntity> categories,
+    List<CategoryDto> categories,
   ) {
-    List<ProductEntity> filtered = allProducts;
+    List<ProductDto> filtered = allProducts;
 
     if (searchQuery.isNotEmpty) {
       final searchTerm = searchQuery.toLowerCase();
@@ -221,7 +220,7 @@ class SearchPageState extends State<SearchPage>
     return filtered;
   }
 
-  Future<void> _handleLikeTap(ProductEntity product) async {
+  Future<void> _handleLikeTap(ProductDto product) async {
     if (_likingProductIds.contains(product.id)) return;
 
     final isCurrentlyLiked = _isLiked(product);
@@ -354,7 +353,7 @@ class SearchPageState extends State<SearchPage>
     return Selector<
       SearchViewModel,
       ({
-        List<CategoryEntity> categories,
+        List<CategoryDto> categories,
         int? selectedCategoryIndex,
         bool showCategoryFilter,
       })
@@ -381,7 +380,7 @@ class SearchPageState extends State<SearchPage>
 
   Widget _buildHeaderContent(
     BuildContext context,
-    List<CategoryEntity> categories,
+    List<CategoryDto> categories,
     int? selectedCategoryIndex,
     bool showCategoryFilter,
     bool onProductsTab,
@@ -455,10 +454,10 @@ class SearchPageState extends State<SearchPage>
         SearchViewModel,
         ProductFeedViewModel,
         ({
-          List<CategoryEntity> categories,
+          List<CategoryDto> categories,
           String searchQuery,
           int? selectedCategoryIndex,
-          List<ProductEntity> products,
+          List<ProductDto> products,
         })
       >(
         selector: (_, searchVm, productVm) => (
@@ -535,7 +534,7 @@ class SearchPageState extends State<SearchPage>
       itemCount: filteredProductIds.length,
       itemBuilder: (context, index) {
         final productId = filteredProductIds[index];
-        return Selector<ProductFeedViewModel, ProductEntity?>(
+        return Selector<ProductFeedViewModel, ProductDto?>(
           selector: (_, vm) => vm.getCachedProduct(productId),
           builder: (context, product, _) {
             if (product == null) {
@@ -576,7 +575,7 @@ class SearchPageState extends State<SearchPage>
       SearchViewModel,
       ({
         bool isLoadingUsers,
-        List<UserEntity> users,
+        List<UserProfileDto> users,
         String searchQuery,
         Set<int> updatingFollowUserIds,
       })
@@ -623,8 +622,8 @@ class SearchPageState extends State<SearchPage>
     );
   }
 
-  List<UserEntity> _getFilteredUsersFromData(
-    List<UserEntity> users,
+  List<UserProfileDto> _getFilteredUsersFromData(
+    List<UserProfileDto> users,
     String searchQuery,
   ) {
     if (searchQuery.isEmpty) return users;
@@ -638,7 +637,7 @@ class SearchPageState extends State<SearchPage>
 
   Widget _buildStudentsContent(
     BuildContext context,
-    List<UserEntity> filtered,
+    List<UserProfileDto> filtered,
     Set<int> updatingFollowUserIds,
     PresenceViewModel presenceViewModel,
   ) {
@@ -693,10 +692,10 @@ class SearchPageState extends State<SearchPage>
           isOnline: isOnline,
           lastSeenAt: lastSeenAt,
         );
-        final university = user.university?.name?.trim() ?? '';
+        final university = user.university?.name.trim() ?? '';
         final subtitle = university.isEmpty
             ? statusLabel
-            : '$university · $statusLabel';
+            : '$university \u00B7 $statusLabel';
         final currentUserId = context.read<UserViewModel>().userId;
         final isCurrentUser = currentUserId == user.id;
         return UserProfileListTile(

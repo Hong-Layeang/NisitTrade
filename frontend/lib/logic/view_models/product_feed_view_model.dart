@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/errors/api_exception.dart';
-import '../../domain/entities/product_entity.dart';
-import '../../domain/repository_interfaces/i_product_repository.dart';
-import '../../domain/repository_interfaces/i_product_like_repository.dart';
-import '../../domain/repository_interfaces/i_product_save_repository.dart';
-import '../../domain/repository_interfaces/i_product_comment_repository.dart';
-import '../../domain/repository_interfaces/i_product_report_repository.dart';
+import '../../data/dtos/product_dto.dart';
+import '../../data/repository_interfaces/i_product_repository.dart';
+import '../../data/repository_interfaces/i_product_like_repository.dart';
+import '../../data/repository_interfaces/i_product_save_repository.dart';
+import '../../data/repository_interfaces/i_product_comment_repository.dart';
+import '../../data/repository_interfaces/i_product_report_repository.dart';
 import '../services/product_interaction_service.dart';
 
 /// ViewModel for managing product feed state
@@ -30,7 +30,7 @@ class ProductFeedViewModel extends ChangeNotifier {
   final IProductRepository _productRepository;
   final ProductInteractionService _interactionService;
 
-  List<ProductEntity> _products = [];
+  List<ProductDto> _products = [];
   bool _isLoading = false;
   bool _isLoadingMore = false;
   String? _error;
@@ -41,16 +41,16 @@ class ProductFeedViewModel extends ChangeNotifier {
   bool _hasMore = true;
 
   // Product cache for optimized navigation
-  final Map<int, ProductEntity> _productCache = {};
+  final Map<int, ProductDto> _productCache = {};
 
-  List<ProductEntity> get products => _products;
+  List<ProductDto> get products => _products;
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
   String? get error => _error;
   bool get hasMore => _hasMore;
 
   /// Get a cached product by ID, returns null if not cached
-  ProductEntity? getCachedProduct(int productId) {
+  ProductDto? getCachedProduct(int productId) {
     return _productCache[productId];
   }
 
@@ -139,7 +139,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     await loadFirstPage(preserveExisting: preserveExisting);
   }
 
-  Future<ProductEntity?> refreshProduct(int productId) async {
+  Future<ProductDto?> refreshProduct(int productId) async {
     final product = await _interactionService.refreshProduct(productId);
     if (product != null) {
       _upsertProduct(product);
@@ -147,7 +147,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     return product;
   }
 
-  Future<ProductEntity?> likeProduct(int productId) async {
+  Future<ProductDto?> likeProduct(int productId) async {
     final product = await _interactionService.likeProduct(productId);
     if (product != null) {
       _upsertProduct(product);
@@ -155,7 +155,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     return product;
   }
 
-  Future<ProductEntity?> unlikeProduct({
+  Future<ProductDto?> unlikeProduct({
     required int productId,
     required int likeId,
   }) async {
@@ -169,7 +169,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     return product;
   }
 
-  Future<ProductEntity?> addComment({
+  Future<ProductDto?> addComment({
     required int productId,
     required String content,
   }) async {
@@ -183,7 +183,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     return product;
   }
 
-  Future<ProductEntity?> updateComment({
+  Future<ProductDto?> updateComment({
     required int productId,
     required int commentId,
     required String content,
@@ -199,7 +199,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     return product;
   }
 
-  Future<ProductEntity?> deleteComment({
+  Future<ProductDto?> deleteComment({
     required int productId,
     required int commentId,
   }) async {
@@ -213,7 +213,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     return product;
   }
 
-  Future<ProductEntity?> hideProduct(int productId) async {
+  Future<ProductDto?> hideProduct(int productId) async {
     final product = await _interactionService.hideProduct(productId);
     if (product != null) {
       _upsertProduct(product);
@@ -221,7 +221,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     return product;
   }
 
-  Future<ProductEntity?> unhideProduct(int productId) async {
+  Future<ProductDto?> unhideProduct(int productId) async {
     final product = await _interactionService.unhideProduct(productId);
     if (product != null) {
       _upsertProduct(product);
@@ -265,7 +265,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _upsertProduct(ProductEntity product) {
+  void _upsertProduct(ProductDto product) {
     final existing = _productCache[product.id];
     final nextProduct = _withStableImageUrls(existing: existing, incoming: product);
 
@@ -283,9 +283,9 @@ class ProductFeedViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  ProductEntity _withStableImageUrls({
-    required ProductEntity? existing,
-    required ProductEntity incoming,
+  ProductDto _withStableImageUrls({
+    required ProductDto? existing,
+    required ProductDto incoming,
   }) {
     if (existing == null) return incoming;
     if (existing.imageUrls.isEmpty || incoming.imageUrls.isEmpty) return incoming;
@@ -297,25 +297,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     );
     if (!sameUnderlyingImages) return incoming;
 
-    return ProductEntity(
-      id: incoming.id,
-      title: incoming.title,
-      description: incoming.description,
-      price: incoming.price,
-      status: incoming.status,
-      userId: incoming.userId,
-      categoryId: incoming.categoryId,
-      createdAt: incoming.createdAt,
-      updatedAt: incoming.updatedAt,
-      seller: incoming.seller,
-      category: incoming.category,
-      imageUrls: existing.imageUrls,
-      likes: incoming.likes,
-      comments: incoming.comments,
-      likeCount: incoming.likeCount,
-      commentCount: incoming.commentCount,
-      isLiked: incoming.isLiked,
-    );
+    return incoming.copyWith(productImages: existing.productImages);
   }
 
   bool _hasSameUnderlyingImageSet(
@@ -341,3 +323,4 @@ class ProductFeedViewModel extends ChangeNotifier {
     return url;
   }
 }
+

@@ -1,74 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/utils/image_url_helper.dart';
-import '../../../data/models/student.dart';
-import '../../../domain/entities/user_entity.dart';
+import '../../../data/dtos/user_profile_dto.dart';
 import 'app_loading.dart';
 import 's3_cached_network_image.dart';
-
-class StudentListTile extends StatelessWidget {
-  final Student student;
-  final bool isFollowing;
-  final VoidCallback? onTap;
-  final VoidCallback? onFollowTap;
-
-  const StudentListTile({
-    super.key,
-    required this.student,
-    this.isFollowing = false,
-    this.onTap,
-    this.onFollowTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.surface, width: 1),
-          ),
-        ),
-        child: Row(
-          children: [
-            UserAvatar(
-              imageUrl: student.avatarUrl ?? '',
-              displayName: student.name,
-              radius: 28,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    student.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    student.username,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            FollowButton(isFollowing: isFollowing, onTap: onFollowTap),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// Reusable user avatar with proper error handling
 class UserAvatar extends StatelessWidget {
@@ -239,7 +174,7 @@ class FollowButton extends StatelessWidget {
 }
 
 class UserProfileListTile extends StatelessWidget {
-  final UserEntity user;
+  final UserProfileDto user;
   final bool isFollowing;
   final bool isFollowLoading;
   final bool showFollowButton;
@@ -328,3 +263,4 @@ class UserProfileListTile extends StatelessWidget {
     );
   }
 }
+

@@ -1,102 +1,101 @@
-import '../models/community_post.dart';
+﻿import 'package:dio/dio.dart';
+
+import '../../core/errors/api_exception.dart';
 import '../../core/errors/api_response.dart';
-import '../providers/community_api_service.dart';
+import '../../core/network/api_client.dart';
+import '../dtos/community_post_dto.dart';
+import '../repository_interfaces/i_community_repository.dart';
 
-abstract class CommunityRepository {
-  Future<ApiResponse<List<CommunityPost>>> getPosts({
-    String feed,
-    int limit,
-    int offset,
-    int? userId,
-  });
-  Future<ApiResponse<CommunityPost>> createPost({
-    required String content,
-    List<String> imagePaths,
-  });
-  Future<ApiResponse<CommunityPost>> getPost(int postId);
-  Future<ApiResponse<void>> likePost(int postId);
-  Future<ApiResponse<void>> unlikePost(int postId);
-  Future<ApiResponse<void>> savePost(int postId);
-  Future<ApiResponse<void>> unsavePost(int postId);
-  Future<ApiResponse<void>> updatePost({
-    required int postId,
-    required String content,
-    List<String> imagePaths,
-    List<String> retainedImageUrls,
-  });
-  Future<ApiResponse<void>> deletePost(int postId);
-  Future<ApiResponse<void>> reportPost({
-    required int postId,
-    required String reason,
-    String? details,
-  });
-  Future<ApiResponse<void>> addComment({
-    required int postId,
-    required String content,
-  });
-  Future<ApiResponse<void>> updateComment({
-    required int postId,
-    required int commentId,
-    required String content,
-  });
-  Future<ApiResponse<void>> deleteComment({
-    required int postId,
-    required int commentId,
-  });
-}
+class CommunityRepositoryImpl implements ICommunityRepository {
+  CommunityRepositoryImpl({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
-class CommunityRepositoryImpl implements CommunityRepository {
-  CommunityRepositoryImpl({CommunityApiService? apiService})
-      : _apiService = apiService ?? CommunityApiService.instance;
-
-  final CommunityApiService _apiService;
+  final Dio _dio;
 
   @override
-  Future<ApiResponse<List<CommunityPost>>> getPosts({
+  Future<ApiResponse<List<CommunityPostDto>>> getPosts({
     String feed = 'community',
     int limit = 20,
     int offset = 0,
     int? userId,
-  }) {
-    return _apiService.getPosts(
-      feed: feed,
-      limit: limit,
-      offset: offset,
-      userId: userId,
-    );
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/community',
+        queryParameters: {
+          'feed': feed,
+          'limit': limit,
+          'offset': offset,
+          if (userId != null) 'user_id': userId,
+        },
+      );
+      final items = (response.data as List)
+          .map((json) => CommunityPostDto.fromJson(json as Map<String, dynamic>))
+          .toList();
+      return ApiResponse.success(items);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to fetch community posts: $e'));
+    }
   }
 
   @override
-  Future<ApiResponse<CommunityPost>> createPost({
+  Future<ApiResponse<CommunityPostDto>> createPost({
     required String content,
     List<String> imagePaths = const [],
-  }) {
-    return _apiService.createPost(content: content, imagePaths: imagePaths);
+  }) async {
+    try {
+      final formData = FormData.fromMap({'content': content});
+      for (final imagePath in imagePaths) {
+        formData.files.add(MapEntry('images', await MultipartFile.fromFile(imagePath)));
+      }
+      final response = await _dio.post(
+        '/community',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      return ApiResponse.success(
+        CommunityPostDto.fromJson(response.data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to create community post: $e'));
+    }
   }
 
   @override
-  Future<ApiResponse<CommunityPost>> getPost(int postId) {
-    return _apiService.getPost(postId);
+  Future<ApiResponse<CommunityPostDto>> getPost(int postId) async {
+    try {
+      final response = await _dio.get('/community/$postId');
+      return ApiResponse.success(
+        CommunityPostDto.fromJson(response.data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to fetch community post detail: $e'));
+    }
   }
 
   @override
   Future<ApiResponse<void>> likePost(int postId) {
-    return _apiService.likePost(postId);
+    return _voidCall(() => _dio.post('/community/$postId/likes'), 'Failed to like community post');
   }
 
   @override
   Future<ApiResponse<void>> unlikePost(int postId) {
-    return _apiService.unlikePost(postId);
+    return _voidCall(() => _dio.delete('/community/$postId/likes'), 'Failed to unlike community post');
   }
 
   @override
   Future<ApiResponse<void>> savePost(int postId) {
-    return _apiService.savePost(postId);
+    return _voidCall(() => _dio.post('/community/$postId/saves'), 'Failed to save community post');
   }
 
   @override
   Future<ApiResponse<void>> unsavePost(int postId) {
-    return _apiService.unsavePost(postId);
+    return _voidCall(() => _dio.delete('/community/$postId/saves'), 'Failed to unsave community post');
   }
 
   @override
@@ -105,18 +104,28 @@ class CommunityRepositoryImpl implements CommunityRepository {
     required String content,
     List<String> imagePaths = const [],
     List<String> retainedImageUrls = const [],
-  }) {
-    return _apiService.updatePost(
-      postId: postId,
-      content: content,
-      imagePaths: imagePaths,
-      retainedImageUrls: retainedImageUrls,
-    );
+  }) async {
+    try {
+      final formData = FormData.fromMap({'content': content, 'image_urls': retainedImageUrls});
+      for (final imagePath in imagePaths) {
+        formData.files.add(MapEntry('images', MultipartFile.fromFileSync(imagePath)));
+      }
+      await _dio.put(
+        '/community/$postId',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: 'Failed to update community post: $e'));
+    }
   }
 
   @override
   Future<ApiResponse<void>> deletePost(int postId) {
-    return _apiService.deletePost(postId);
+    return _voidCall(() => _dio.delete('/community/$postId'), 'Failed to delete community post');
   }
 
   @override
@@ -125,7 +134,16 @@ class CommunityRepositoryImpl implements CommunityRepository {
     required String reason,
     String? details,
   }) {
-    return _apiService.reportPost(postId: postId, reason: reason, details: details);
+    return _voidCall(
+      () => _dio.post(
+        '/community/$postId/reports',
+        data: {
+          'reason': reason,
+          if (details != null && details.trim().isNotEmpty) 'details': details.trim(),
+        },
+      ),
+      'Failed to report community post',
+    );
   }
 
   @override
@@ -133,7 +151,10 @@ class CommunityRepositoryImpl implements CommunityRepository {
     required int postId,
     required String content,
   }) {
-    return _apiService.addComment(postId: postId, content: content);
+    return _voidCall(
+      () => _dio.post('/community/$postId/comments', data: {'content': content}),
+      'Failed to add community comment',
+    );
   }
 
   @override
@@ -142,10 +163,9 @@ class CommunityRepositoryImpl implements CommunityRepository {
     required int commentId,
     required String content,
   }) {
-    return _apiService.updateComment(
-      postId: postId,
-      commentId: commentId,
-      content: content,
+    return _voidCall(
+      () => _dio.put('/community/$postId/comments/$commentId', data: {'content': content}),
+      'Failed to update community comment',
     );
   }
 
@@ -154,6 +174,24 @@ class CommunityRepositoryImpl implements CommunityRepository {
     required int postId,
     required int commentId,
   }) {
-    return _apiService.deleteComment(postId: postId, commentId: commentId);
+    return _voidCall(
+      () => _dio.delete('/community/$postId/comments/$commentId'),
+      'Failed to delete community comment',
+    );
+  }
+
+  Future<ApiResponse<void>> _voidCall(
+    Future<dynamic> Function() fn,
+    String errorMessage,
+  ) async {
+    try {
+      await fn();
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiException.fromDioException(e));
+    } catch (e) {
+      return ApiResponse.error(ApiException(message: '$errorMessage: $e'));
+    }
   }
 }
+
