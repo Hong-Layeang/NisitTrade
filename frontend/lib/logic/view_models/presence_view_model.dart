@@ -47,14 +47,18 @@ class PresenceViewModel extends ChangeNotifier with WidgetsBindingObserver {
   UserPresence? presenceForUser(int userId) => _presenceByUserId[userId];
 
   void watchUserIds(Iterable<int> userIds) {
-    final sanitized = userIds.where((id) => id > 0);
+    final sanitized = userIds.where((id) => id > 0).toList();
     if (sanitized.isEmpty) {
       return;
     }
 
+    final prevSize = _watchedUserIds.length;
     _watchedUserIds.addAll(sanitized);
-    _presenceService.watchUserIds(_watchedUserIds);
-    unawaited(ensureConnected());
+
+    if (_watchedUserIds.length > prevSize) {
+      _presenceService.watchUserIds(_watchedUserIds);
+      unawaited(ensureConnected());
+    }
   }
 
   Future<void> ensureConnected() async {

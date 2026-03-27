@@ -41,25 +41,30 @@ class ChatRoomScreen extends StatefulWidget {
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
 
-class _ChatRoomScreenState extends State<ChatRoomScreen> {
+class _ChatRoomScreenState extends State<ChatRoomScreen>
+    with WidgetsBindingObserver {
   late ChatRoomViewModel _viewModel;
   late ScrollController _scrollController;
   bool _hasInitialized = false;
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
   final Set<int> _expiredPromptedProductIds = {};
+  int? _lastSeenBottomMessageId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() {
-        _now = DateTime.now();
-      });
+      if (!mounted || !_hasInitialized) return;
       _checkForNewlyExpiredAttachments();
+      if (_viewModel.attachedProducts.isNotEmpty) {
+        setState(() {
+          _now = DateTime.now();
+        });
+      }
     });
   }
 
@@ -71,6 +76,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
 
     _viewModel = Provider.of<ChatRoomViewModel>(context, listen: false);
+    _viewModel.addListener(_onViewModelChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensureWebSocketAndJoin();
       _loadConversation();
@@ -80,9 +86,53 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _viewModel.removeListener(_onViewModelChanged);
     _countdownTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && _hasInitialized) {
+      // Reconnect WS and rejoin room to catch any missed messages
+      _ensureWebSocketAndJoin();
+      // Reload messages to get anything sent while the app was backgrounded
+      _refreshMessages();
+    }
+  }
+
+  Future<void> _refreshMessages() async {
+    if (!mounted) return;
+    await _viewModel.loadMessages(refresh: true);
+    if (mounted) _scrollToBottom(animated: false);
+  }
+
+  /// Scrolls to the bottom whenever a new message is appended at the end
+  /// of the list (e.g. incoming WebSocket message). Only auto-scrolls when
+  /// the user is already near the bottom so we don't interrupt reading.
+  void _onViewModelChanged() {
+    final messages = _viewModel.messages;
+    if (messages.isEmpty) return;
+    final lastId = messages.last.id;
+    if (lastId != _lastSeenBottomMessageId) {
+      _lastSeenBottomMessageId = lastId;
+      if (_isNearBottom()) {
+        _scrollToBottom();
+      }
+    }
+  }
+
+  bool _isNearBottom() {
+    if (!_scrollController.hasClients) return true;
+    try {
+      final pos = _scrollController.position;
+      return (pos.maxScrollExtent - pos.pixels) < 200;
+    } catch (_) {
+      return true;
+    }
   }
 
   Future<void> _ensureWebSocketAndJoin() async {
@@ -181,9 +231,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     String messageText,
     List<String> imagePaths,
   ) async {
+    final hasPendingAttachments = _viewModel.attachedProducts.any(
+      (ap) => ap.countdownStartedAt == null,
+    );
+
     final success = await _viewModel.sendMessage(
       messageText,
       imagePaths: imagePaths,
+      attachConversationProduct: hasPendingAttachments,
     );
 
     if (success) {
@@ -445,9 +500,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       lastSeenAt: lastSeenAt,
     );
 
-    return Row(
-      children: [
-        UserAvatar(imageUrl: avatarUrl, displayName: displayName, radius: 18),
+    return GestureDetector(
+      onTap: participantUserId > 0
+          ? () => Navigator.of(context).pushNamed(
+                AppRoutes.userProfile,
+                arguments: OtherProfileArgs(userId: participantUserId),
+              )
+          : null,
+      child: Row(
+        children: [
+          UserAvatar(imageUrl: avatarUrl, displayName: displayName, radius: 18),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -509,6 +571,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 

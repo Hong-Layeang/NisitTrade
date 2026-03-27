@@ -137,6 +137,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       case AppLifecycleState.detached:
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
+        unawaited(_chatWebSocket.disconnect());
         break;
     }
   }
@@ -145,8 +146,6 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     addMessageToChat(message);
   }
 
-  /// Handles `chat:notify` — sent to the user's personal room so it arrives
-  /// even when the user hasn't joined the conversation room yet.
   void _onWsMessageNotify(Message message) {
     // Ignore own messages
     if (_currentUserId != null && message.senderId == _currentUserId) return;
@@ -162,18 +161,14 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
     final conversationId = message.conversationId;
 
-    // If user is currently viewing this conversation, skip (chat:receive handles it)
     if (_currentConversation?.id == conversationId) return;
 
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index != -1) {
-      // Known conversation — increment unread and update last message
       _upsertConversationLastMessage(message, incrementUnread: true);
-      // Also join the conversation room if not already
       joinConversationRoom(conversationId);
       notifyListeners();
     } else {
-      // Unknown/new conversation — reload conversations from API
       joinConversationRoom(conversationId);
       unawaited(loadConversations(refresh: true));
     }
@@ -436,13 +431,6 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Syncs attached products from message history so that the recipient side
-  /// (e.g. the seller) sees the carousel even though they never called
-  /// [addAttachedProduct] themselves.
-  ///
-  /// Uses [message.sentAt] as the countdown start time (the timer begins when
-  /// the buyer sends the message that includes the product).
-  /// Products already resolved/dismissed by this user are skipped.
   void _syncAttachedProductsFromMessages(
     int conversationId,
     List<Message> messages, {
@@ -462,14 +450,12 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
           list.indexWhere((ap) => ap.product.id == product.id);
 
       if (existingIndex == -1) {
-        // Recipient side: product not in list yet — add it with countdown.
         list.add(AttachedProduct(
           product: product,
           countdownStartedAt: message.sentAt,
         ));
         changed = true;
       } else if (list[existingIndex].countdownStartedAt == null) {
-        // Sender side: product was added locally but countdown not yet stamped.
         list[existingIndex] =
             list[existingIndex].copyWith(countdownStartedAt: message.sentAt);
         changed = true;
