@@ -4,6 +4,7 @@ import '../../../core/errors/api_exception.dart';
 import '../../../data/dtos/product_dto.dart';
 import '../../../data/repository_interfaces/i_product_image_repository.dart';
 import '../../../data/repository_interfaces/i_product_repository.dart';
+import '../../../logic/services/profile_content_change_notifier.dart';
 
 /// Result of a product form submission.
 class ProductSubmissionResult {
@@ -40,12 +41,15 @@ class ProductSubmissionResult {
 class ProductFormOrchestrator {
   final IProductRepository _productRepository;
   final IProductImageRepository _productImageRepository;
+  final ProfileContentChangeNotifier _profileContentChangeNotifier;
 
   ProductFormOrchestrator({
     required IProductRepository productRepository,
     required IProductImageRepository productImageRepository,
+    required ProfileContentChangeNotifier profileContentChangeNotifier,
   })  : _productRepository = productRepository,
-        _productImageRepository = productImageRepository;
+        _productImageRepository = productImageRepository,
+        _profileContentChangeNotifier = profileContentChangeNotifier;
 
   /// Creates a new product with images.
   Future<ProductSubmissionResult> createProduct({
@@ -82,6 +86,10 @@ class ProductFormOrchestrator {
           throw imageResponse.error!;
         }
       }
+
+      _profileContentChangeNotifier.markProductChanged(
+        ownerUserId: product.userId,
+      );
 
       return ProductSubmissionResult.success(
         'Product created successfully.',
@@ -143,6 +151,10 @@ class ProductFormOrchestrator {
           throw imageResponse.error!;
         }
       }
+
+      _profileContentChangeNotifier.markProductChanged(
+        ownerUserId: product.userId,
+      );
 
       return ProductSubmissionResult.success(
         'Listing updated successfully.',

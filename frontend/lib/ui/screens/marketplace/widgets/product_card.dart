@@ -23,6 +23,7 @@ import 'product_card_image_carousel.dart';
 import 'product_card_info.dart';
 import 'product_card_seller_header.dart';
 import 'product_card_action_handler.dart';
+import '../../../../logic/services/profile_content_change_notifier.dart';
 import '../../../../logic/services/share_service.dart';
 
 final getIt = GetIt.instance;
@@ -277,8 +278,8 @@ class _ProductCardState extends State<ProductCard>
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete listing'),
-        content: const Text('Are you sure you want to delete this listing?'),
+        title: const Text('Delete Product'),
+        content: const Text('Are you sure you want to delete this product?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -304,14 +305,18 @@ class _ProductCardState extends State<ProductCard>
         throw response.error!;
       }
 
+      getIt<ProfileContentChangeNotifier>().markProductChanged(
+        ownerUserId: _product.userId,
+      );
+
       if (mounted) {
         context.read<ProductFeedViewModel>().refresh();
       }
 
-      _showSnack('Listing deleted.');
+      _showSnack('product deleted.');
     } catch (e, st) {
       debugPrint('ProductCard._handleDeleteListing failed: $e\n$st');
-      _showSnack('Failed to delete listing.');
+      _showSnack('Failed to delete Product.');
     } finally {
       if (mounted) {
         setState(() => _isActionLoading = false);
@@ -335,9 +340,9 @@ class _ProductCardState extends State<ProductCard>
         widget.onProductUpdated?.call(updated);
       }
 
-      _showSnack(wasHidden ? 'Listing unhidden.' : 'Listing hidden.');
+      _showSnack(wasHidden ? 'Product unhidden.' : 'product hidden.');
     } catch (e) {
-      _showSnack('Failed to update listing visibility.');
+      _showSnack('Failed to update product visibility.');
     } finally {
       if (mounted) {
         setState(() => _isActionLoading = false);
@@ -373,7 +378,7 @@ class _ProductCardState extends State<ProductCard>
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Report listing'),
+            title: const Text('Report product'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

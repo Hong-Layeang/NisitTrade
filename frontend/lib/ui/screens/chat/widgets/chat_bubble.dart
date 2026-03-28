@@ -5,6 +5,7 @@ import 'package:frontend/core/utils/chat_timestamp_formatter.dart';
 import 'package:frontend/core/utils/image_url_helper.dart';
 import 'package:frontend/data/dtos/conversation_dto.dart';
 import 'package:frontend/data/dtos/product_dto.dart';
+import 'package:frontend/ui/screens/chat/purchase_confirmation_message.dart';
 import 'package:frontend/ui/widgets/full_screen_image_viewer.dart';
 import 'package:frontend/ui/widgets/s3_cached_network_image.dart';
 
@@ -30,8 +31,15 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayMessageText = PurchaseConfirmationMessage.isPurchaseConfirmation(
+          message.messageText,
+        )
+        ? PurchaseConfirmationMessage.displayText(
+            productTitle: attachedProduct?.title,
+          )
+        : message.messageText;
     final textColor = isCurrentUser ? Colors.white : AppColors.textPrimary;
-    final hasMessageText = message.messageText.trim().isNotEmpty;
+    final hasMessageText = displayMessageText.trim().isNotEmpty;
     final imageUrls = message.imageUrls
         .map((url) => url.trim())
         .where((url) => url.isNotEmpty)
@@ -84,6 +92,7 @@ class ChatBubble extends StatelessWidget {
                   child: _buildBubbleContent(
                     context,
                     bubblePadding: bubblePadding,
+                    displayMessageText: displayMessageText,
                     textColor: textColor,
                     hasMessageText: hasMessageText,
                     hasImages: hasImages,
@@ -101,6 +110,7 @@ class ChatBubble extends StatelessWidget {
   Widget _buildBubbleContent(
     BuildContext context, {
     required EdgeInsets bubblePadding,
+    required String displayMessageText,
     required Color textColor,
     required bool hasMessageText,
     required bool hasImages,
@@ -124,7 +134,7 @@ class ChatBubble extends StatelessWidget {
           ],
           if (hasMessageText)
             SelectableText(
-              message.messageText,
+              displayMessageText,
               style: TextStyle(
                 color: textColor,
                 fontSize: 15,
@@ -233,14 +243,17 @@ class ChatBubble extends StatelessWidget {
     if (imageUrls.length == 1) {
       return LayoutBuilder(
         builder: (context, constraints) {
+          final singleImageHeight =
+              (constraints.maxWidth * 1.08).clamp(180.0, 340.0).toDouble();
+
           return _buildImageTile(
             context,
             imageUrls: imageUrls,
             imageUrl: imageUrls.first,
             index: 0,
             width: constraints.maxWidth,
-            height: 200,
-            fit: BoxFit.fill,
+            height: singleImageHeight,
+            fit: BoxFit.cover,
           );
         },
       );

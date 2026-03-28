@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago_flutter/timeago_flutter.dart';
 
@@ -10,6 +11,7 @@ import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/chat_view_model.dart';
+import '../../../logic/services/profile_content_change_notifier.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/colors.dart';
@@ -29,6 +31,8 @@ import 'widgets/edit_comment_dialog.dart';
 import 'widgets/product_card_action_handler.dart';
 import '../profile/other_profile_page.dart' hide getIt;
 import '../../../logic/services/share_service.dart';
+
+final getIt = GetIt.instance;
 
 class ProductDetailArgs {
   final int productId;
@@ -60,7 +64,7 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage>
     with TickerProviderStateMixin {
-  static const double _productImageAspectRatio = 5 / 4;
+  static const double _productImageAspectRatio = 1;
 
   static const List<String> _reportReasonOptions = [
     'Spam or scam',
@@ -559,6 +563,13 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       final response = await _productRepository.deleteProduct(widget.productId);
       if (!response.isSuccess) {
         throw response.error!;
+      }
+
+      final ownerUserId = _product?.userId;
+      if (ownerUserId != null) {
+        getIt<ProfileContentChangeNotifier>().markProductChanged(
+          ownerUserId: ownerUserId,
+        );
       }
 
       if (!mounted) return;
@@ -1132,6 +1143,29 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     );
   }
 
+  List<CommentDto> _sortCommentsForDisplay(List<CommentDto> comments) {
+    final currentUserId = context.read<UserViewModel>().userId;
+    final sortedComments = List<CommentDto>.from(comments);
+
+    sortedComments.sort((a, b) {
+      final isAOwnComment = currentUserId != null && a.userId == currentUserId;
+      final isBOwnComment = currentUserId != null && b.userId == currentUserId;
+
+      if (isAOwnComment != isBOwnComment) {
+        return isAOwnComment ? -1 : 1;
+      }
+
+      final createdAtComparison = b.createdAt.compareTo(a.createdAt);
+      if (createdAtComparison != 0) {
+        return createdAtComparison;
+      }
+
+      return b.id.compareTo(a.id);
+    });
+
+    return sortedComments;
+  }
+
   Widget _buildComments(List<CommentDto> comments) {
     if (comments.isEmpty) {
       return const Padding(
@@ -1143,15 +1177,17 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       );
     }
 
+    final sortedComments = _sortCommentsForDisplay(comments);
+
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      itemCount: comments.length,
+      itemCount: sortedComments.length,
       separatorBuilder: (_, _) =>
           const Divider(height: 16, color: AppColors.border),
       itemBuilder: (context, index) {
-        final comment = comments[index];
+        final comment = sortedComments[index];
         return CommentItem(
           key: ValueKey(comment.id),
           comment: comment,

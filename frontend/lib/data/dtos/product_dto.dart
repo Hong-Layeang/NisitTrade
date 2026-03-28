@@ -37,9 +37,9 @@ class ProductDto {
     List<LikeDto>? likes,
     List<CommentDto>? comments,
     int? commentCount,
-  })  : likes = likes ?? const [],
-        comments = comments ?? const [],
-        commentCount = commentCount ?? (comments?.length ?? 0);
+  }) : likes = likes ?? const [],
+       comments = comments ?? const [],
+       commentCount = commentCount ?? (comments?.length ?? 0);
 
   static int _toInt(dynamic value, {int fallback = 0}) {
     if (value is int) return value;
@@ -51,8 +51,11 @@ class ProductDto {
   factory ProductDto.fromJson(Map<String, dynamic> json) {
     final parsedComments = json['Comments'] != null
         ? (json['Comments'] as List)
-            .map((comment) => CommentDto.fromJson(comment as Map<String, dynamic>))
-            .toList()
+              .map(
+                (comment) =>
+                    CommentDto.fromJson(comment as Map<String, dynamic>),
+              )
+              .toList()
         : <CommentDto>[];
     final parsedCommentCount = _toInt(
       json['comment_count'] ??
@@ -63,14 +66,15 @@ class ProductDto {
     );
 
     return ProductDto(
-      id: json['id'] as int? ?? 0,
+      id: _toInt(json['id']),
       title: (json['title'] ?? '') as String,
       description: json['description'] as String?,
-      price:
-          json['price'] != null ? double.parse(json['price'].toString()) : 0.0,
+      price: json['price'] != null
+          ? double.parse(json['price'].toString())
+          : 0.0,
       status: (json['status'] ?? 'available') as String,
-      userId: json['user_id'] as int? ?? 0,
-      categoryId: json['category_id'] as int? ?? 0,
+      userId: _toInt(json['user_id'] ?? json['userId']),
+      categoryId: _toInt(json['category_id'] ?? json['categoryId']),
       createdAt: (json['createdAt'] ?? json['created_at']) != null
           ? DateTime.parse((json['createdAt'] ?? json['created_at']) as String)
           : DateTime.now(),
@@ -85,14 +89,16 @@ class ProductDto {
           : null,
       productImages: json['ProductImages'] != null
           ? (json['ProductImages'] as List)
-              .map((img) =>
-                  ProductImageDto.fromJson(img as Map<String, dynamic>))
-              .toList()
+                .map(
+                  (img) =>
+                      ProductImageDto.fromJson(img as Map<String, dynamic>),
+                )
+                .toList()
           : null,
       likes: json['Likes'] != null
           ? (json['Likes'] as List)
-              .map((like) => LikeDto.fromJson(like as Map<String, dynamic>))
-              .toList()
+                .map((like) => LikeDto.fromJson(like as Map<String, dynamic>))
+                .toList()
           : [],
       comments: parsedComments,
       commentCount: parsedCommentCount,
@@ -114,7 +120,8 @@ class ProductDto {
       if (category != null) 'Category': category!.toJson(),
       if (productImages != null)
         'ProductImages': productImages!.map((img) => img.toJson()).toList(),
-      if (likes.isNotEmpty) 'Likes': likes.map((like) => like.toJson()).toList(),
+      if (likes.isNotEmpty)
+        'Likes': likes.map((like) => like.toJson()).toList(),
       if (comments.isNotEmpty)
         'Comments': comments.map((comment) => comment.toJson()).toList(),
       'comment_count': commentsCount,

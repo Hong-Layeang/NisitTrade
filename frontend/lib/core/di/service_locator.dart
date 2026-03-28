@@ -37,6 +37,7 @@ import '../../logic/view_models/marketplace_view_model.dart';
 import '../../logic/view_models/user_view_model.dart';
 import '../../logic/services/presence_websocket_service.dart';
 import '../../logic/services/chat_websocket_service.dart';
+import '../../logic/services/profile_content_change_notifier.dart';
 
 final getIt = GetIt.instance;
 
@@ -94,6 +95,10 @@ Future<void> setupServiceLocator() async {
     () => ChatWebSocketService(),
   );
 
+  getIt.registerLazySingleton<ProfileContentChangeNotifier>(
+    () => ProfileContentChangeNotifier(),
+  );
+
 
   getIt.registerFactory<ProductFeedViewModel>(
     () => ProductFeedViewModel(
@@ -117,6 +122,7 @@ Future<void> setupServiceLocator() async {
       productRepository: getIt<IProductRepository>(),
       productSaveRepository: getIt<IProductSaveRepository>(),
       communityRepository: getIt<ICommunityRepository>(),
+      profileContentChangeNotifier: getIt<ProfileContentChangeNotifier>(),
     ),
   );
 
@@ -130,6 +136,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<CommunityViewModel>(
     () => CommunityViewModel(
       communityRepository: getIt<ICommunityRepository>(),
+      profileContentChangeNotifier: getIt<ProfileContentChangeNotifier>(),
     ),
   );
 

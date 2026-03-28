@@ -549,7 +549,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     if (shouldDelete != true || !mounted) return;
 
     final vm = context.read<CommunityViewModel>();
-    final ok = await vm.deletePost(post.id);
+    final ok = await vm.deletePost(post.id, ownerUserId: post.author.id);
     if (!mounted) return;
 
     if (!ok) {
@@ -844,15 +844,32 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       );
     }
 
+    final sortedComments = List<CommunityCommentDto>.from(comments)
+      ..sort((a, b) {
+        final isAOwnComment = userId != null && a.userId == userId;
+        final isBOwnComment = userId != null && b.userId == userId;
+
+        if (isAOwnComment != isBOwnComment) {
+          return isAOwnComment ? -1 : 1;
+        }
+
+        final createdAtComparison = b.createdAt.compareTo(a.createdAt);
+        if (createdAtComparison != 0) {
+          return createdAtComparison;
+        }
+
+        return b.id.compareTo(a.id);
+      });
+
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      itemCount: comments.length,
+      itemCount: sortedComments.length,
       separatorBuilder: (_, _) =>
           const Divider(height: 16, color: AppColors.border),
       itemBuilder: (context, index) {
-        final comment = comments[index];
+        final comment = sortedComments[index];
         final handle = buildSchoolShortName(
           universityName: comment.user?.university?.name,
           universityDomain: comment.user?.university?.domain,

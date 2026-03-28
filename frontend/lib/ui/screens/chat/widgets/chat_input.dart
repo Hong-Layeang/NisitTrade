@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/constants/colors.dart';
+import '../../../../ui/widgets/app_loading.dart';
 import '../../../../ui/widgets/full_screen_image_viewer.dart';
 
 class ChatInput extends StatefulWidget {
-  final Future<void> Function(String, List<String>) onSendMessage;
+  final Future<bool> Function(String, List<String>) onSendMessage;
   final bool isLoading;
   final bool isSendingMessage;
   final bool isDisabled;
@@ -90,9 +91,13 @@ class _ChatInputState extends State<ChatInput> {
     final message = _controller.text.trim();
     final imagePaths = _selectedImages.map((image) => image.path).toList(growable: false);
 
-    await widget.onSendMessage(message, imagePaths);
+    final didSend = await widget.onSendMessage(message, imagePaths);
 
     if (!mounted) {
+      return;
+    }
+
+    if (!didSend) {
       return;
     }
 
@@ -203,37 +208,43 @@ class _ChatInputState extends State<ChatInput> {
   }
 
   Widget _buildSendButton() {
-    return GestureDetector(
-      onTap: _canSend ? _handleSend : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: _canSend
-              ? const LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: _canSend ? null : AppColors.border,
-        ),
-        child: Center(
-          child: widget.isSendingMessage
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : const Icon(
-                  Icons.arrow_upward_rounded,
-                  color: Colors.white,
-                ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _canSend ? _handleSend : null,
+        customBorder: const CircleBorder(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: _canSend
+                ? const LinearGradient(
+                    colors: [AppColors.primary, AppColors.secondary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: _canSend ? null : AppColors.border,
+          ),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 160),
+              child: widget.isSendingMessage
+                  ? const AppLoadingIndicator(
+                      key: ValueKey('chat_send_loading'),
+                      size: 20,
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    )
+                  : const Icon(
+                      Icons.arrow_upward_rounded,
+                      key: ValueKey('chat_send_icon'),
+                      color: Colors.white,
+                    ),
+            ),
+          ),
         ),
       ),
     );

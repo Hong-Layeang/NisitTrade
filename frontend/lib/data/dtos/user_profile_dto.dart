@@ -16,6 +16,8 @@ class UserProfileDto {
   final UniversityDto? university;
   final int followerCount;
   final int followingCount;
+  final double averageRating;
+  final int ratingCount;
   final bool isFollowing;
   final String? emailDomain;
   final bool isBlockedByMe;
@@ -39,6 +41,8 @@ class UserProfileDto {
     this.university,
     this.followerCount = 0,
     this.followingCount = 0,
+    this.averageRating = 0,
+    this.ratingCount = 0,
     this.isFollowing = false,
     this.emailDomain,
     this.isBlockedByMe = false,
@@ -79,6 +83,16 @@ class UserProfileDto {
           : null,
       followerCount: json['follower_count'] as int? ?? 0,
       followingCount: json['following_count'] as int? ?? 0,
+        averageRating: json['avg_rating'] is num
+          ? (json['avg_rating'] as num).toDouble()
+          : (json['avg_rating'] is String
+            ? double.tryParse(json['avg_rating'] as String) ?? 0
+            : 0),
+        ratingCount: json['rating_count'] is num
+          ? (json['rating_count'] as num).toInt()
+          : (json['rating_count'] is String
+            ? int.tryParse(json['rating_count'] as String) ?? 0
+            : 0),
       isFollowing: json['is_following'] as bool? ?? false,
       emailDomain: json['email_domain'] as String?,
       isBlockedByMe: json['is_blocked_by_me'] as bool? ?? false,
@@ -95,6 +109,8 @@ class UserProfileDto {
     bool? isFollowing,
     int? followerCount,
     int? followingCount,
+    double? averageRating,
+    int? ratingCount,
     String? coverImage,
     String? profileImage,
     bool? isBlockedByMe,
@@ -121,6 +137,8 @@ class UserProfileDto {
       university: university,
       followerCount: followerCount ?? this.followerCount,
       followingCount: followingCount ?? this.followingCount,
+      averageRating: averageRating ?? this.averageRating,
+      ratingCount: ratingCount ?? this.ratingCount,
       isFollowing: isFollowing ?? this.isFollowing,
       emailDomain: emailDomain,
       isBlockedByMe: isBlockedByMe ?? this.isBlockedByMe,

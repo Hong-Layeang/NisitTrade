@@ -70,17 +70,9 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    final fromIndex = _currentIndex;
     setState(() {
       _currentIndex = index;
     });
-
-    const contentTabs = {2, 3};
-    if (index == 4 && contentTabs.contains(fromIndex)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _profileKey.currentState?.refresh();
-      });
-    }
   }
 
   void _handleTabReselected(int index) {

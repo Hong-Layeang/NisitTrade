@@ -21,8 +21,8 @@ class PresenceViewModel extends ChangeNotifier with WidgetsBindingObserver {
   PresenceViewModel({
     required PresenceWebSocketService presenceService,
     AuthTokenStore? tokenStore,
-  })  : _presenceService = presenceService,
-        _tokenStore = tokenStore ?? AuthTokenStore.instance {
+  }) : _presenceService = presenceService,
+       _tokenStore = tokenStore ?? AuthTokenStore.instance {
     WidgetsBinding.instance.addObserver(this);
     _subscription = _presenceService.events.listen(_onPresenceEvent);
 
@@ -79,7 +79,9 @@ class PresenceViewModel extends ChangeNotifier with WidgetsBindingObserver {
         _presenceService.watchUserIds(_watchedUserIds);
       }
     } catch (error, stackTrace) {
-      debugPrint('PresenceViewModel.ensureConnected error: $error\n$stackTrace');
+      debugPrint(
+        'PresenceViewModel.ensureConnected error: $error\n$stackTrace',
+      );
     } finally {
       _isEnsuringConnection = false;
     }
@@ -95,11 +97,12 @@ class PresenceViewModel extends ChangeNotifier with WidgetsBindingObserver {
       case AppLifecycleState.resumed:
         unawaited(ensureConnected());
         break;
+      case AppLifecycleState.detached:
+        unawaited(_presenceService.disconnect());
+        break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
-        unawaited(_presenceService.disconnect());
         break;
     }
   }

@@ -16,6 +16,7 @@ import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/constants/app_limits.dart';
 import '../../../core/constants/colors.dart';
+import '../../../logic/services/profile_content_change_notifier.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../widgets/app_snack_bar.dart';
@@ -65,6 +66,7 @@ class _EditProductPageState extends State<EditProductPage> {
     _orchestrator = ProductFormOrchestrator(
       productRepository: getIt<IProductRepository>(),
       productImageRepository: getIt<IProductImageRepository>(),
+      profileContentChangeNotifier: getIt<ProfileContentChangeNotifier>(),
     );
     _initializeForm();
     _loadCategories();

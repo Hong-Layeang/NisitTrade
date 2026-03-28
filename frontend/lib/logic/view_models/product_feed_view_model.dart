@@ -241,6 +241,10 @@ class ProductFeedViewModel extends ChangeNotifier {
     return _interactionService.shareProduct(productId);
   }
 
+  void applyExternalProductUpdate(ProductDto product) {
+    _upsertProduct(product);
+  }
+
   Future<void> reportProduct({
     required int productId,
     required String reason,
@@ -271,6 +275,14 @@ class ProductFeedViewModel extends ChangeNotifier {
 
     // Update cache
     _productCache[nextProduct.id] = nextProduct;
+
+    if (nextProduct.isHidden || nextProduct.isSold) {
+      _products = _products
+          .where((item) => item.id != nextProduct.id)
+          .toList(growable: false);
+      notifyListeners();
+      return;
+    }
     
     final index = _products.indexWhere((item) => item.id == nextProduct.id);
     if (index == -1) {

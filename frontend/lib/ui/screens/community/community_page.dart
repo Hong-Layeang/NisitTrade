@@ -433,7 +433,7 @@ class CommunityPageState extends State<CommunityPage>
     if (shouldDelete != true || !mounted) return;
 
     final vm = context.read<CommunityViewModel>();
-    final ok = await vm.deletePost(post.id);
+    final ok = await vm.deletePost(post.id, ownerUserId: post.author.id);
     if (!mounted) return;
 
     if (!ok) {

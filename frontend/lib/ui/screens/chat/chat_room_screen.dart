@@ -12,18 +12,23 @@ import '../../../data/dtos/conversation_dto.dart';
 import '../../../data/dtos/product_dto.dart';
 import '../../../data/repository_interfaces/i_product_repository.dart';
 import '../../../data/repository_interfaces/i_user_repository.dart';
+import '../../../logic/services/profile_content_change_notifier.dart';
 import '../../../logic/view_models/chat_view_model.dart';
 import '../../../logic/view_models/presence_view_model.dart';
+import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
-import '../../../ui/screens/marketplace/product_detail_page.dart';
+import '../../../ui/screens/marketplace/product_detail_page.dart' hide getIt;
 import '../../../ui/screens/profile/other_profile_page.dart' hide getIt;
 import '../../../ui/widgets/app_action_sheet.dart';
+import '../../../ui/widgets/app_loading.dart';
 import '../../../ui/widgets/app_snack_bar.dart';
+import '../../../ui/widgets/loading_error_builder.dart';
 import '../../../ui/widgets/user_widgets.dart';
 import 'widgets/attachment_carousel.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input.dart';
 import 'widgets/chat_menu_helpers.dart';
+import 'purchase_confirmation_message.dart';
 import 'widgets/purchase_rating_dialog.dart';
 
 class ChatRoomScreen extends StatefulWidget {
@@ -41,6 +46,7 @@ class ChatRoomScreen extends StatefulWidget {
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
+
 class _ChatRoomScreenState extends State<ChatRoomScreen>
     with WidgetsBindingObserver {
   late ChatRoomViewModel _viewModel;
@@ -51,7 +57,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
   final Set<int> _expiredPromptedProductIds = {};
+  final Set<int> _autoPromptedPurchaseConfirmationMessageIds = {};
   int? _lastSeenBottomMessageId;
+  bool _hasPositionedLatestMessage = false;
+  bool _isShowingPurchaseConfirmationPrompt = false;
 
   @override
   void initState() {
@@ -90,6 +99,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChanged);
+    if (_viewModel.currentConversation?.id == widget.conversationId) {
+      _viewModel.clearCurrentConversation(notify: false);
+    }
     _countdownTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
@@ -99,22 +111,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed && _hasInitialized) {
-      // Reconnect WS and rejoin room to catch any missed messages
       _ensureWebSocketAndJoin();
-      // Reload messages to get anything sent while the app was backgrounded
-      _refreshMessages();
     }
   }
 
-  Future<void> _refreshMessages() async {
-    if (!mounted) return;
-    await _viewModel.loadMessages(refresh: true);
-    if (mounted) _scrollToBottom(animated: false);
-  }
-
-  /// Scrolls to the bottom whenever a new message is appended at the end
-  /// of the list (e.g. incoming WebSocket message). Only auto-scrolls when
-  /// the user is already near the bottom so we don't interrupt reading.
   void _onViewModelChanged() {
     final messages = _viewModel.messages;
     if (messages.isEmpty) return;
@@ -125,6 +125,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         _scrollToBottom();
       }
     }
+
+    _maybePromptSellerForConfirmedPurchase();
   }
 
   bool _isNearBottom() {
@@ -143,6 +145,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }
 
   Future<void> _loadConversation() async {
+    _hasPositionedLatestMessage = false;
+    _lastSeenBottomMessageId = null;
+
     final currentConversation = _viewModel.currentConversation;
     final hasMatchingConversation =
         currentConversation?.id == widget.conversationId;
@@ -155,15 +160,91 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
 
     if (_viewModel.currentConversation?.id == widget.conversationId) {
-      await _viewModel.loadMessages(refresh: true);
+      await _viewModel.loadMessages(refresh: true, preserveExisting: false);
     }
 
     _watchCurrentParticipantPresence();
     _scrollToBottom(animated: false);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _checkForNewlyExpiredAttachments();
+      if (!mounted) {
+        return;
+      }
+
+      _checkForNewlyExpiredAttachments();
+      _maybePromptSellerForConfirmedPurchase();
     });
+  }
+
+  void _maybePromptSellerForConfirmedPurchase() {
+    if (!mounted || _isShowingPurchaseConfirmationPrompt) {
+      return;
+    }
+
+    final conversation = _viewModel.currentConversation;
+    if (conversation == null || conversation.id != widget.conversationId) {
+      return;
+    }
+
+    final currentUserId = _getCurrentUserId();
+    if (currentUserId == 0) {
+      return;
+    }
+
+    for (final message in _viewModel.messages.reversed) {
+      final confirmedProductId = PurchaseConfirmationMessage.tryParseProductId(
+        message.messageText,
+      );
+      if (confirmedProductId == null) {
+        continue;
+      }
+      if (_autoPromptedPurchaseConfirmationMessageIds.contains(message.id)) {
+        continue;
+      }
+
+      _autoPromptedPurchaseConfirmationMessageIds.add(message.id);
+
+      if (!_isBuyerMessageForCurrentConversation(message, conversation)) {
+        continue;
+      }
+
+      if (message.senderId == currentUserId) {
+        continue;
+      }
+
+      AttachedProduct? confirmedProduct;
+      for (final attachedProduct in _viewModel.attachedProducts) {
+        if (attachedProduct.product.id == confirmedProductId) {
+          confirmedProduct = attachedProduct;
+          break;
+        }
+      }
+
+      if (confirmedProduct == null) {
+        continue;
+      }
+      if (confirmedProduct.product.isSold || confirmedProduct.product.isHidden) {
+        _viewModel.removeAttachedProduct(confirmedProduct.product.id);
+        continue;
+      }
+      if (!_isProductOwnerForConversation(confirmedProduct.product, conversation)) {
+        continue;
+      }
+
+      _isShowingPurchaseConfirmationPrompt = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) {
+          _isShowingPurchaseConfirmationPrompt = false;
+          return;
+        }
+
+        await _handleMarkAsSold(confirmedProduct!.product);
+        if (mounted) {
+          _isShowingPurchaseConfirmationPrompt = false;
+        }
+      });
+      break;
+    }
   }
 
   void _watchCurrentParticipantPresence() {
@@ -200,9 +281,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     return false;
   }
 
-  void _scrollToBottom({bool animated = true}) {
+  void _scrollToBottom({bool animated = true, int retryFrames = 8}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
       if (!_scrollController.hasClients) {
+        if (retryFrames > 0) {
+          _scrollToBottom(animated: animated, retryFrames: retryFrames - 1);
+        }
         return;
       }
 
@@ -216,6 +304,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       } else {
         _scrollController.jumpTo(target);
       }
+
+      _hasPositionedLatestMessage = true;
     });
   }
 
@@ -224,12 +314,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       return;
     }
 
+    if (!_hasPositionedLatestMessage) {
+      return;
+    }
+
     if (_scrollController.position.pixels <= 120) {
       _viewModel.loadMoreMessages();
     }
   }
 
-  Future<void> _handleSendMessage(
+  Future<bool> _handleSendMessage(
     String messageText,
     List<String> imagePaths,
   ) async {
@@ -245,13 +339,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
     if (success) {
       _scrollToBottom();
-      return;
+      return true;
+    }
+
+    if (!mounted) {
+      return false;
     }
 
     AppSnackBar.error(
       context,
       _viewModel.sendMessageError ?? 'Failed to send message',
     );
+    return false;
   }
 
   @override
@@ -351,67 +450,73 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     final isShowingRequestedConversation =
         conversation?.id == widget.conversationId;
 
-    if (viewModel.isLoadingCurrentConversation &&
-        !isShowingRequestedConversation) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (viewModel.currentConversationError != null) {
-      return _buildErrorState(viewModel.currentConversationError ?? '');
-    }
-
-    if (conversation == null) {
-      return const Center(child: Text('No conversation found'));
-    }
-
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFF4FBFF), AppColors.surface],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Column(
-        children: [
-          // Attachment carousel for attached products
-          Consumer<ChatRoomViewModel>(
-            builder: (context, vm, _) {
-              if (vm.attachedProducts.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              return AttachmentCarousel(
-                attachedProducts: vm.attachedProducts,
-                countdownLabelBuilder: (ap) {
-                  final isOwner =
-                      ap.product.userId == _getCurrentUserId();
-                  return _buildProductCountdownLabel(ap, isOwner: isOwner);
-                },
-                isExpiredBuilder: _isProductCountdownExpired,
-                isOwnerBuilder: (product) =>
-                    product.userId == _getCurrentUserId(),
-                onTapProduct: (product) => _navigateToProduct(product),
-                onConfirmPurchase: (product) =>
-                    _handleConfirmPurchase(product),
-                onMarkAsSold: (product) => _handleMarkAsSold(product),
-                onRemove: (product) =>
-                    vm.removeAttachedProduct(product.id),
-              );
-            },
-          ),
-          Expanded(child: _buildMessagesList(viewModel)),
-          if (viewModel.isSelectionMode)
-            const SizedBox.shrink()
-          else if (isMessagingBlocked)
-            _buildBlockedComposerState(conversation)
-          else
-            ChatInput(
-              onSendMessage: _handleSendMessage,
-              isLoading: viewModel.isLoadingCurrentConversation,
-              isSendingMessage: viewModel.isSendingMessage,
+    return LoadingErrorBuilder(
+      isLoading:
+          viewModel.isLoadingCurrentConversation &&
+          !isShowingRequestedConversation,
+      error: isShowingRequestedConversation
+          ? null
+          : viewModel.currentConversationError,
+      onRetry: _loadConversation,
+      child: conversation == null
+          ? const Center(child: Text('No conversation found'))
+          : Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFF4FBFF), AppColors.surface],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Attachment carousel for attached products
+                  Consumer<ChatRoomViewModel>(
+                    builder: (context, vm, _) {
+                      if (vm.attachedProducts.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return AttachmentCarousel(
+                        attachedProducts: vm.attachedProducts,
+                        countdownLabelBuilder: (ap) {
+                          final isOwner = _isProductOwnerForConversation(
+                            ap.product,
+                            conversation,
+                          );
+                          return _buildProductCountdownLabel(
+                            ap,
+                            isOwner: isOwner,
+                          );
+                        },
+                        isExpiredBuilder: _isProductCountdownExpired,
+                        isOwnerBuilder: (product) =>
+                            _isProductOwnerForConversation(
+                              product,
+                              conversation,
+                            ),
+                        onTapProduct: (product) => _navigateToProduct(product),
+                        onConfirmPurchase: (product) =>
+                            _handleConfirmPurchase(product),
+                        onMarkAsSold: (product) => _handleMarkAsSold(product),
+                        onRemove: (product) =>
+                            vm.removeAttachedProduct(product.id),
+                      );
+                    },
+                  ),
+                  Expanded(child: _buildMessagesList(viewModel)),
+                  if (viewModel.isSelectionMode)
+                    const SizedBox.shrink()
+                  else if (isMessagingBlocked)
+                    _buildBlockedComposerState(conversation)
+                  else
+                    ChatInput(
+                      onSendMessage: _handleSendMessage,
+                      isLoading: viewModel.isLoadingCurrentConversation,
+                      isSendingMessage: viewModel.isSendingMessage,
+                    ),
+                ],
+              ),
             ),
-        ],
-      ),
     );
   }
 
@@ -431,7 +536,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => _EditMessageDialog(initialText: message.messageText),
+      builder: (context) =>
+          _EditMessageDialog(initialText: message.messageText),
     );
 
     if (!mounted || result == null) return;
@@ -471,7 +577,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     final success = await viewModel.deleteSelectedMessages();
     if (!mounted) return;
     if (success) {
-      AppSnackBar.success(context, '$count message${count > 1 ? 's' : ''} deleted');
+      AppSnackBar.success(
+        context,
+        '$count message${count > 1 ? 's' : ''} deleted',
+      );
     } else {
       AppSnackBar.error(context, 'Failed to delete messages');
     }
@@ -497,12 +606,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
     final participantUserId = participant?.userId ?? 0;
     final realtimePresence = participantUserId > 0
-      ? presenceViewModel.presenceForUser(participantUserId)
-      : null;
+        ? presenceViewModel.presenceForUser(participantUserId)
+        : null;
     final isOnline =
-      realtimePresence?.isOnline ?? participant?.user?.isOnline ?? false;
+        realtimePresence?.isOnline ?? participant?.user?.isOnline ?? false;
     final lastSeenAt =
-      realtimePresence?.lastSeenAt ?? participant?.user?.lastSeenAt;
+        realtimePresence?.lastSeenAt ?? participant?.user?.lastSeenAt;
     final statusInfo = buildPresenceLabel(
       isOnline: isOnline,
       lastSeenAt: lastSeenAt,
@@ -511,112 +620,74 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     return GestureDetector(
       onTap: participantUserId > 0
           ? () => Navigator.of(context).pushNamed(
-                AppRoutes.userProfile,
-                arguments: OtherProfileArgs(userId: participantUserId),
-              )
+              AppRoutes.userProfile,
+              arguments: OtherProfileArgs(userId: participantUserId),
+            )
           : null,
       child: Row(
         children: [
           UserAvatar(imageUrl: avatarUrl, displayName: displayName, radius: 18),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                  if (schoolShortName.isNotEmpty) ...[
+                    if (schoolShortName.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        schoolShortName,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: presenceColor(isOnline: isOnline),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Text(
-                      schoolShortName,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                    Expanded(
+                      child: Text(
+                        statusInfo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
-                ],
-              ),
-              Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: presenceColor(isOnline: isOnline),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      statusInfo,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(String message) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 44,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Could not load this conversation',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadConversation,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -630,13 +701,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
   void _checkForNewlyExpiredAttachments() {
     final currentUserId = _getCurrentUserId();
+    final conversation = _viewModel.currentConversation;
     for (final ap in List.of(_viewModel.attachedProducts)) {
       if (!_isProductCountdownExpired(ap)) continue;
       if (_expiredPromptedProductIds.contains(ap.product.id)) continue;
 
       _expiredPromptedProductIds.add(ap.product.id);
-      final isOwner =
-          currentUserId != 0 && ap.product.userId == currentUserId;
+      final ownerId = _resolveProductOwnerId(ap.product, conversation);
+      final isOwner = currentUserId != 0 && ownerId == currentUserId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           if (isOwner) {
@@ -681,6 +753,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     final choice = await _showUpdateListingStatusDialog(product);
     if (!mounted) return;
 
+    if (choice == null) {
+      return;
+    }
+
     _viewModel.removeAttachedProduct(product.id);
 
     if (choice == _ListingStatusChoice.markAsSold) {
@@ -690,7 +766,21 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       );
       if (!mounted) return;
       if (response.isSuccess) {
-        AppSnackBar.success(context, 'Listing marked as sold and removed from feed');
+        final updatedProduct = response.data;
+        if (updatedProduct != null) {
+          context.read<ProductFeedViewModel>().applyExternalProductUpdate(
+            updatedProduct,
+          );
+          getIt<ProfileContentChangeNotifier>().markProductChanged(
+            ownerUserId: updatedProduct.userId,
+          );
+        }
+
+        if (!mounted) return;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.marketplace,
+          (route) => false,
+        );
       } else {
         AppSnackBar.error(
           context,
@@ -698,11 +788,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         );
       }
     }
-    // _ListingStatusChoice.keepActive: do nothing - listing stays on feed
   }
 
-    Future<_ListingStatusChoice?> _showUpdateListingStatusDialog(
-      ProductDto product) {
+  bool _isBuyerMessageForCurrentConversation(
+    MessageDto message,
+    ConversationDto conversation,
+  ) {
+    final participant = _otherParticipant(conversation);
+    if (participant == null || participant.userId <= 0) {
+      return false;
+    }
+    return message.senderId == participant.userId;
+  }
+
+  Future<_ListingStatusChoice?> _showUpdateListingStatusDialog(
+    ProductDto product,
+  ) {
     return showModalBottomSheet<_ListingStatusChoice>(
       context: context,
       isScrollControlled: true,
@@ -715,10 +816,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   Future<void> _handleConfirmPurchase(ProductDto product) async {
     final conversation = _viewModel.currentConversation;
     final sellerParticipant = conversation != null
-        ? _otherParticipant(conversation)
+        ? _sellerParticipant(conversation, product)
         : null;
-    final sellerName = sellerParticipant?.user?.name ??
-        'Seller';
+    final sellerName = sellerParticipant?.user?.name ?? 'Seller';
 
     final result = await showPurchaseRatingDialog(
       context,
@@ -733,13 +833,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       return;
     }
 
-    final sellerId = product.userId != 0
-        ? product.userId
-        : (sellerParticipant?.userId ?? 0);
+    final sellerId = _resolveProductOwnerId(product, conversation);
+    final currentUserId = _getCurrentUserId();
 
     if (sellerId == 0) {
       _viewModel.removeAttachedProduct(product.id);
       AppSnackBar.error(context, 'Could not identify seller to rate');
+      return;
+    }
+
+    if (currentUserId != 0 && sellerId == currentUserId) {
+      _viewModel.removeAttachedProduct(product.id);
+      AppSnackBar.error(context, 'You cannot rate your own listing');
       return;
     }
 
@@ -755,14 +860,34 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _viewModel.removeAttachedProduct(product.id);
 
     if (response.isSuccess) {
-      AppSnackBar.success(context, 'Review submitted - thank you!');
+      final notifiedSeller = await _sendPurchaseConfirmationSignal(product);
+      if (!mounted) return;
+
+      AppSnackBar.success(
+        context,
+        notifiedSeller
+            ? 'Review submitted. Seller can now update the listing.'
+            : 'Review submitted - thank you!',
+      );
     } else {
-      AppSnackBar.error(context, response.error?.message ?? 'Failed to submit review');
+      AppSnackBar.error(
+        context,
+        response.error?.message ?? 'Failed to submit review',
+      );
     }
   }
 
-  String _buildProductCountdownLabel(AttachedProduct ap,
-      {bool isOwner = false}) {
+  Future<bool> _sendPurchaseConfirmationSignal(ProductDto product) async {
+    return _viewModel.sendMessage(
+      PurchaseConfirmationMessage.build(productId: product.id),
+      attachConversationProduct: false,
+    );
+  }
+
+  String _buildProductCountdownLabel(
+    AttachedProduct ap, {
+    bool isOwner = false,
+  }) {
     final startedAt = ap.countdownStartedAt;
     if (startedAt == null) {
       return isOwner ? 'Awaiting buyer' : 'Awaiting purchase message';
@@ -794,12 +919,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }
 
   Widget _buildMessagesList(ChatRoomViewModel viewModel) {
-    if (viewModel.isLoadingMessages && viewModel.messages.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     if (viewModel.messages.isEmpty) {
-      return LayoutBuilder(
+      final emptyState = LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
@@ -848,6 +969,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           );
         },
       );
+
+      return LoadingErrorBuilder(
+        isLoading: viewModel.isLoadingMessages,
+        error: viewModel.messagesError,
+        onRetry: () => viewModel.loadMessages(refresh: true),
+        child: emptyState,
+      );
     }
 
     final timelineItems = _buildTimelineItems(viewModel);
@@ -860,7 +988,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         if (index == 0 && viewModel.isLoadingMessages) {
           return const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: AppLoadingIndicator(size: 22, strokeWidth: 2.2),
+            ),
           );
         }
 
@@ -1279,11 +1409,56 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         );
   }
 
+  ConversationParticipantDto? _sellerParticipant(
+    ConversationDto conversation,
+    ProductDto product,
+  ) {
+    final ownerId = _resolveProductOwnerId(product, conversation);
+    if (ownerId > 0) {
+      final matchingParticipant = conversation.participants
+          ?.cast<ConversationParticipantDto?>()
+          .firstWhere(
+            (participant) => participant?.userId == ownerId,
+            orElse: () => null,
+          );
+      if (matchingParticipant != null) {
+        return matchingParticipant;
+      }
+    }
+    return _otherParticipant(conversation);
+  }
+
+  bool _isProductOwnerForConversation(
+    ProductDto product,
+    ConversationDto? conversation,
+  ) {
+    final currentUserId = _getCurrentUserId();
+    if (currentUserId == 0) {
+      return false;
+    }
+    return _resolveProductOwnerId(product, conversation) == currentUserId;
+  }
+
+  int _resolveProductOwnerId(
+    ProductDto product,
+    ConversationDto? conversation,
+  ) {
+    if (product.userId > 0) {
+      return product.userId;
+    }
+
+    final conversationProduct = conversation?.product;
+    if (conversationProduct != null && conversationProduct.id == product.id) {
+      return conversationProduct.userId;
+    }
+
+    return 0;
+  }
+
   int _getCurrentUserId() {
     final userViewModel = Provider.of<UserViewModel>(context, listen: false);
     return userViewModel.userId ?? 0;
   }
-
 }
 
 class _ChatTimelineItem {
@@ -1410,8 +1585,11 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.check_rounded,
-                        color: Colors.white, size: 24),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1436,7 +1614,9 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 7),
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(20),
@@ -1445,8 +1625,11 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.sell_outlined,
-                          size: 13, color: AppColors.primary),
+                      const Icon(
+                        Icons.sell_outlined,
+                        size: 13,
+                        color: AppColors.primary,
+                      ),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
@@ -1467,10 +1650,13 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.of(context)
-                        .pop(_ListingStatusChoice.markAsSold),
-                    icon: const Icon(Icons.remove_shopping_cart_outlined,
-                        size: 18),
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pop(_ListingStatusChoice.markAsSold),
+                    icon: const Icon(
+                      Icons.remove_shopping_cart_outlined,
+                      size: 18,
+                    ),
                     label: const Text('Mark as Sold - Remove from Feed'),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
@@ -1491,8 +1677,9 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context)
-                        .pop(_ListingStatusChoice.keepActive),
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pop(_ListingStatusChoice.keepActive),
                     icon: const Icon(Icons.layers_outlined, size: 18),
                     label: const Text('Keep Listing Active'),
                     style: OutlinedButton.styleFrom(

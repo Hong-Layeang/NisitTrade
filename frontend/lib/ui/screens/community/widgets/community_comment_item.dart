@@ -40,7 +40,7 @@ class CommunityCommentItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.only(top: 1),
           child: GestureDetector(
             onTap: onUserTap,
             child: UserAvatar(
@@ -50,13 +50,13 @@ class CommunityCommentItem extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: InkWell(
@@ -98,13 +98,13 @@ class CommunityCommentItem extends StatelessWidget {
                   ),
                   if (showEditMenu)
                     SizedBox(
-                      width: 24,
-                      height: 24,
+                      width: 20,
+                      height: 20,
                       child: PopupMenuButton<String>(
                         padding: EdgeInsets.zero,
                         icon: const Icon(
                           Icons.more_horiz,
-                          size: 18,
+                          size: 16,
                           color: AppColors.textSecondary,
                         ),
                         onSelected: (value) {
@@ -150,22 +150,23 @@ class CommunityCommentItem extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 0),
               Text(
                 content,
                 style: const TextStyle(
                   color: AppColors.textPrimary,
-                  height: 1.4,
+                  fontSize: 14,
+                  height: 1.3,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Timeago(
                 date: createdAt,
                 builder: (context, value) => Text(
                   value,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 12,
+                    fontSize: 11,
                   ),
                 ),
               ),

@@ -5,12 +5,17 @@ import 'package:flutter/material.dart';
 import '../../core/errors/api_exception.dart';
 import '../../data/dtos/community_post_dto.dart';
 import '../../data/repository_interfaces/i_community_repository.dart';
+import '../services/profile_content_change_notifier.dart';
 
 class CommunityViewModel extends ChangeNotifier {
-  CommunityViewModel({required ICommunityRepository communityRepository})
-      : _repository = communityRepository;
+  CommunityViewModel({
+    required ICommunityRepository communityRepository,
+    required ProfileContentChangeNotifier profileContentChangeNotifier,
+  })  : _repository = communityRepository,
+        _profileContentChangeNotifier = profileContentChangeNotifier;
 
   final ICommunityRepository _repository;
+  final ProfileContentChangeNotifier _profileContentChangeNotifier;
 
   List<CommunityPostDto> _posts = [];
   bool _isLoading = false;
@@ -111,6 +116,9 @@ class CommunityViewModel extends ChangeNotifier {
       _posts = [newPost, ..._posts];
 
       await load(feed: _activeFeed);
+      _profileContentChangeNotifier.markCommunityPostChanged(
+        ownerUserId: newPost.author.id,
+      );
       return true;
     } on ApiException catch (e) {
       _error = e.message;
@@ -195,7 +203,13 @@ class CommunityViewModel extends ChangeNotifier {
           ? await _repository.savePost(postId)
           : await _repository.unsavePost(postId);
       if (!response.isSuccess) throw response.error!;
-      return getPostDetail(postId);
+      final updatedPost = await getPostDetail(postId);
+      if (updatedPost != null) {
+        _profileContentChangeNotifier.markCommunityPostChanged(
+          ownerUserId: updatedPost.author.id,
+        );
+      }
+      return updatedPost;
     } on ApiException catch (e) {
       _error = e.message;
       notifyListeners();
@@ -233,11 +247,21 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> deletePost(int postId) async {
+  Future<bool> deletePost(int postId, {int? ownerUserId}) async {
     try {
+      final existingPost = _posts.cast<CommunityPostDto?>().firstWhere(
+        (post) => post?.id == postId,
+        orElse: () => null,
+      );
       final response = await _repository.deletePost(postId);
       if (!response.isSuccess) throw response.error!;
       _posts = _posts.where((post) => post.id != postId).toList();
+      final changedOwnerUserId = ownerUserId ?? existingPost?.author.id;
+      if (changedOwnerUserId != null) {
+        _profileContentChangeNotifier.markCommunityPostChanged(
+          ownerUserId: changedOwnerUserId,
+        );
+      }
       notifyListeners();
       return true;
     } on ApiException catch (e) {

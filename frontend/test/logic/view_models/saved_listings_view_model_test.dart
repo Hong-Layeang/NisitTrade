@@ -9,6 +9,7 @@ import 'package:frontend/data/repository_interfaces/i_community_repository.dart'
 import 'package:frontend/data/repository_interfaces/i_product_repository.dart';
 import 'package:frontend/data/repository_interfaces/i_product_save_repository.dart';
 import 'package:frontend/data/repository_interfaces/i_user_repository.dart';
+import 'package:frontend/logic/services/profile_content_change_notifier.dart';
 import 'package:frontend/logic/view_models/saved_listings_view_model.dart';
 
 void main() {
@@ -25,6 +26,7 @@ void main() {
         productRepository: productRepo,
         productSaveRepository: saveRepo,
         communityRepository: communityRepo,
+        profileContentChangeNotifier: ProfileContentChangeNotifier(),
       );
 
       await vm.loadSavedListings(userId: 99);
@@ -53,6 +55,7 @@ void main() {
         productRepository: productRepo,
         productSaveRepository: saveRepo,
         communityRepository: communityRepo,
+        profileContentChangeNotifier: ProfileContentChangeNotifier(),
       );
 
       await vm.loadSavedListings(userId: 99);
@@ -81,6 +84,7 @@ void main() {
         productRepository: productRepo,
         productSaveRepository: saveRepo,
         communityRepository: communityRepo,
+        profileContentChangeNotifier: ProfileContentChangeNotifier(),
       );
 
       await vm.loadSavedListings(userId: 99);

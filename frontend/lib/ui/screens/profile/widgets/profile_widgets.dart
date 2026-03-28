@@ -2,15 +2,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../data/dtos/university_dto.dart';
+import '../../../widgets/app_loading.dart';
 
 class ProfileUtils {
   ProfileUtils._();
 
-  /// Extract a short school abbreviation from the university's name.
   static String getSchoolShortName(UniversityDto? university) {
     if (university == null) return 'N/A';
 
-    // Try abbreviation from name first (first letter of each significant word)
     const skipWords = {'of', 'the', 'and', 'in', 'at', 'for', 'a', 'an', 'to'};
     final nameParts = university.name.trim().split(RegExp(r'\s+'));
     final initials = nameParts
@@ -119,11 +118,11 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
                     placeholder: (context, url) => Container(
-                      color: AppColors.primary.withValues(alpha: 0.15),
+                      color: AppColors.surface,
                       child: const Center(
-                        child: CircularProgressIndicator(
+                        child: AppLoadingIndicator(
+                          size: 28,
                           strokeWidth: 2,
-                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -237,49 +236,82 @@ class UserStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: avatarTotalRadius + rowHeight,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: sideSpacing),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _ProfileCountStat(
-                    icon: Icons.person_add_outlined,
-                    count: '$followers',
-                    label: 'Followers',
-                  ),
-                  SizedBox(height: detailGap),
-                  _ProfileCountStat(
-                    icon: Icons.people_outlined,
-                    count: '$following',
-                    label: 'Following',
-                  ),
-                ],
-              ),
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: avatarTotalRadius + rowHeight),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final desiredCenterGap = avatarTotalRadius * 2 + 16;
+          final maxSafeGap = (constraints.maxWidth * 0.52).clamp(120.0, 190.0);
+          final centerGap = desiredCenterGap.clamp(120.0, maxSafeGap);
+          final rowGap = detailGap.clamp(6.0, 8.0);
+          const topInset = 10.0;
+          const secondaryRightRowTopInset = 6.0;
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(sideSpacing, topInset, sideSpacing, 0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _ProfileCountStat(
+                          icon: Icons.person_add_outlined,
+                          count: '$followers',
+                          label: 'Followers',
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: centerGap),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ProfileStatItem(
+                          icon: Icons.school_outlined,
+                          value: major,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: rowGap),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _ProfileCountStat(
+                          icon: Icons.people_outlined,
+                          count: '$following',
+                          label: 'Following',
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: centerGap),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            top: secondaryRightRowTopInset,
+                          ),
+                          child: ProfileStatItem(
+                            icon: Icons.verified_outlined,
+                            value: schoolShortName,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            SizedBox(width: avatarTotalRadius * 2 + 16),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ProfileStatItem(icon: Icons.school_outlined, value: major),
-                  SizedBox(height: detailGap),
-                  ProfileStatItem(
-                    icon: Icons.verified_outlined,
-                    value: schoolShortName,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -301,7 +333,7 @@ class _ProfileCountStat extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: AppColors.textSecondary),
+        Icon(icon, size: 20, color: AppColors.textSecondary),
         const SizedBox(width: 6),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,17 +342,22 @@ class _ProfileCountStat extends StatelessWidget {
             Text(
               count,
               style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
                 color: AppColors.primary,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
                 color: AppColors.textSecondary,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -384,6 +421,8 @@ class ProfileHeaderData {
   final String? bio;
   final int followerCount;
   final int followingCount;
+  final double averageRating;
+  final int ratingCount;
   final String? major;
   final String schoolShortName;
 
@@ -394,6 +433,8 @@ class ProfileHeaderData {
     this.bio,
     required this.followerCount,
     required this.followingCount,
+    this.averageRating = 0,
+    this.ratingCount = 0,
     this.major,
     required this.schoolShortName,
   });
@@ -618,12 +659,19 @@ class ProfileHeaderSection extends StatelessWidget {
     final bio = (data.bio != null && data.bio!.isNotEmpty)
         ? data.bio!
         : 'No bio yet.';
+    final hasRatings = data.ratingCount > 0;
     return Column(
       children: [
         const SizedBox(height: 8),
         Text(
           data.fullName,
           style: textTheme.titleLarge?.copyWith(color: AppColors.primary),
+        ),
+        const SizedBox(height: 10),
+        _ProfileRatingBadge(
+          averageRating: data.averageRating,
+          ratingCount: data.ratingCount,
+          showEmptyState: !hasRatings,
         ),
         const SizedBox(height: 8),
         Padding(
@@ -639,6 +687,57 @@ class ProfileHeaderSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileRatingBadge extends StatelessWidget {
+  final double averageRating;
+  final int ratingCount;
+  final bool showEmptyState;
+
+  const _ProfileRatingBadge({
+    required this.averageRating,
+    required this.ratingCount,
+    required this.showEmptyState,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasRatings = !showEmptyState && ratingCount > 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: hasRatings
+            ? const Color(0xFFFFF6E8)
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: hasRatings ? const Color(0xFFFFD59E) : AppColors.border,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            hasRatings ? Icons.star_rounded : Icons.star_outline_rounded,
+            size: 18,
+            color: hasRatings ? const Color(0xFFE7A328) : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            hasRatings
+                ? '${averageRating.toStringAsFixed(1)} ($ratingCount review${ratingCount == 1 ? '' : 's'})'
+                : 'No buyer ratings yet',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: hasRatings ? const Color(0xFF8B4A05) : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

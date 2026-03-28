@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../../logic/services/s3_presigned_url_service.dart';
+import '../../core/constants/colors.dart';
+import 'app_loading.dart';
 
 /// Widget to display S3 images with automatic presigned URL refresh on 403 errors
 class S3CachedNetworkImage extends StatefulWidget {
@@ -42,6 +44,25 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
   late String _currentImageUrl;
   int _retryCount = 0;
   bool _isLoading = false;
+
+  String? get _stableCacheKey {
+    final directKey = widget.s3Key?.trim();
+    if (directKey != null && directKey.isNotEmpty) {
+      return directKey;
+    }
+
+    final fromCurrent = _extractS3KeyFromUrl(_currentImageUrl)?.trim();
+    if (fromCurrent != null && fromCurrent.isNotEmpty) {
+      return fromCurrent;
+    }
+
+    final fromOriginal = _extractS3KeyFromUrl(widget.imageUrl)?.trim();
+    if (fromOriginal != null && fromOriginal.isNotEmpty) {
+      return fromOriginal;
+    }
+
+    return null;
+  }
 
   bool _isValidNetworkUrl(String? url) {
     final value = url?.trim() ?? '';
@@ -193,10 +214,10 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
       return Container(
         width: widget.width,
         height: widget.height,
-        color: widget.backgroundColor ?? Colors.grey.shade200,
+        color: widget.backgroundColor ?? AppColors.surface,
         child: const Icon(
-          Icons.image_not_supported,
-          color: Colors.grey,
+          Icons.image_not_supported_outlined,
+          color: AppColors.textSecondary,
         ),
       );
     }
@@ -205,13 +226,16 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
       return Container(
         width: widget.width,
         height: widget.height,
-        color: widget.backgroundColor,
-        child: const Center(child: CircularProgressIndicator()),
+        color: widget.backgroundColor ?? AppColors.surface,
+        child: const Center(
+          child: AppLoadingIndicator(size: 22, strokeWidth: 2.2),
+        ),
       );
     }
 
     return CachedNetworkImage(
       imageUrl: _currentImageUrl,
+      cacheKey: _stableCacheKey,
       width: widget.width,
       height: widget.height,
       fit: widget.fit,
@@ -223,7 +247,10 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
             return Container(
               width: widget.width,
               height: widget.height,
-              color: widget.backgroundColor,
+              color: widget.backgroundColor ?? AppColors.surface,
+              child: const Center(
+                child: AppLoadingIndicator(size: 20, strokeWidth: 2),
+              ),
             );
           },
       errorWidget: (context, url, error) {
@@ -235,10 +262,10 @@ class _S3CachedNetworkImageState extends State<S3CachedNetworkImage> {
             Container(
               width: widget.width,
               height: widget.height,
-              color: widget.backgroundColor ?? Colors.grey.shade200,
+              color: widget.backgroundColor ?? AppColors.surface,
               child: const Icon(
-                Icons.image_not_supported,
-                color: Colors.grey,
+                Icons.image_not_supported_outlined,
+                color: AppColors.textSecondary,
               ),
             );
       },

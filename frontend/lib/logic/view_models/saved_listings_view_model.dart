@@ -7,6 +7,7 @@ import '../../data/repository_interfaces/i_community_repository.dart';
 import '../../data/repository_interfaces/i_product_repository.dart';
 import '../../data/repository_interfaces/i_product_save_repository.dart';
 import '../../data/repository_interfaces/i_user_repository.dart';
+import '../services/profile_content_change_notifier.dart';
 
 /// ViewModel for managing saved listings state and actions.
 class SavedListingsViewModel extends ChangeNotifier {
@@ -15,15 +16,18 @@ class SavedListingsViewModel extends ChangeNotifier {
     required IProductRepository productRepository,
     required IProductSaveRepository productSaveRepository,
     required ICommunityRepository communityRepository,
+    required ProfileContentChangeNotifier profileContentChangeNotifier,
   })  : _userRepository = userRepository,
         _productRepository = productRepository,
         _productSaveRepository = productSaveRepository,
-        _communityRepository = communityRepository;
+        _communityRepository = communityRepository,
+        _profileContentChangeNotifier = profileContentChangeNotifier;
 
   final IUserRepository _userRepository;
   final IProductRepository _productRepository;
   final IProductSaveRepository _productSaveRepository;
   final ICommunityRepository _communityRepository;
+  final ProfileContentChangeNotifier _profileContentChangeNotifier;
 
   List<ProductDto> _savedProducts = [];
   List<CommunityPostDto> _savedPosts = [];
@@ -245,12 +249,20 @@ class SavedListingsViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final existingProduct = _savedProducts.cast<ProductDto?>().firstWhere(
+        (item) => item?.id == productId,
+        orElse: () => null,
+      );
       final response = await _productRepository.deleteProduct(productId);
       if (!response.isSuccess) {
         throw response.error!;
       }
 
       _savedProducts = _savedProducts.where((item) => item.id != productId).toList();
+      final ownerUserId = existingProduct?.userId;
+      if (ownerUserId != null) {
+        _profileContentChangeNotifier.markProductChanged(ownerUserId: ownerUserId);
+      }
       return true;
     } on ApiException catch (e) {
       _actionError = e.message;

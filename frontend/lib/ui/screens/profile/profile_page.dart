@@ -14,6 +14,7 @@ import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../../logic/view_models/marketplace_view_model.dart';
 import '../../../logic/view_models/search_view_model.dart';
 import '../../../logic/view_models/community_view_model.dart';
+import '../../../logic/services/profile_content_change_notifier.dart';
 import '../../../core/errors/app_error_messages.dart';
 import '../../../core/errors/api_exception.dart';
 import '../../../core/auth/auth_service.dart';
@@ -30,7 +31,6 @@ import 'widgets/profile_widgets.dart';
 import '../marketplace/product_detail_page.dart';
 import '../community/community_detail_page.dart';
 import '../../widgets/s3_cached_network_image.dart';
-import '../../../app.dart';
 
 final getIt = GetIt.instance;
 
@@ -42,10 +42,11 @@ class ProfilePage extends StatefulWidget {
 }
 
 class ProfilePageState extends State<ProfilePage>
-    with SingleTickerProviderStateMixin, RouteAware {
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final IUserRepository _userRepository;
   late final ICommunityRepository _communityRepository;
+  late final ProfileContentChangeNotifier _profileContentChangeNotifier;
 
   List<ProductDto> _products = [];
   List<CommunityPostDto> _posts = [];
@@ -55,6 +56,9 @@ class ProfilePageState extends State<ProfilePage>
   bool _isSavingProfile = false;
   String? _error;
   bool _productsLoaded = false;
+  int _lastHandledProfileChangeId = 0;
+  bool _isContentRefreshInFlight = false;
+  bool _hasQueuedContentRefresh = false;
 
   // Using AppDimensions for layout constants
 
@@ -87,72 +91,69 @@ class ProfilePageState extends State<ProfilePage>
     return Column(
       children: [
         Expanded(
-          child: AppRefreshIndicator(
-            onRefresh: () async {
-              await context.read<UserViewModel>().refresh();
-              await refresh();
+          child: NestedScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverToBoxAdapter(
+                  child: ProfileHeaderSection(
+                    data: ProfileHeaderData(
+                      coverImage: profile.coverImage,
+                      profileImage: profile.profileImage,
+                      fullName: profile.fullName,
+                      bio: profile.bio,
+                      followerCount: profile.followerCount,
+                      followingCount: profile.followingCount,
+                      averageRating: profile.averageRating,
+                      ratingCount: profile.ratingCount,
+                      major: profile.major,
+                      schoolShortName: () {
+                        final h = buildSchoolShortName(
+                          universityName: profile.university?.name,
+                          universityDomain:
+                              profile.university?.domain ??
+                              profile.emailDomain,
+                          email: profile.email,
+                          fallback: '',
+                        );
+                        return h.isNotEmpty ? h.toUpperCase() : 'N/A';
+                      }(),
+                    ),
+                    coverHeight: AppDimensions.profileCoverHeight,
+                    avatarRadius: AppDimensions.profileAvatarRadius,
+                    avatarBorder: AppDimensions.profileAvatarBorder,
+                    avatarGap: AppDimensions.profileAvatarGap,
+                    statsDetailGap: 10,
+                    canEditCover: true,
+                    onCoverTap:
+                        profile.coverImage != null &&
+                            profile.coverImage!.isNotEmpty &&
+                            !_isUploadingCover
+                        ? () => _viewFullScreen(profile.coverImage!)
+                        : null,
+                    onAvatarTap:
+                        profile.profileImage != null &&
+                            profile.profileImage!.isNotEmpty &&
+                            !_isUploadingAvatar
+                        ? () => _viewFullScreen(profile.profileImage!)
+                        : null,
+                    coverOverlay: _buildCoverOverlay(profile),
+                    avatarOverlay: _buildAvatarOverlay(),
+                  ),
+                ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _StickyTabBarDelegate(
+                    tabBar: _buildTabBar(context),
+                    productCount: _products.length,
+                    postCount: _posts.length,
+                  ),
+                ),
+              ];
             },
-            child: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) {
-                return [
-                  SliverToBoxAdapter(
-                    child: ProfileHeaderSection(
-                      data: ProfileHeaderData(
-                        coverImage: profile.coverImage,
-                        profileImage: profile.profileImage,
-                        fullName: profile.fullName,
-                        bio: profile.bio,
-                        followerCount: profile.followerCount,
-                        followingCount: profile.followingCount,
-                        major: profile.major,
-                        schoolShortName: () {
-                          final h = buildSchoolShortName(
-                            universityName: profile.university?.name,
-                            universityDomain:
-                                profile.university?.domain ??
-                                profile.emailDomain,
-                            email: profile.email,
-                            fallback: '',
-                          );
-                          return h.isNotEmpty ? h.toUpperCase() : 'N/A';
-                        }(),
-                      ),
-                      coverHeight: AppDimensions.profileCoverHeight,
-                      avatarRadius: AppDimensions.profileAvatarRadius,
-                      avatarBorder: AppDimensions.profileAvatarBorder,
-                      avatarGap: AppDimensions.profileAvatarGap,
-                      statsDetailGap: 10,
-                      canEditCover: true,
-                      onCoverTap:
-                          profile.coverImage != null &&
-                              profile.coverImage!.isNotEmpty &&
-                              !_isUploadingCover
-                          ? () => _viewFullScreen(profile.coverImage!)
-                          : null,
-                      onAvatarTap:
-                          profile.profileImage != null &&
-                              profile.profileImage!.isNotEmpty &&
-                              !_isUploadingAvatar
-                          ? () => _viewFullScreen(profile.profileImage!)
-                          : null,
-                      coverOverlay: _buildCoverOverlay(profile),
-                      avatarOverlay: _buildAvatarOverlay(),
-                    ),
-                  ),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _StickyTabBarDelegate(
-                      tabBar: _buildTabBar(context),
-                      productCount: _products.length,
-                      postCount: _posts.length,
-                    ),
-                  ),
-                ];
-              },
-              body: TabBarView(
-                controller: _tabController,
-                children: [_buildProductGrid(), _buildPostsTab()],
-              ),
+            body: TabBarView(
+              controller: _tabController,
+              children: [_buildProductGrid(), _buildPostsTab()],
             ),
           ),
         ),
@@ -162,7 +163,7 @@ class ProfilePageState extends State<ProfilePage>
 
   /// Reload product listings
   Future<void> refresh() async {
-    await _loadProducts();
+    await _refreshProfileContent();
   }
 
   /// Build overlay for cover image (edit button, upload spinner, menu)
@@ -338,6 +339,7 @@ class ProfilePageState extends State<ProfilePage>
         tabs: [
           Tab(
             icon: Badge(
+              isLabelVisible: productCount > 0,
               label: Text('$productCount'),
               backgroundColor: AppColors.primary,
               textColor: Colors.white,
@@ -350,6 +352,7 @@ class ProfilePageState extends State<ProfilePage>
           ),
           Tab(
             icon: Badge(
+              isLabelVisible: postCount > 0,
               label: Text('$postCount'),
               backgroundColor: AppColors.primary,
               textColor: Colors.white,
@@ -371,11 +374,13 @@ class ProfilePageState extends State<ProfilePage>
     }
 
     if (_posts.isEmpty) {
-      return const CustomScrollView(
-        slivers: [
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Padding(
+      return AppRefreshIndicator(
+        onRefresh: refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 24),
+            Padding(
               padding: EdgeInsets.all(24),
               child: EmptyState(
                 icon: Icons.article_outlined,
@@ -383,50 +388,41 @@ class ProfilePageState extends State<ProfilePage>
                 subtitle: 'Share your first post with an image.',
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.only(top: 8, left: 2, right: 2, bottom: 2),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
-      ),
-      itemCount: _posts.length,
-      itemBuilder: (context, index) {
-        final post = _posts[index];
-        final imageUrl = post.orderedImages.first;
+    return AppRefreshIndicator(
+      onRefresh: refresh,
+      child: GridView.builder(
+        padding: const EdgeInsets.only(top: 8, left: 2, right: 2, bottom: 2),
+        physics: const AlwaysScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 2,
+        ),
+        itemCount: _posts.length,
+        itemBuilder: (context, index) {
+          final post = _posts[index];
+          final imageUrl = post.orderedImages.first;
 
-        return GestureDetector(
-          onTap: () => _openPost(post),
-          child: RepaintBoundary(
-            child: S3CachedNetworkImage(
-              key: ValueKey('profile_post_${post.id}_$imageUrl'),
-              imageUrl: imageUrl,
-              fit: BoxFit.cover,
-              useOldImageOnUrlChange: true,
-              fadeInDuration: Duration.zero,
-              fadeOutDuration: Duration.zero,
-              progressIndicatorBuilder: (context, url, progress) => Container(
-                color: AppColors.surface,
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: AppColors.surface,
-                child: const Icon(Icons.image, color: AppColors.textSecondary),
+          return GestureDetector(
+            onTap: () => _openPost(post),
+            child: RepaintBoundary(
+              child: S3CachedNetworkImage(
+                key: ValueKey('profile_post_${post.id}_$imageUrl'),
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                useOldImageOnUrlChange: true,
+                fadeInDuration: Duration.zero,
+                fadeOutDuration: Duration.zero,
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -436,11 +432,13 @@ class ProfilePageState extends State<ProfilePage>
     }
 
     if (_products.isEmpty) {
-      return const CustomScrollView(
-        slivers: [
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Padding(
+      return AppRefreshIndicator(
+        onRefresh: refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 24),
+            Padding(
               padding: EdgeInsets.all(24),
               child: EmptyState(
                 icon: Icons.inventory_2_outlined,
@@ -448,59 +446,98 @@ class ProfilePageState extends State<ProfilePage>
                 subtitle: 'List your first item for sale.',
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.only(top: 8, left: 2, right: 2, bottom: 2),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
-      ),
-      itemCount: _products.length,
-      itemBuilder: (context, index) {
-        final product = _products[index];
-        final imageUrl = product.firstImageUrl;
-        if (imageUrl == null || imageUrl.isEmpty) {
+    return AppRefreshIndicator(
+      onRefresh: refresh,
+      child: GridView.builder(
+        padding: const EdgeInsets.only(top: 8, left: 2, right: 2, bottom: 2),
+        physics: const AlwaysScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 2,
+        ),
+        itemCount: _products.length,
+        itemBuilder: (context, index) {
+          final product = _products[index];
+          final imageUrl = product.firstImageUrl;
+          if (imageUrl == null || imageUrl.isEmpty) {
+            return GestureDetector(
+              onTap: () => _openProduct(product),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    color: AppColors.surface,
+                    child: const Icon(
+                      Icons.image,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  if (!product.isAvailable)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: _buildProductStatusBadge(product),
+                    ),
+                ],
+              ),
+            );
+          }
+
           return GestureDetector(
             onTap: () => _openProduct(product),
-            child: Container(
-              color: AppColors.surface,
-              child: const Icon(Icons.image, color: AppColors.textSecondary),
+            child: RepaintBoundary(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  S3CachedNetworkImage(
+                    key: ValueKey('profile_product_${product.id}_$imageUrl'),
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    useOldImageOnUrlChange: true,
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                  ),
+                  if (!product.isAvailable)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: _buildProductStatusBadge(product),
+                    ),
+                ],
+              ),
             ),
           );
-        }
+        },
+      ),
+    );
+  }
 
-        return GestureDetector(
-          onTap: () => _openProduct(product),
-          child: RepaintBoundary(
-            child: S3CachedNetworkImage(
-              key: ValueKey('profile_product_${product.id}_$imageUrl'),
-              imageUrl: imageUrl,
-              fit: BoxFit.cover,
-              useOldImageOnUrlChange: true,
-              fadeInDuration: Duration.zero,
-              fadeOutDuration: Duration.zero,
-              progressIndicatorBuilder: (context, url, progress) => Container(
-                color: AppColors.surface,
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: AppColors.surface,
-                child: const Icon(Icons.image, color: AppColors.textSecondary),
-              ),
-            ),
-          ),
-        );
-      },
+  Widget _buildProductStatusBadge(ProductDto product) {
+    final backgroundColor = product.isSold
+        ? const Color(0xCCB54141)
+        : const Color(0xCC5F6368);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        product.statusLabel,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
     );
   }
 
@@ -528,18 +565,14 @@ class ProfilePageState extends State<ProfilePage>
     super.initState();
     _userRepository = getIt<IUserRepository>();
     _communityRepository = getIt<ICommunityRepository>();
+    _profileContentChangeNotifier = getIt<ProfileContentChangeNotifier>();
+    _profileContentChangeNotifier.addListener(_handleProfileContentChanged);
     _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Register with RouteObserver to detect when returning from other routes
-    final route = ModalRoute.of(context);
-    if (route != null) {
-      routeObserver.subscribe(this, route as PageRoute);
-    }
-
     if (!_productsLoaded) {
       final userId = context.read<UserViewModel>().userId;
       if (userId != null) {
@@ -554,19 +587,43 @@ class ProfilePageState extends State<ProfilePage>
   }
 
   @override
-  void didPopNext() {
-    _productsLoaded = false;
-    if (mounted) {
-      refresh();
-    }
-    super.didPopNext();
-  }
-
-  @override
   void dispose() {
-    routeObserver.unsubscribe(this);
+    _profileContentChangeNotifier.removeListener(_handleProfileContentChanged);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleProfileContentChanged() {
+    final event = _profileContentChangeNotifier.lastEvent;
+    if (event == null || event.changeId == _lastHandledProfileChangeId) {
+      return;
+    }
+
+    final userId = context.read<UserViewModel>().userId;
+    if (userId == null || event.ownerUserId != userId) {
+      return;
+    }
+
+    _lastHandledProfileChangeId = event.changeId;
+    _queueContentRefresh();
+  }
+
+  void _queueContentRefresh() {
+    if (!mounted) return;
+    if (_isContentRefreshInFlight) {
+      _hasQueuedContentRefresh = true;
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      _isContentRefreshInFlight = true;
+      do {
+        _hasQueuedContentRefresh = false;
+        await refresh();
+      } while (mounted && _hasQueuedContentRefresh);
+      _isContentRefreshInFlight = false;
+    });
   }
 
   void _viewFullScreen(String imageUrl) {
@@ -735,7 +792,14 @@ class ProfilePageState extends State<ProfilePage>
     if (userProvider.profile == null && !userProvider.isLoading) {
       await userProvider.load();
     }
-    await refresh();
+    await _refreshProfileContent(refreshUser: false);
+  }
+
+  Future<void> _refreshProfileContent({bool refreshUser = true}) async {
+    if (refreshUser) {
+      await context.read<UserViewModel>().refresh();
+    }
+    await _loadProducts();
   }
 
   Future<void> _loadProducts() async {

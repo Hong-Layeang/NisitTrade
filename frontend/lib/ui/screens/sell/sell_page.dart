@@ -10,6 +10,7 @@ import '../../../data/dtos/category_dto.dart';
 import '../../../data/repository_interfaces/i_category_repository.dart';
 import '../../../data/repository_interfaces/i_product_image_repository.dart';
 import '../../../data/repository_interfaces/i_product_repository.dart';
+import '../../../logic/services/profile_content_change_notifier.dart';
 import '../../../logic/view_models/product_feed_view_model.dart';
 import '../../widgets/app_snack_bar.dart';
 import 'product_form_image_picker.dart';
@@ -53,6 +54,7 @@ class _SellPageState extends State<SellPage> {
     _orchestrator = ProductFormOrchestrator(
       productRepository: getIt<IProductRepository>(),
       productImageRepository: getIt<IProductImageRepository>(),
+      profileContentChangeNotifier: getIt<ProfileContentChangeNotifier>(),
     );
     _loadCategories();
   }

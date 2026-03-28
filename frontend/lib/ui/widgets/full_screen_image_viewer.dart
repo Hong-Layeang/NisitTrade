@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+
+import '../../core/utils/image_url_helper.dart';
+import 's3_cached_network_image.dart';
 
 class FullScreenImageViewer {
   FullScreenImageViewer._();
@@ -216,31 +219,47 @@ class _FullScreenImagePageState extends State<_FullScreenImagePage>
   }
 
   Widget _buildZoomableImage(String url) {
+    final isLocal =
+        !url.startsWith('http://') && !url.startsWith('https://');
+
     return InteractiveViewer(
       minScale: 0.5,
       maxScale: 5.0,
       child: Center(
-        child: CachedNetworkImage(
-          key: ValueKey('fullscreen_$url'),
-          imageUrl: url,
-          fit: BoxFit.contain,
-          useOldImageOnUrlChange: true,
-          fadeInDuration: Duration.zero,
-          fadeOutDuration: Duration.zero,
-          progressIndicatorBuilder: (context, url, progress) => SizedBox(
-            height: 240,
-            child: Center(
-              child: CircularProgressIndicator(
-                value: progress.progress,
-                color: Colors.white,
-                strokeWidth: 2,
+        child: isLocal
+            ? Image.file(
+                File(url),
+                key: ValueKey('fullscreen_$url'),
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Center(
+                  child: Icon(
+                      Icons.broken_image, color: Colors.white38, size: 72),
+                ),
+              )
+            : S3CachedNetworkImage(
+                key: ValueKey('fullscreen_$url'),
+                imageUrl: url,
+                s3Key: ImageUrlHelper.extractS3KeyFromUrl(url),
+                fit: BoxFit.contain,
+                backgroundColor: Colors.transparent,
+                useOldImageOnUrlChange: true,
+                fadeInDuration: Duration.zero,
+                fadeOutDuration: Duration.zero,
+                progressIndicatorBuilder: (context, url, progress) => SizedBox(
+                  height: 240,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: progress.progress,
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => const Center(
+                  child: Icon(
+                      Icons.broken_image, color: Colors.white38, size: 72),
+                ),
               ),
-            ),
-          ),
-          errorWidget: (context, url, error) => const Center(
-            child: Icon(Icons.broken_image, color: Colors.white38, size: 72),
-          ),
-        ),
       ),
     );
   }

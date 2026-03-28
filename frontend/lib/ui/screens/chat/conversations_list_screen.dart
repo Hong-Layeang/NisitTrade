@@ -15,7 +15,8 @@ import '../../../core/di/service_locator.dart';
 import '../../../logic/view_models/chat_view_model.dart';
 import '../../../logic/view_models/presence_view_model.dart';
 import '../../../logic/view_models/user_view_model.dart';
-import '../marketplace/product_detail_page.dart';
+import 'purchase_confirmation_message.dart';
+import '../marketplace/product_detail_page.dart' hide getIt;
 import '../../../ui/widgets/app_action_sheet.dart';
 import '../../../ui/widgets/app_snack_bar.dart';
 import '../../../ui/widgets/user_widgets.dart';
@@ -312,6 +313,9 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     final lastMessage = conversation.lastMessage;
     final messageText = (lastMessage?.messageText ?? '').trim();
     if (messageText.isNotEmpty) {
+      if (PurchaseConfirmationMessage.isPurchaseConfirmation(messageText)) {
+        return PurchaseConfirmationMessage.previewText;
+      }
       return messageText;
     }
     if ((lastMessage?.imageUrls ?? const <String>[]).isNotEmpty) {

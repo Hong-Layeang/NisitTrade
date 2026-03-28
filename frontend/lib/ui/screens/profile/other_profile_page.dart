@@ -15,6 +15,7 @@ import '../../../data/dtos/user_profile_dto.dart';
 import '../../../data/dtos/community_post_dto.dart';
 import '../../../data/repository_interfaces/i_community_repository.dart';
 import '../../../data/repository_interfaces/i_user_repository.dart';
+import '../../../logic/services/profile_content_change_notifier.dart';
 import '../../../logic/view_models/user_view_model.dart';
 import '../../widgets/empty_state.dart';
 import '../community/community_detail_page.dart';
@@ -46,6 +47,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
   late final TabController _tabController;
   late final IUserRepository _userRepository;
   late final ICommunityRepository _communityRepository;
+  late final ProfileContentChangeNotifier _profileContentChangeNotifier;
 
   UserProfileDto? _profile;
   List<ProductDto> _products = [];
@@ -53,25 +55,62 @@ class _OtherProfilePageState extends State<OtherProfilePage>
   bool _isLoading = false;
   String? _error;
   bool _isFollowing = false;
+  int _lastHandledProfileChangeId = 0;
+  bool _isContentRefreshInFlight = false;
+  bool _hasQueuedContentRefresh = false;
 
   @override
   void initState() {
     super.initState();
     _userRepository = getIt<IUserRepository>();
     _communityRepository = getIt<ICommunityRepository>();
+    _profileContentChangeNotifier = getIt<ProfileContentChangeNotifier>();
+    _profileContentChangeNotifier.addListener(_handleProfileContentChanged);
     _tabController = TabController(length: 2, vsync: this);
     _loadProfile();
   }
 
   @override
   void dispose() {
+    _profileContentChangeNotifier.removeListener(_handleProfileContentChanged);
     _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadProfile() async {
+  void _handleProfileContentChanged() {
+    final event = _profileContentChangeNotifier.lastEvent;
+    if (event == null || event.changeId == _lastHandledProfileChangeId) {
+      return;
+    }
+    if (event.ownerUserId != widget.userId) {
+      return;
+    }
+
+    _lastHandledProfileChangeId = event.changeId;
+    _queueContentRefresh();
+  }
+
+  void _queueContentRefresh() {
+    if (!mounted) return;
+    if (_isContentRefreshInFlight) {
+      _hasQueuedContentRefresh = true;
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      _isContentRefreshInFlight = true;
+      do {
+        _hasQueuedContentRefresh = false;
+        await _loadProfile(showLoading: false);
+      } while (mounted && _hasQueuedContentRefresh);
+      _isContentRefreshInFlight = false;
+    });
+  }
+
+  Future<void> _loadProfile({bool showLoading = true}) async {
     setState(() {
-      _isLoading = true;
+      _isLoading = showLoading;
       _error = null;
     });
 
@@ -217,6 +256,8 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                         bio: profile.bio,
                         followerCount: profile.followerCount,
                         followingCount: profile.followingCount,
+                        averageRating: profile.averageRating,
+                        ratingCount: profile.ratingCount,
                         major: profile.major,
                         schoolShortName: () {
                           final h = buildSchoolShortName(
@@ -362,6 +403,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         tabs: [
           Tab(
             icon: Badge(
+              isLabelVisible: productCount > 0,
               label: Text('$productCount'),
               backgroundColor: AppColors.primary,
               textColor: Colors.white,
@@ -374,6 +416,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
           ),
           Tab(
             icon: Badge(
+              isLabelVisible: postCount > 0,
               label: Text('$postCount'),
               backgroundColor: AppColors.primary,
               textColor: Colors.white,
@@ -483,9 +526,23 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         if (imageUrl == null || imageUrl.isEmpty) {
           return GestureDetector(
             onTap: () => _openProduct(product),
-            child: Container(
-              color: AppColors.surface,
-              child: const Icon(Icons.image, color: AppColors.textSecondary),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  color: AppColors.surface,
+                  child: const Icon(
+                    Icons.image,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (!product.isAvailable)
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: _buildProductStatusBadge(product),
+                  ),
+              ],
             ),
           );
         }
@@ -493,30 +550,67 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         return GestureDetector(
           onTap: () => _openProduct(product),
           child: RepaintBoundary(
-            child: CachedNetworkImage(
-              key: ValueKey('other_profile_product_${product.id}_$imageUrl'),
-              imageUrl: imageUrl,
-              fit: BoxFit.cover,
-              useOldImageOnUrlChange: true,
-              fadeInDuration: Duration.zero,
-              fadeOutDuration: Duration.zero,
-              placeholder: (context, url) => Container(
-                color: AppColors.surface,
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CachedNetworkImage(
+                  key: ValueKey('other_profile_product_${product.id}_$imageUrl'),
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                  useOldImageOnUrlChange: true,
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  placeholder: (context, url) => Container(
+                    color: AppColors.surface,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: AppColors.surface,
+                    child: const Icon(
+                      Icons.image,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: AppColors.surface,
-                child: const Icon(Icons.image, color: AppColors.textSecondary),
-              ),
+                if (!product.isAvailable)
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: _buildProductStatusBadge(product),
+                  ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildProductStatusBadge(ProductDto product) {
+    final backgroundColor = product.isSold
+        ? const Color(0xCCB54141)
+        : const Color(0xCC5F6368);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        product.statusLabel,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
     );
   }
 

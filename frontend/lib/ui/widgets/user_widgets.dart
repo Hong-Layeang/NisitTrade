@@ -83,26 +83,7 @@ class UserAvatar extends StatelessWidget {
                       errorWidget: (context, url, error) {
                         return _buildInitialsFallback();
                       },
-                      progressIndicatorBuilder: (context, url, progress) {
-                        final total = progress.totalSize ?? 1;
-                        final downloaded = progress.downloaded;
-                        final progressValue = total > 0
-                            ? (downloaded / total)
-                            : 0.0;
-                        return Container(
-                          width: radius * 2,
-                          height: radius * 2,
-                          color: AppColors.surface,
-                          child: Center(
-                            child: AppLoadingIndicator(
-                              size: radius,
-                              strokeWidth: 2,
-                              value: progressValue,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        );
-                      },
+
                     )
                   : _buildInitialsFallback(),
             ),

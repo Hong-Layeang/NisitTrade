@@ -97,23 +97,6 @@ class ProductCardImageCarousel extends StatelessWidget {
                 useOldImageOnUrlChange: true,
                 fadeInDuration: Duration.zero,
                 fadeOutDuration: Duration.zero,
-                progressIndicatorBuilder: (context, url, progress) => Container(
-                  color: AppColors.surface,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: AppColors.surface,
-                  child: const Icon(
-                    Icons.image,
-                    size: 80,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
               );
             }
 
