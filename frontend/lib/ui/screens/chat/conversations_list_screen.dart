@@ -708,15 +708,16 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     required int userId,
     required String displayName,
   }) async {
-    final reason = await showUserReportReasonDialog(
+    final reportInput = await showUserReportSheet(
       context,
       title: 'Report $displayName',
     );
-    if (!mounted || reason == null) return;
+    if (!mounted || reportInput == null) return;
 
     final response = await _userRepository.reportUser(
       userId: userId,
-      reason: reason,
+      reason: reportInput.reason,
+      details: reportInput.details,
     );
     if (!mounted) return;
 

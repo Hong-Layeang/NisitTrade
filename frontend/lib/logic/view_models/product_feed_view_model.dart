@@ -42,6 +42,7 @@ class ProductFeedViewModel extends ChangeNotifier {
 
   // Product cache for optimized navigation
   final Map<int, ProductDto> _productCache = {};
+  final Set<int> _viewerHiddenProductIds = <int>{};
 
   List<ProductDto> get products => _products;
   bool get isLoading => _isLoading;
@@ -83,7 +84,9 @@ class ProductFeedViewModel extends ChangeNotifier {
         throw response.error!;
       }
 
-      final loadedProducts = response.data ?? [];
+          final loadedProducts = (response.data ?? [])
+            .where((product) => !_viewerHiddenProductIds.contains(product.id))
+            .toList(growable: false);
       _products = loadedProducts;
       _hasMore = loadedProducts.length >= _pageSize;
       
@@ -118,7 +121,9 @@ class ProductFeedViewModel extends ChangeNotifier {
         throw response.error!;
       }
 
-      final loadedProducts = response.data ?? [];
+          final loadedProducts = (response.data ?? [])
+            .where((product) => !_viewerHiddenProductIds.contains(product.id))
+            .toList(growable: false);
       _products = [..._products, ...loadedProducts];
       _hasMore = loadedProducts.length >= _pageSize;
       
@@ -245,6 +250,18 @@ class ProductFeedViewModel extends ChangeNotifier {
     _upsertProduct(product);
   }
 
+  Future<void> hideProductForViewer(ProductDto product) async {
+    await _interactionService.hideProductForViewer(product.id);
+    _viewerHiddenProductIds.add(product.id);
+    _upsertProduct(product.copyWith(status: 'hidden'));
+  }
+
+  Future<void> unhideProductForViewer(ProductDto product) async {
+    await _interactionService.unhideProductForViewer(product.id);
+    _viewerHiddenProductIds.remove(product.id);
+    _upsertProduct(product);
+  }
+
   Future<void> reportProduct({
     required int productId,
     required String reason,
@@ -266,6 +283,7 @@ class ProductFeedViewModel extends ChangeNotifier {
     _error = null;
     _currentPage = 0;
     _hasMore = true;
+    _viewerHiddenProductIds.clear();
     notifyListeners();
   }
 
@@ -276,20 +294,30 @@ class ProductFeedViewModel extends ChangeNotifier {
     // Update cache
     _productCache[nextProduct.id] = nextProduct;
 
-    if (nextProduct.isHidden || nextProduct.isSold) {
+    if (_viewerHiddenProductIds.contains(nextProduct.id) && !nextProduct.isHidden) {
       _products = _products
           .where((item) => item.id != nextProduct.id)
           .toList(growable: false);
       notifyListeners();
       return;
     }
+
+    final resolvedProduct = nextProduct;
+
+    if (resolvedProduct.isSold) {
+      _products = _products
+          .where((item) => item.id != resolvedProduct.id)
+          .toList(growable: false);
+      notifyListeners();
+      return;
+    }
     
-    final index = _products.indexWhere((item) => item.id == nextProduct.id);
+    final index = _products.indexWhere((item) => item.id == resolvedProduct.id);
     if (index == -1) {
-      _products = [..._products, nextProduct];
+      _products = [..._products, resolvedProduct];
     } else {
       final updated = [..._products];
-      updated[index] = nextProduct;
+      updated[index] = resolvedProduct;
       _products = updated;
     }
     notifyListeners();

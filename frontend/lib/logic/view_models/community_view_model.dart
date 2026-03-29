@@ -299,6 +299,38 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> hidePostForViewer(int postId) async {
+    try {
+      final response = await _repository.hidePostForViewer(postId);
+      if (!response.isSuccess) throw response.error!;
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Failed to hide post.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> unhidePostForViewer(int postId) async {
+    try {
+      final response = await _repository.unhidePostForViewer(postId);
+      if (!response.isSuccess) throw response.error!;
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Failed to unhide post.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<CommunityPostDto?> addComment({
     required int postId,
     required String content,

@@ -13,6 +13,8 @@ import '../../../logic/view_models/user_view_model.dart';
 import '../../../logic/view_models/saved_listings_view_model.dart';
 import '../../widgets/app_action_sheet.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_report_sheet.dart';
+import '../../widgets/app_undo_inline_card.dart';
 import '../profile/other_profile_page.dart';
 import 'community_detail_page.dart';
 import 'widgets/community_post_card.dart';
@@ -42,6 +44,7 @@ class CommunityPageState extends State<CommunityPage>
   late final FocusNode _postFocusNode;
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _postController = TextEditingController();
+  final Map<int, _CollapsedCommunityPostState> _collapsedPosts = {};
   bool _isComposerOpen = true;
   final List<String> _selectedImagePaths = [];
 
@@ -446,69 +449,19 @@ class CommunityPageState extends State<CommunityPage>
 
   Future<void> _reportPost(CommunityPostDto post) async {
     if (mounted) FocusScope.of(context).unfocus();
-    var selectedReason = _reportReasonOptions.first;
-    final detailsController = TextEditingController();
-
-    final shouldSubmit = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Report post'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedReason,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Reason'),
-                    items: _reportReasonOptions
-                        .map(
-                          (reason) => DropdownMenuItem<String>(
-                            value: reason,
-                            child: Text(reason, overflow: TextOverflow.ellipsis),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setDialogState(() => selectedReason = value);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: detailsController,
-                    decoration: const InputDecoration(labelText: 'Details (optional)'),
-                    maxLines: 3,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Submit'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final reportInput = await showReportSheet(
+      context,
+      title: 'Report post',
+      description: 'Tell us what is wrong with this post.',
+      reasons: _reportReasonOptions,
     );
-
-    final details = detailsController.text.trim();
-    detailsController.dispose();
-    if (shouldSubmit != true || !mounted) return;
+    if (reportInput == null || !mounted) return;
 
     final vm = context.read<CommunityViewModel>();
     final ok = await vm.reportPost(
       postId: post.id,
-      reason: selectedReason,
-      details: details.isEmpty ? null : details,
+      reason: reportInput.reason,
+      details: reportInput.details,
     );
 
     if (!mounted) return;
@@ -517,7 +470,43 @@ class CommunityPageState extends State<CommunityPage>
       return;
     }
 
-    AppSnackBar.success(context, 'Report submitted.');
+    setState(() {
+      _collapsedPosts[post.id] = _CollapsedCommunityPostState(
+        title: 'Report submitted',
+        message: 'This post is hidden from your feed while we review it.',
+        onUndo: () async {
+          if (!mounted) return;
+          setState(() => _collapsedPosts.remove(post.id));
+        },
+      );
+    });
+  }
+
+  Future<void> _hidePost(CommunityPostDto post) async {
+    if (!mounted) return;
+    final vm = context.read<CommunityViewModel>();
+    final ok = await vm.hidePostForViewer(post.id);
+    if (!mounted) return;
+    if (!ok) {
+      AppSnackBar.error(context, vm.error ?? 'Failed to hide post.');
+      return;
+    }
+
+    setState(() {
+      _collapsedPosts[post.id] = _CollapsedCommunityPostState(
+        title: 'Post hidden',
+        message: 'We will show fewer posts like this in your feed.',
+        onUndo: () async {
+          final undoOk = await vm.unhidePostForViewer(post.id);
+          if (!mounted) return;
+          if (!undoOk) {
+            AppSnackBar.error(context, vm.error ?? 'Failed to undo hide post.');
+            return;
+          }
+          setState(() => _collapsedPosts.remove(post.id));
+        },
+      );
+    });
   }
 
   Future<void> _toggleSavePost(CommunityPostDto post) async {
@@ -599,6 +588,12 @@ class CommunityPageState extends State<CommunityPage>
               : Icons.bookmark_add_outlined,
           onTap: () => _toggleSavePost(effectivePost),
         ),
+        if (!isOwner)
+          AppActionSheetItem(
+            label: 'Hide post',
+            icon: Icons.visibility_off_outlined,
+            onTap: () => _hidePost(effectivePost),
+          ),
         if (!isOwner)
           AppActionSheetItem(
             label: 'Report post',
@@ -784,6 +779,15 @@ class CommunityPageState extends State<CommunityPage>
                         itemCount: vm.posts.length,
                         itemBuilder: (context, index) {
                           final post = vm.posts[index];
+                          final collapsedState = _collapsedPosts[post.id];
+                          if (collapsedState != null) {
+                            return AppUndoInlineCard(
+                              title: collapsedState.title,
+                              message: collapsedState.message,
+                              onUndo: collapsedState.onUndo,
+                              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            );
+                          }
                           return CommunityPostCard(
                             post: post,
                             isLiked: post.isLikedByMe,
@@ -800,5 +804,17 @@ class CommunityPageState extends State<CommunityPage>
       },
     );
   }
+}
+
+class _CollapsedCommunityPostState {
+  final String title;
+  final String message;
+  final Future<void> Function() onUndo;
+
+  const _CollapsedCommunityPostState({
+    required this.title,
+    required this.message,
+    required this.onUndo,
+  });
 }
 

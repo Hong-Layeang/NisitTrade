@@ -341,9 +341,7 @@ class _AttachmentCard extends StatelessWidget {
                       ? onMarkAsSold
                       : (isExpired ? null : onConfirmPurchase),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isOwner
-                        ? const Color(0xFF0FBA81)
-                        : AppColors.primary,
+                    backgroundColor: AppColors.primary,
                     disabledBackgroundColor: Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(

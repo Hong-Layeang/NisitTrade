@@ -18,6 +18,7 @@ class ChatBubble extends StatelessWidget {
   final bool showAttachedProductCard;
   final bool isSelected;
   final bool isSelectionMode;
+  final void Function(ProductDto product)? onTapAttachedProduct;
 
   const ChatBubble({
     super.key,
@@ -29,6 +30,7 @@ class ChatBubble extends StatelessWidget {
     this.showAttachedProductCard = true,
     this.isSelected = false,
     this.isSelectionMode = false,
+    this.onTapAttachedProduct,
   });
 
   @override
@@ -447,66 +449,75 @@ class ChatBubble extends StatelessWidget {
         ? ImageUrlHelper.getFullImageUrl(imageUrl)
         : null;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isCurrentUser
-            ? Colors.white.withValues(alpha: 0.14)
-            : const Color(0xFFF2F8FC),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: attachedProduct != null && onTapAttachedProduct != null
+            ? () => onTapAttachedProduct!(attachedProduct!)
+            : null,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCurrentUser
-              ? Colors.white.withValues(alpha: 0.12)
-              : const Color(0xFFDCE8F0),
-        ),
-      ),
-      padding: const EdgeInsets.all(9),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: resolvedImageUrl != null
-                ? S3CachedNetworkImage(
-                    imageUrl: resolvedImageUrl,
-                    s3Key: s3Key,
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 56,
-                    height: 56,
-                    color: Colors.white30,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.image_not_supported_outlined),
-                  ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  attachedProduct?.title ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: isCurrentUser ? Colors.white : AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  attachedProduct?.formattedPrice ?? '',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: isCurrentUser ? Colors.white : AppColors.primary,
-                  ),
-                ),
-              ],
+        child: Container(
+          decoration: BoxDecoration(
+            color: isCurrentUser
+                ? Colors.white.withValues(alpha: 0.14)
+                : const Color(0xFFF2F8FC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isCurrentUser
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : const Color(0xFFDCE8F0),
             ),
           ),
-        ],
+          padding: const EdgeInsets.all(9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: resolvedImageUrl != null
+                    ? S3CachedNetworkImage(
+                        imageUrl: resolvedImageUrl,
+                        s3Key: s3Key,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: 56,
+                        height: 56,
+                        color: Colors.white30,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.image_not_supported_outlined),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      attachedProduct?.title ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isCurrentUser ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      attachedProduct?.formattedPrice ?? '',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isCurrentUser ? Colors.white : AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

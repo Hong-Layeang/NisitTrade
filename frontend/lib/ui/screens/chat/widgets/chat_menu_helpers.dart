@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/colors.dart';
+import '../../../widgets/app_report_sheet.dart';
 
 Future<bool> showDeleteChatConfirmation(
   BuildContext context, {
@@ -33,53 +33,21 @@ Future<bool> showDeleteChatConfirmation(
   return result ?? false;
 }
 
-Future<String?> showUserReportReasonDialog(
+Future<ReportSheetInput?> showUserReportSheet(
   BuildContext context, {
   required String title,
 }) async {
-  const reasons = [
-    'Spam or scam',
-    'Harassment or bullying',
-    'Inappropriate content',
-    'Impersonation',
-    'Selling prohibited items',
-    'Other',
-  ];
-
-  final result = await showDialog<String>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select a reason for reporting this user.',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            ...reasons.map(
-              (reason) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text(reason, style: const TextStyle(fontSize: 15)),
-                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-                onTap: () => Navigator.of(context).pop(reason),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      );
-    },
+  return showReportSheet(
+    context,
+    title: title,
+    description: 'Tell us what is wrong with this account.',
+    reasons: const [
+      'Spam or scam',
+      'Harassment or bullying',
+      'Inappropriate content',
+      'Impersonation',
+      'Selling prohibited items',
+      'Other',
+    ],
   );
-
-  return result;
 }

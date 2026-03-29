@@ -18,6 +18,7 @@ import '../product_detail_page.dart';
 import '../../profile/other_profile_page.dart';
 import '../../../../core/navigation/app_routes.dart';
 import '../../../widgets/app_snack_bar.dart';
+import '../../../widgets/app_undo_inline_card.dart';
 import 'product_card_action_row.dart';
 import 'product_card_image_carousel.dart';
 import 'product_card_info.dart';
@@ -55,6 +56,9 @@ class _ProductCardState extends State<ProductCard>
   bool _isLoading = false;
   bool _isActionLoading = false;
   late IProductRepository _productRepository;
+  String? _collapsedTitle;
+  String? _collapsedMessage;
+  Future<void> Function()? _collapsedUndoAction;
 
   @override
   bool get wantKeepAlive => true;
@@ -71,6 +75,42 @@ class _ProductCardState extends State<ProductCard>
     _product = widget.product;
   }
 
+  void _showCollapsedState({
+    required ProductDto product,
+    required String title,
+    required String message,
+    required Future<void> Function() onUndo,
+  }) {
+    setState(() {
+      _product = product;
+      _collapsedTitle = title;
+      _collapsedMessage = message;
+      _collapsedUndoAction = onUndo;
+    });
+    widget.onProductUpdated?.call(product);
+  }
+
+  void _clearCollapsedState() {
+    setState(() {
+      _collapsedTitle = null;
+      _collapsedMessage = null;
+      _collapsedUndoAction = null;
+    });
+  }
+
+  Future<void> _undoViewerHideFallback() async {
+    final provider = context.read<ProductFeedViewModel>();
+    final restored = _product.copyWith(
+      status: 'available',
+      updatedAt: DateTime.now(),
+    );
+    await provider.unhideProductForViewer(restored);
+    if (!mounted) return;
+    setState(() => _product = restored);
+    widget.onProductUpdated?.call(restored);
+    _clearCollapsedState();
+  }
+
   @override
   void didUpdateWidget(ProductCard oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -81,6 +121,9 @@ class _ProductCardState extends State<ProductCard>
           setState(() {
             _currentImageIndex = 0;
             _product = widget.product;
+            _collapsedTitle = null;
+            _collapsedMessage = null;
+            _collapsedUndoAction = null;
           });
           if (_pageController.hasClients) {
             _pageController.jumpToPage(0);
@@ -123,7 +166,7 @@ class _ProductCardState extends State<ProductCard>
     final chatViewModel = context.read<ChatRoomViewModel>();
 
     final existingConversation =
-      chatViewModel.findConversationForProduct(_product.id);
+      chatViewModel.findConversationWithUser(_product.userId);
     if (existingConversation != null) {
       chatViewModel.selectConversation(existingConversation);
       chatViewModel.addAttachedProduct(_product);
@@ -139,7 +182,9 @@ class _ProductCardState extends State<ProductCard>
       return;
     }
 
-    final conversation = await chatViewModel.createConversation(_product.id);
+    final conversation = await chatViewModel.createConversationWithUser(
+      _product.userId,
+    );
     if (!mounted) return;
 
     if (conversation == null) {
@@ -321,16 +366,62 @@ class _ProductCardState extends State<ProductCard>
     try {
       final wasHidden = _product.isHidden;
       final provider = context.read<ProductFeedViewModel>();
-      final updated = wasHidden
-          ? await provider.unhideProduct(_product.id)
-          : await provider.hideProduct(_product.id);
+      final originalProduct = _product;
+      ProductDto? updated;
 
-      if (updated != null && mounted) {
-        setState(() => _product = updated);
-        widget.onProductUpdated?.call(updated);
+      if (_isOwner()) {
+        updated = wasHidden
+            ? await provider.unhideProduct(_product.id)
+            : await provider.hideProduct(_product.id);
+      } else {
+        final localUpdated = _product.copyWith(
+          status: wasHidden ? 'available' : 'hidden',
+          updatedAt: DateTime.now(),
+        );
+        updated = localUpdated;
+        if (wasHidden) {
+          await provider.unhideProductForViewer(localUpdated);
+        } else {
+          await provider.hideProductForViewer(localUpdated);
+        }
       }
 
-      _showSnack(wasHidden ? 'Product unhidden.' : 'product hidden.');
+      if (updated == null || !mounted) return;
+      final resolvedUpdated = updated;
+
+      if (wasHidden) {
+        setState(() => _product = resolvedUpdated);
+        widget.onProductUpdated?.call(resolvedUpdated);
+        _clearCollapsedState();
+        _showSnack('Product unhidden.');
+        return;
+      }
+
+      _showCollapsedState(
+        product: resolvedUpdated,
+        title: 'Listing hidden',
+        message: _isOwner()
+            ? 'This listing is now hidden.'
+            : 'We will keep this listing out of your feed for now.',
+        onUndo: () async {
+          ProductDto? restored;
+          if (_isOwner()) {
+            restored = await provider.unhideProduct(originalProduct.id);
+          } else {
+            restored = originalProduct;
+            await provider.unhideProductForViewer(restored);
+          }
+          if (!mounted) return;
+          if (restored == null) {
+            AppSnackBar.error(context, 'Failed to undo hide product.');
+            return;
+          }
+          final resolvedRestored = restored;
+          setState(() => _product = resolvedRestored);
+          widget.onProductUpdated?.call(resolvedRestored);
+          _clearCollapsedState();
+        },
+      );
     } catch (e) {
       _showSnack('Failed to update product visibility.');
     } finally {
@@ -406,21 +497,22 @@ class _ProductCardState extends State<ProductCard>
             reason: reportInput.reason,
             details: reportInput.details,
           );
+      if (!mounted) return;
+
       final originalProduct = _product;
       final hiddenProduct = _product.copyWith(
         status: 'hidden',
         updatedAt: DateTime.now(),
       );
 
-      setState(() => _product = hiddenProduct);
       context.read<ProductFeedViewModel>().applyExternalProductUpdate(
         hiddenProduct,
       );
-      widget.onProductUpdated?.call(hiddenProduct);
 
-      AppSnackBar.showUndo(
-        context,
-        'Report submitted. Listing removed from your feed.',
+      _showCollapsedState(
+        product: hiddenProduct,
+        title: 'Report submitted',
+        message: 'This listing is hidden from your feed while we review it.',
         onUndo: () async {
           if (!mounted) return;
           setState(() => _product = originalProduct);
@@ -428,6 +520,7 @@ class _ProductCardState extends State<ProductCard>
             originalProduct,
           );
           widget.onProductUpdated?.call(originalProduct);
+          _clearCollapsedState();
         },
       );
     } catch (e) {
@@ -592,6 +685,22 @@ class _ProductCardState extends State<ProductCard>
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
+
+    if (_product.isHidden && !_isOwner()) {
+      return Material(
+        color: AppColors.background,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: AppUndoInlineCard(
+              title: _collapsedTitle ?? 'Listing hidden',
+              message: _collapsedMessage ?? 'This listing is hidden from your feed.',
+              onUndo: _collapsedUndoAction ?? _undoViewerHideFallback,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Material(
       color: AppColors.background,

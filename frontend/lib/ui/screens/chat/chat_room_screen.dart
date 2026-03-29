@@ -62,6 +62,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   int? _lastSeenBottomMessageId;
   bool _hasPositionedLatestMessage = false;
   bool _isShowingPurchaseConfirmationPrompt = false;
+  bool _isShowingBuyerRatingPrompt = false;
+  bool _hasPrimedSellerDecisionHistory = false;
 
   @override
   void initState() {
@@ -149,6 +151,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   Future<void> _loadConversation() async {
     _hasPositionedLatestMessage = false;
     _lastSeenBottomMessageId = null;
+    _hasPrimedSellerDecisionHistory = false;
+    _processedSellerDecisionMessageIds.clear();
 
     final currentConversation = _viewModel.currentConversation;
     final hasMatchingConversation =
@@ -164,6 +168,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     if (_viewModel.currentConversation?.id == widget.conversationId) {
       await _viewModel.loadMessages(refresh: true, preserveExisting: false);
     }
+
+    _primeSellerDecisionHistory();
 
     _watchCurrentParticipantPresence();
     _scrollToBottom(animated: false);
@@ -784,6 +790,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           product,
           action: SellerPurchaseDecisionMessage.actionSold,
         );
+        if (!mounted) return;
         final updatedProduct = response.data;
         if (updatedProduct != null) {
           context.read<ProductFeedViewModel>().applyExternalProductUpdate(
@@ -888,6 +895,64 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
   }
 
+  Future<void> _promptBuyerToRateAfterSellerMarkedSold(
+    ProductDto product,
+  ) async {
+    final conversation = _viewModel.currentConversation;
+    final sellerParticipant = conversation != null
+        ? _sellerParticipant(conversation, product)
+        : null;
+    final sellerName = sellerParticipant?.user?.name ?? 'Seller';
+
+    final result = await showPurchaseRatingDialog(
+      context,
+      sellerName: sellerName,
+      productTitle: product.title,
+    );
+
+    if (!mounted) return;
+
+    if (result == null) {
+      _completePurchaseAttachmentCycle(product.id);
+      return;
+    }
+
+    final sellerId = _resolveProductOwnerId(product, conversation);
+    final currentUserId = _getCurrentUserId();
+
+    if (sellerId == 0) {
+      _completePurchaseAttachmentCycle(product.id);
+      AppSnackBar.error(context, 'Could not identify seller to rate');
+      return;
+    }
+
+    if (currentUserId != 0 && sellerId == currentUserId) {
+      _completePurchaseAttachmentCycle(product.id);
+      AppSnackBar.error(context, 'You cannot rate your own listing');
+      return;
+    }
+
+    final response = await _userRepository.submitRating(
+      sellerId: sellerId,
+      productId: product.id,
+      rating: result.rating,
+      feedback: result.feedback,
+    );
+
+    if (!mounted) return;
+
+    _completePurchaseAttachmentCycle(product.id);
+
+    if (response.isSuccess) {
+      AppSnackBar.success(context, 'Thanks for rating your purchase.');
+    } else {
+      AppSnackBar.error(
+        context,
+        response.error?.message ?? 'Failed to submit review',
+      );
+    }
+  }
+
   void _completePurchaseAttachmentCycle(int productId) {
     _expiredPromptedProductIds.remove(productId);
     _viewModel.completeAttachedProductCycle(productId);
@@ -906,12 +971,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }) async {
     await _viewModel.sendMessage(
       SellerPurchaseDecisionMessage.build(productId: product.id, action: action),
+      attachedProductId: product.id,
       attachConversationProduct: false,
     );
   }
 
+  void _primeSellerDecisionHistory() {
+    for (final message in _viewModel.messages) {
+      final decision = SellerPurchaseDecisionMessage.tryParse(message.messageText);
+      if (decision != null) {
+        _processedSellerDecisionMessageIds.add(message.id);
+        _completePurchaseAttachmentCycle(decision.productId);
+      }
+    }
+    _hasPrimedSellerDecisionHistory = true;
+  }
+
   void _applySellerDecisionSignals() {
-    if (!mounted) return;
+    if (!mounted || _isShowingBuyerRatingPrompt || !_hasPrimedSellerDecisionHistory) return;
 
     final conversation = _viewModel.currentConversation;
     if (conversation == null || conversation.id != widget.conversationId) {
@@ -930,8 +1007,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
       _processedSellerDecisionMessageIds.add(message.id);
 
-      final sellerId = conversation.product?.userId;
-      if (sellerId == null || sellerId <= 0) {
+      final product = _findProductForDecision(decision.productId, conversation);
+      if (product == null) {
+        continue;
+      }
+
+      final sellerId = _resolveProductOwnerId(product, conversation);
+      if (sellerId <= 0) {
         continue;
       }
 
@@ -941,16 +1023,83 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         continue;
       }
 
+      if (decision.isMarkedSold) {
+        if (_hasCurrentUserPurchaseConfirmation(decision.productId)) {
+          _completePurchaseAttachmentCycle(decision.productId);
+          if (!mounted) return;
+          AppSnackBar.info(context, 'Seller marked this listing as sold.');
+          continue;
+        }
+
+        final resolvedProduct = product;
+        _isShowingBuyerRatingPrompt = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) {
+            _isShowingBuyerRatingPrompt = false;
+            return;
+          }
+          await _promptBuyerToRateAfterSellerMarkedSold(resolvedProduct);
+          if (mounted) {
+            _isShowingBuyerRatingPrompt = false;
+          }
+        });
+        continue;
+      }
+
       _completePurchaseAttachmentCycle(decision.productId);
       if (!mounted) return;
 
-      final label = decision.isMarkedSold
-          ? 'Seller marked this listing as sold.'
-          : decision.isKeptActive
+      final label = decision.isKeptActive
           ? 'Seller kept this listing active.'
           : 'Seller marked this purchase as not sold.';
       AppSnackBar.info(context, label);
     }
+  }
+
+  ProductDto? _findProductForDecision(
+    int productId,
+    ConversationDto? conversation,
+  ) {
+    for (final attachedProduct in _viewModel.attachedProducts) {
+      if (attachedProduct.product.id == productId) {
+        return attachedProduct.product;
+      }
+    }
+
+    for (final message in _viewModel.messages.reversed) {
+      final attachedProduct = message.attachedProduct;
+      if (attachedProduct != null && attachedProduct.id == productId) {
+        return attachedProduct;
+      }
+    }
+
+    final conversationProduct = conversation?.product;
+    if (conversationProduct != null && conversationProduct.id == productId) {
+      return conversationProduct;
+    }
+
+    return null;
+  }
+
+  bool _hasCurrentUserPurchaseConfirmation(int productId) {
+    final currentUserId = _getCurrentUserId();
+    if (currentUserId == 0) {
+      return false;
+    }
+
+    for (final message in _viewModel.messages) {
+      if (message.senderId != currentUserId) {
+        continue;
+      }
+      final confirmedProductId = PurchaseConfirmationMessage.tryParseProductId(
+        message.messageText,
+      );
+      if (confirmedProductId == productId) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   String _buildProductCountdownLabel(
@@ -1086,7 +1235,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           message: message,
           isCurrentUser: isCurrentUser,
           attachedProduct: message.attachedProduct,
-          showAttachedProductCard: false,
+          showAttachedProductCard:
+              PurchaseConfirmationMessage.isPurchaseConfirmation(
+                message.messageText,
+              ) ||
+              SellerPurchaseDecisionMessage.isSellerDecision(
+                message.messageText,
+              ),
+          onTapAttachedProduct: _navigateToProduct,
           isSelected: isSelected,
           isSelectionMode: isSelectionMode,
           onLongPress: () {
@@ -1334,15 +1490,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     required int userId,
     required String displayName,
   }) async {
-    final reason = await showUserReportReasonDialog(
+    final reportInput = await showUserReportSheet(
       context,
       title: 'Report $displayName',
     );
-    if (!mounted || reason == null) return;
+    if (!mounted || reportInput == null) return;
 
     final response = await _userRepository.reportUser(
       userId: userId,
-      reason: reason,
+      reason: reportInput.reason,
+      details: reportInput.details,
     );
 
     if (!mounted) return;

@@ -19,14 +19,18 @@ class CommunityRepositoryImpl implements ICommunityRepository {
     int? userId,
   }) async {
     try {
+      final queryParameters = <String, dynamic>{
+        'feed': feed,
+        'limit': limit,
+        'offset': offset,
+      };
+      if (userId != null) {
+        queryParameters['user_id'] = userId;
+      }
+
       final response = await _dio.get(
         '/community',
-        queryParameters: {
-          'feed': feed,
-          'limit': limit,
-          'offset': offset,
-          if (userId != null) 'user_id': userId,
-        },
+        queryParameters: queryParameters,
       );
       final items = (response.data as List)
           .map((json) => CommunityPostDto.fromJson(json as Map<String, dynamic>))
@@ -143,6 +147,22 @@ class CommunityRepositoryImpl implements ICommunityRepository {
         },
       ),
       'Failed to report community post',
+    );
+  }
+
+  @override
+  Future<ApiResponse<void>> hidePostForViewer(int postId) {
+    return _voidCall(
+      () => _dio.patch('/community/$postId/hide-for-me'),
+      'Failed to hide community post for viewer',
+    );
+  }
+
+  @override
+  Future<ApiResponse<void>> unhidePostForViewer(int postId) {
+    return _voidCall(
+      () => _dio.patch('/community/$postId/unhide-for-me'),
+      'Failed to unhide community post for viewer',
     );
   }
 

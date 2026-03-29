@@ -38,6 +38,10 @@ abstract class IProductRepository {
   
   Future<ApiResponse<ProductDto>> unhideProduct(int productId);
 
+  Future<ApiResponse<void>> hideProductForViewer(int productId);
+
+  Future<ApiResponse<void>> unhideProductForViewer(int productId);
+
   Future<ApiResponse<String>> shareProduct(int productId);
 }
 

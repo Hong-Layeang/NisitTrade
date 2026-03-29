@@ -22,6 +22,7 @@ import '../../../core/utils/image_url_helper.dart';
 import '../../widgets/app_action_chip.dart';
 import '../../widgets/app_comment_composer.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_undo_inline_card.dart';
 import '../../widgets/full_screen_image_viewer.dart';
 import '../../widgets/user_widgets.dart';
 import '../edit/edit_product_page.dart';
@@ -83,6 +84,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
   bool _isTogglingLike = false;
   int _currentImageIndex = 0;
+  String? _collapsedTitle;
+  String? _collapsedMessage;
+  Future<void> Function()? _collapsedUndoAction;
 
   @override
   void initState() {
@@ -158,7 +162,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     final chatViewModel = context.read<ChatRoomViewModel>();
 
     final existingConversation =
-      chatViewModel.findConversationForProduct(product.id);
+      chatViewModel.findConversationWithUser(product.userId);
     if (existingConversation != null) {
       chatViewModel.selectConversation(existingConversation);
       chatViewModel.addAttachedProduct(product);
@@ -174,7 +178,9 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       return;
     }
 
-    final conversation = await chatViewModel.createConversation(product.id);
+    final conversation = await chatViewModel.createConversationWithUser(
+      product.userId,
+    );
     if (!mounted) return;
 
     if (conversation == null) {
@@ -586,16 +592,61 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       if (product == null) return;
 
       final provider = context.read<ProductFeedViewModel>();
-      final updated = product.isHidden
-          ? await provider.unhideProduct(widget.productId)
-          : await provider.hideProduct(widget.productId);
+      ProductDto? updated;
+
+      if (_isOwner()) {
+        updated = product.isHidden
+            ? await provider.unhideProduct(widget.productId)
+            : await provider.hideProduct(widget.productId);
+      } else {
+        updated = product.copyWith(
+          status: product.isHidden ? 'available' : 'hidden',
+          updatedAt: DateTime.now(),
+        );
+        if (product.isHidden) {
+          await provider.unhideProductForViewer(updated);
+        } else {
+          await provider.hideProductForViewer(updated);
+        }
+      }
 
       if (updated != null && mounted) {
         setState(() => _product = updated);
-        AppSnackBar.success(
-          context,
-          product.isHidden ? 'Product unhidden.' : 'Product hidden.',
-        );
+        if (product.isHidden) {
+          setState(() {
+            _collapsedTitle = null;
+            _collapsedMessage = null;
+            _collapsedUndoAction = null;
+          });
+          AppSnackBar.success(context, 'Product unhidden.');
+        } else {
+          setState(() {
+            _collapsedTitle = 'Listing hidden';
+            _collapsedMessage = _isOwner()
+                ? 'This Product is now hidden.'
+                : 'We will keep this Product out of your feed for now.';
+            _collapsedUndoAction = () async {
+              ProductDto? restored;
+              if (_isOwner()) {
+                restored = await provider.unhideProduct(widget.productId);
+              } else {
+                restored = product;
+                await provider.unhideProductForViewer(restored);
+              }
+              if (!mounted) return;
+              if (restored == null) {
+                AppSnackBar.error(context, 'Failed to undo hide product.');
+                return;
+              }
+              setState(() {
+                _product = restored;
+                _collapsedTitle = null;
+                _collapsedMessage = null;
+                _collapsedUndoAction = null;
+              });
+            };
+          });
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -681,6 +732,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         reason: reportInput.reason,
         details: reportInput.details,
       );
+      if (!mounted) return;
+
       final product = _product;
       if (product == null) return;
 
@@ -694,17 +747,22 @@ class _ProductDetailPageState extends State<ProductDetailPage>
         hiddenProduct,
       );
 
-      AppSnackBar.showUndo(
-        context,
-        'Report submitted. Listing removed from your feed.',
-        onUndo: () async {
+      setState(() {
+        _collapsedTitle = 'Report submitted';
+        _collapsedMessage = 'This listing is hidden from your feed while we review it.';
+        _collapsedUndoAction = () async {
           if (!mounted) return;
-          setState(() => _product = product);
+          setState(() {
+            _product = product;
+            _collapsedTitle = null;
+            _collapsedMessage = null;
+            _collapsedUndoAction = null;
+          });
           context.read<ProductFeedViewModel>().applyExternalProductUpdate(
             product,
           );
-        },
-      );
+        };
+      });
     } catch (_) {
       if (mounted) {
         AppSnackBar.error(context, 'Failed to submit report.');
@@ -740,6 +798,24 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     handler.showActionSheet();
   }
 
+  Future<void> _undoViewerHideFallback() async {
+    final product = _product;
+    if (product == null) return;
+    final restored = product.copyWith(
+      status: 'available',
+      updatedAt: DateTime.now(),
+    );
+    final provider = context.read<ProductFeedViewModel>();
+    await provider.unhideProductForViewer(restored);
+    if (!mounted) return;
+    setState(() {
+      _product = restored;
+      _collapsedTitle = null;
+      _collapsedMessage = null;
+      _collapsedUndoAction = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -767,6 +843,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final showCollapsedCard = product.isHidden && !_isOwner();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Product'),
@@ -780,48 +858,59 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       body: Column(
         children: [
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refreshProduct,
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildImageSection(product),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: _buildHeader(product),
+            child: showCollapsedCard
+                ? Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: AppUndoInlineCard(
+                        title: _collapsedTitle ?? 'Listing hidden',
+                        message: _collapsedMessage ?? 'This listing is hidden from your feed.',
+                        onUndo: _collapsedUndoAction ?? _undoViewerHideFallback,
+                      ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildSellerRow(product),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _refreshProduct,
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildImageSection(product),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: _buildHeader(product),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _buildSellerRow(product),
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _buildActions(product),
+                          ),
+                          const SizedBox(height: 16),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _buildDescription(product),
+                          ),
+                          const SizedBox(height: 18),
+                          const Divider(height: 1, color: AppColors.border),
+                          Padding(
+                            key: _commentsSectionKey,
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                            child: _buildCommentsHeader(product),
+                          ),
+                          _buildComments(product.comments),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildActions(product),
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildDescription(product),
-                    ),
-                    const SizedBox(height: 18),
-                    const Divider(height: 1, color: AppColors.border),
-                    Padding(
-                      key: _commentsSectionKey,
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                      child: _buildCommentsHeader(product),
-                    ),
-                    _buildComments(product.comments),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
-            ),
+                  ),
           ),
-          _buildCommentComposer(),
+          if (!showCollapsedCard) _buildCommentComposer(),
         ],
       ),
     );

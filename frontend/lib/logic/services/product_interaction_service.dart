@@ -120,6 +120,20 @@ class ProductInteractionService {
     return response.data;
   }
 
+  Future<void> hideProductForViewer(int productId) async {
+    final response = await _productRepository.hideProductForViewer(productId);
+    if (!response.isSuccess) {
+      throw response.error!;
+    }
+  }
+
+  Future<void> unhideProductForViewer(int productId) async {
+    final response = await _productRepository.unhideProductForViewer(productId);
+    if (!response.isSuccess) {
+      throw response.error!;
+    }
+  }
+
   Future<void> saveListing(int productId) async {
     final response = await _saveRepository.saveListing(productId);
     if (!response.isSuccess) {

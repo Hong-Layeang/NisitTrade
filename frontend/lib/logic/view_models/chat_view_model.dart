@@ -87,7 +87,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
   final Map<int, List<AttachedProduct>> _attachedProductsByConversation = {};
 
-  final Map<int, Set<int>> _resolvedProductsByConversation = {};
+  final Map<int, Map<int, DateTime>> _resolvedProductsByConversation = {};
 
   // Multi-select state
   final Set<int> _selectedMessageIds = {};
@@ -233,6 +233,31 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _onWsMessageDeleted(MessageDeleteEvent event) {
+    if (event.clearAll) {
+      _attachedProductsByConversation.remove(event.conversationId);
+      _resolvedProductsByConversation.remove(event.conversationId);
+
+      if (_currentConversation?.id == event.conversationId) {
+        _messages = [];
+        _messagesWithProductAttachment.clear();
+      }
+
+      final index = _conversations.indexWhere(
+        (conversation) => conversation.id == event.conversationId,
+      );
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(
+          clearLastMessage: true,
+          unreadCount: 0,
+          updatedAt: DateTime.now(),
+        );
+      }
+
+      unawaited(_saveAttachments());
+      notifyListeners();
+      return;
+    }
+
     _messages.removeWhere((m) => event.messageIds.contains(m.id));
     _selectedMessageIds.removeAll(event.messageIds);
     if (_selectedMessageIds.isEmpty) _isSelectionMode = false;
@@ -377,8 +402,8 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       list.insert(0, AttachedProduct(product: product));
     }
     _resolvedProductsByConversation
-        .putIfAbsent(convId, () => <int>{})
-        .remove(product.id);
+      .putIfAbsent(convId, () => <int, DateTime>{})
+      .remove(product.id);
     _saveAttachments();
     notifyListeners();
   }
@@ -390,8 +415,8 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       (ap) => ap.product.id == productId,
     );
     _resolvedProductsByConversation
-        .putIfAbsent(convId, () => {})
-        .add(productId);
+      .putIfAbsent(convId, () => <int, DateTime>{})[productId] =
+      DateTime.now();
     _saveAttachments();
     notifyListeners();
   }
@@ -420,7 +445,10 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         .toSet();
     _attachedProductsByConversation.remove(conversationId);
     if (ids.isNotEmpty) {
-      _resolvedProductsByConversation[conversationId] = ids;
+      final resolvedAt = DateTime.now();
+      _resolvedProductsByConversation[conversationId] = {
+        for (final id in ids) id: resolvedAt,
+      };
     }
     _saveAttachments();
     notifyListeners();
@@ -434,6 +462,31 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     for (var i = 0; i < list.length; i++) {
       if (list[i].countdownStartedAt == null) {
         list[i] = list[i].copyWith(countdownStartedAt: sentAt);
+      }
+    }
+  }
+
+  void _stampPendingCountdownsForProducts(
+    DateTime sentAt,
+    Iterable<int> productIds,
+  ) {
+    final convId = _currentConversation?.id;
+    if (convId == null) return;
+
+    final list = _attachedProductsByConversation[convId];
+    if (list == null || list.isEmpty) return;
+
+    final targetIds = productIds.toSet();
+    if (targetIds.isEmpty) return;
+
+    for (var i = 0; i < list.length; i++) {
+      final item = list[i];
+      if (!targetIds.contains(item.product.id)) {
+        continue;
+      }
+
+      if (item.countdownStartedAt == null) {
+        list[i] = item.copyWith(countdownStartedAt: sentAt);
       }
     }
   }
@@ -457,7 +510,10 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
     final resolvedMap = <String, dynamic>{};
     for (final entry in _resolvedProductsByConversation.entries) {
-      resolvedMap[entry.key.toString()] = entry.value.toList();
+      resolvedMap[entry.key.toString()] = {
+        for (final resolvedEntry in entry.value.entries)
+          resolvedEntry.key.toString(): resolvedEntry.value.toIso8601String(),
+      };
     }
     await prefs.setString(_resolvedKey, jsonEncode(resolvedMap));
   }
@@ -489,11 +545,40 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         for (final entry in resolvedMap.entries) {
           final convId = int.tryParse(entry.key);
           if (convId == null) continue;
-          final ids = (entry.value as List)
-              .map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0)
-              .where((id) => id > 0)
-              .toSet();
-          _resolvedProductsByConversation[convId] = ids;
+
+          final rawValue = entry.value;
+          if (rawValue is List) {
+            final resolvedAt = DateTime.now();
+            final ids = rawValue
+                .map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0)
+                .where((id) => id > 0)
+                .toSet();
+            _resolvedProductsByConversation[convId] = {
+              for (final id in ids) id: resolvedAt,
+            };
+            continue;
+          }
+
+          if (rawValue is Map<String, dynamic>) {
+            final parsed = <int, DateTime>{};
+            for (final resolvedEntry in rawValue.entries) {
+              final productId = int.tryParse(resolvedEntry.key);
+              if (productId == null || productId <= 0) {
+                continue;
+              }
+
+              final rawResolvedAt = resolvedEntry.value?.toString() ?? '';
+              final resolvedAt = DateTime.tryParse(rawResolvedAt);
+              if (resolvedAt == null) {
+                continue;
+              }
+
+              parsed[productId] = resolvedAt;
+            }
+            if (parsed.isNotEmpty) {
+              _resolvedProductsByConversation[convId] = parsed;
+            }
+          }
         }
       } catch (_) {
         // Ignore corrupted resolved data
@@ -550,6 +635,10 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     bool changed = false;
 
     for (final message in messages) {
+      if (_shouldSkipAttachmentTrackingForMessage(message)) {
+        continue;
+      }
+
       final product = _resolveAttachmentProductFromMessage(
         conversationId,
         message,
@@ -559,7 +648,15 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         conversationId,
         product,
       );
-      if (resolved.contains(resolvedProduct.id)) continue;
+
+      final resolvedAt = resolved[resolvedProduct.id];
+      if (resolvedAt != null) {
+        if (!message.sentAt.isAfter(resolvedAt)) {
+          continue;
+        }
+        resolved.remove(resolvedProduct.id);
+        changed = true;
+      }
 
       final list = _attachedProductsByConversation.putIfAbsent(
         conversationId,
@@ -588,6 +685,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     if (changed && save) {
       _saveAttachments();
     }
+  }
+
+  bool _shouldSkipAttachmentTrackingForMessage(MessageDto message) {
+    final normalized = message.messageText.trim();
+    return normalized.startsWith('__seller_purchase_decision__:');
   }
 
   ProductDto? _resolveAttachmentProductFromMessage(
@@ -780,7 +882,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
           if (lastMessage != null) {
             _syncAttachedProductsFromMessages(
               conversation.id,
-              [lastMessage!],
+              [lastMessage],
               save: true,
             );
           }
@@ -958,6 +1060,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
         } else {
           _messages.insertAll(0, fetchedMessages);
         }
+
         _messageOffset = refresh
             ? fetchedMessages.length
             : _messageOffset + fetchedMessages.length;
@@ -996,6 +1099,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
   Future<bool> sendMessage(
     String messageText, {
     bool attachConversationProduct = false,
+    int? attachedProductId,
     List<String> imagePaths = const [],
   }) async {
     final normalizedMessageText = messageText.trim();
@@ -1004,9 +1108,19 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       return false;
     }
 
+    final pendingAttachmentProductIds =
+      attachConversationProduct && attachedProductId == null
+      ? (_attachedProductsByConversation[_currentConversation!.id] ?? [])
+        .where((attachment) => attachment.countdownStartedAt == null)
+        .map((attachment) => attachment.product.id)
+        .where((productId) => productId > 0)
+        .toSet()
+        .toList(growable: false)
+      : const <int>[];
+
     if (normalizedMessageText.isEmpty &&
-        imagePaths.isEmpty &&
-        !attachConversationProduct) {
+      imagePaths.isEmpty &&
+      pendingAttachmentProductIds.isEmpty) {
       return false;
     }
 
@@ -1015,12 +1129,16 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
 
     try {
+        final primaryAttachmentProductId = attachedProductId != null && attachedProductId > 0
+          ? attachedProductId
+          : pendingAttachmentProductIds.isNotEmpty
+          ? pendingAttachmentProductIds.first
+          : null;
+
       final response = await _chatRepository.sendMessage(
         conversationId: _currentConversation!.id,
         messageText: normalizedMessageText,
-        attachedProductId: attachConversationProduct
-            ? _currentConversation?.product?.id
-            : null,
+        attachedProductId: primaryAttachmentProductId,
         imagePaths: imagePaths,
       );
 
@@ -1031,10 +1149,36 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
           _messages.add(msg);
         }
         _upsertConversationLastMessage(msg, unreadCount: 0);
-        if (attachConversationProduct) {
+        if (primaryAttachmentProductId != null) {
           _messagesWithProductAttachment.add(msg.id);
+          _stampPendingCountdownsForProducts(msg.sentAt, [
+            primaryAttachmentProductId,
+          ]);
         }
-        _stampPendingCountdowns(msg.sentAt);
+
+        for (final productId in pendingAttachmentProductIds.skip(1)) {
+          final attachmentResponse = await _chatRepository.sendMessage(
+            conversationId: _currentConversation!.id,
+            messageText: '',
+            attachedProductId: productId,
+            imagePaths: const [],
+          );
+
+          if (!attachmentResponse.isSuccess || attachmentResponse.data == null) {
+            continue;
+          }
+
+          final attachmentMessage = attachmentResponse.data!;
+          if (!_messages.any((m) => m.id == attachmentMessage.id)) {
+            _messages.add(attachmentMessage);
+          }
+          _upsertConversationLastMessage(attachmentMessage, unreadCount: 0);
+          _messagesWithProductAttachment.add(attachmentMessage.id);
+          _stampPendingCountdownsForProducts(attachmentMessage.sentAt, [
+            productId,
+          ]);
+        }
+
         _saveAttachments();
         _sendMessageError = null;
         notifyListeners();
@@ -1169,6 +1313,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       _attachedProductsByConversation.remove(conversationId);
+      _resolvedProductsByConversation.remove(conversationId);
       await _saveAttachments();
 
       if (_currentConversation?.id == conversationId) {

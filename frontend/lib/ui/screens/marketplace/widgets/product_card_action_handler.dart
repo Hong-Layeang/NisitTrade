@@ -58,7 +58,7 @@ class ProductCardActionHandler {
           icon: Icons.restore_outlined,
           onTap: onRecoverToFeed,
         ),
-      if (isOwner)
+      if (!isOwner)
         AppActionSheetItem(
           label: product.isHidden ? 'Unhide product' : 'Hide product',
           icon: Icons.visibility_off_outlined,

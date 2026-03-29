@@ -335,10 +335,12 @@ class MessageUpdateEvent {
 class MessageDeleteEvent {
   final List<int> messageIds;
   final int conversationId;
+  final bool clearAll;
 
   const MessageDeleteEvent({
     required this.messageIds,
     required this.conversationId,
+    this.clearAll = false,
   });
 
   factory MessageDeleteEvent.fromJson(Map<String, dynamic> json) {
@@ -349,6 +351,7 @@ class MessageDeleteEvent {
           .where((id) => id > 0)
           .toList(),
       conversationId: ChatWebSocketService._toInt(json['conversationId']),
+      clearAll: json['clearAll'] == true,
     );
   }
 }

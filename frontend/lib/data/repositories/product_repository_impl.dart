@@ -148,6 +148,22 @@ class ProductRepositoryImpl implements IProductRepository {
   }
 
   @override
+  Future<ApiResponse<void>> hideProductForViewer(int productId) async {
+    return _voidCall(
+      () => _dio.patch('/products/$productId/hide-for-me'),
+      'Failed to hide product for viewer',
+    );
+  }
+
+  @override
+  Future<ApiResponse<void>> unhideProductForViewer(int productId) async {
+    return _voidCall(
+      () => _dio.patch('/products/$productId/unhide-for-me'),
+      'Failed to unhide product for viewer',
+    );
+  }
+
+  @override
   Future<ApiResponse<String>> shareProduct(int productId) async {
     try {
       final response = await _dio.get('/products/$productId/share');

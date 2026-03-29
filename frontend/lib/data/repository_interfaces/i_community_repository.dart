@@ -29,6 +29,8 @@ abstract class ICommunityRepository {
     required String reason,
     String? details,
   });
+  Future<ApiResponse<void>> hidePostForViewer(int postId);
+  Future<ApiResponse<void>> unhidePostForViewer(int postId);
   Future<ApiResponse<void>> addComment({
     required int postId,
     required String content,
