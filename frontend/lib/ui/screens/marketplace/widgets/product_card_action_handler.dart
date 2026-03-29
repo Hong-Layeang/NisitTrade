@@ -13,6 +13,7 @@ class ProductCardActionHandler {
   final Future<void> Function() onDeleteProduct;
   final Future<void> Function() onToggleSaveProduct;
   final Future<void> Function() onHideToggle;
+  final Future<void> Function() onRecoverToFeed;
   final Future<void> Function() onShareProduct;
   final Future<void> Function() onReportProduct;
 
@@ -25,6 +26,7 @@ class ProductCardActionHandler {
     required this.onDeleteProduct,
     required this.onToggleSaveProduct,
     required this.onHideToggle,
+    required this.onRecoverToFeed,
     required this.onShareProduct,
     required this.onReportProduct,
   });
@@ -50,6 +52,12 @@ class ProductCardActionHandler {
         icon: isSaved ? Icons.bookmark_remove_outlined : Icons.bookmark_border,
         onTap: onToggleSaveProduct,
       ),
+      if (isOwner && product.isSold)
+        AppActionSheetItem(
+          label: 'Recover to feed',
+          icon: Icons.restore_outlined,
+          onTap: onRecoverToFeed,
+        ),
       if (isOwner)
         AppActionSheetItem(
           label: product.isHidden ? 'Unhide product' : 'Hide product',

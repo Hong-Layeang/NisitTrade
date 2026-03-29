@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/navigation/app_routes.dart';
@@ -30,8 +32,51 @@ class AppAppBar extends StatefulWidget implements PreferredSizeWidget {
 }
 
 class _AppAppBarState extends State<AppAppBar> {
+  static const Duration _badgeSwitchInterval = Duration(seconds: 3);
+
+  Timer? _badgeSwitchTimer;
+  bool _showChatBadge = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _configureBadgeRotation();
+  }
+
+  @override
+  void didUpdateWidget(covariant AppAppBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chatBadgeCount != widget.chatBadgeCount ||
+        oldWidget.pendingPurchaseBadgeCount !=
+            widget.pendingPurchaseBadgeCount) {
+      _configureBadgeRotation();
+    }
+  }
+
+  void _configureBadgeRotation() {
+    _badgeSwitchTimer?.cancel();
+
+    final hasChat = widget.chatBadgeCount > 0;
+    final hasPurchase = widget.pendingPurchaseBadgeCount > 0;
+
+    if (hasChat && hasPurchase) {
+      _badgeSwitchTimer = Timer.periodic(_badgeSwitchInterval, (_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _showChatBadge = !_showChatBadge;
+        });
+      });
+      return;
+    }
+
+    _showChatBadge = hasChat;
+  }
+
   @override
   void dispose() {
+    _badgeSwitchTimer?.cancel();
     super.dispose();
   }
 
@@ -88,20 +133,9 @@ class _AppAppBarState extends State<AppAppBar> {
               if (widget.chatBadgeCount > 0 ||
                   widget.pendingPurchaseBadgeCount > 0)
                 Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (widget.chatBadgeCount > 0)
-                        _buildChatBadge(onPrimary),
-                      if (widget.chatBadgeCount > 0 &&
-                          widget.pendingPurchaseBadgeCount > 0)
-                        const SizedBox(height: 2),
-                      if (widget.pendingPurchaseBadgeCount > 0)
-                        _buildPurchaseBadge(onPrimary),
-                    ],
-                  ),
+                  right: 4,
+                  top: 4,
+                  child: _buildActiveBadge(onPrimary),
                 ),
             ],
           ),
@@ -109,6 +143,19 @@ class _AppAppBarState extends State<AppAppBar> {
         const SizedBox(width: 8),
       ],
     );
+  }
+
+  Widget _buildActiveBadge(Color onPrimary) {
+    final showChat = widget.chatBadgeCount > 0;
+    final showPurchase = widget.pendingPurchaseBadgeCount > 0;
+
+    if (showChat && showPurchase) {
+      return _showChatBadge
+          ? _buildChatBadge(onPrimary)
+          : _buildPurchaseBadge(onPrimary);
+    }
+
+    return showChat ? _buildChatBadge(onPrimary) : _buildPurchaseBadge(onPrimary);
   }
 
   Widget _buildChatBadge(Color onPrimary) {
@@ -156,7 +203,7 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       constraints: BoxConstraints(minWidth: minSize, minHeight: minSize),
       child: Text(

@@ -115,18 +115,18 @@ class ChatRepository implements IChatRepository {
     List<String> imagePaths = const [],
   }) async {
     try {
-      final formData = FormData.fromMap({
+      final hasImages = imagePaths.isNotEmpty;
+      final payload = {
         'message_text': messageText,
         if (attachedProductId != null) 'attached_product_id': attachedProductId,
-      });
-      for (final imagePath in imagePaths) {
-        formData.files.add(MapEntry('images', await MultipartFile.fromFile(imagePath)));
-      }
-      final response = await _dio.post(
-        '/messages/conversation/$conversationId',
-        data: formData,
-        options: Options(contentType: 'multipart/form-data'),
-      );
+      };
+
+      final response = hasImages
+          ? await _sendMultipartMessage(conversationId, payload, imagePaths)
+          : await _dio.post(
+              '/messages/conversation/$conversationId',
+              data: payload,
+            );
       return ApiResponse.success(
         MessageDto.fromJson(response.data as Map<String, dynamic>),
       );
@@ -135,6 +135,25 @@ class ChatRepository implements IChatRepository {
     } catch (e) {
       return ApiResponse.error(ApiException(message: 'Failed to send message: $e'));
     }
+  }
+
+  Future<Response<dynamic>> _sendMultipartMessage(
+    int conversationId,
+    Map<String, dynamic> payload,
+    List<String> imagePaths,
+  ) async {
+    final formData = FormData.fromMap(payload);
+    for (final imagePath in imagePaths) {
+      formData.files.add(
+        MapEntry('images', await MultipartFile.fromFile(imagePath)),
+      );
+    }
+
+    return _dio.post(
+      '/messages/conversation/$conversationId',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
   }
 
   @override

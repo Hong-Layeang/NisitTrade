@@ -757,8 +757,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       return;
     }
 
-    _viewModel.removeAttachedProduct(product.id);
-
     if (choice == _ListingStatusChoice.markAsSold) {
       final response = await _productRepository.updateProductStatus(
         id: product.id,
@@ -766,6 +764,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       );
       if (!mounted) return;
       if (response.isSuccess) {
+        _viewModel.removeAttachedProduct(product.id);
         final updatedProduct = response.data;
         if (updatedProduct != null) {
           context.read<ProductFeedViewModel>().applyExternalProductUpdate(
@@ -1013,11 +1012,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
         final isSelected = viewModel.isMessageSelected(message.id);
         final isSelectionMode = viewModel.isSelectionMode;
-
         return ChatBubble(
           message: message,
           isCurrentUser: isCurrentUser,
           attachedProduct: message.attachedProduct,
+          showAttachedProductCard: false,
           isSelected: isSelected,
           isSelectionMode: isSelectionMode,
           onLongPress: () {
@@ -1374,7 +1373,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
     if (success) {
       AppSnackBar.success(context, 'Chat deleted');
-      Navigator.of(context).maybePop();
+      Navigator.of(context).pushReplacementNamed(AppRoutes.chat);
       return;
     }
 
@@ -1660,16 +1659,6 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                     label: const Text('Mark as Sold - Remove from Feed'),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
                     ),
                   ),
                 ),
@@ -1684,15 +1673,6 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                     label: const Text('Keep Listing Active'),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      side: const BorderSide(color: AppColors.border),
-                      foregroundColor: AppColors.textSecondary,
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                   ),
                 ),

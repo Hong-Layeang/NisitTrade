@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -26,6 +25,7 @@ class ChatWebSocketService {
       StreamController<MessageDeleteEvent>.broadcast();
   final _messageReadController = StreamController<MessageReadEvent>.broadcast();
   final _typingController = StreamController<TypingEvent>.broadcast();
+  final _connectionController = StreamController<bool>.broadcast();
 
   bool get isConnected => _socket?.connected == true;
 
@@ -37,6 +37,7 @@ class ChatWebSocketService {
       _messageDeletedController.stream;
   Stream<MessageReadEvent> get onMessageRead => _messageReadController.stream;
   Stream<TypingEvent> get onTyping => _typingController.stream;
+  Stream<bool> get onConnectionChanged => _connectionController.stream;
 
   Future<void> connect({required String token}) async {
     _token = token;
@@ -70,6 +71,7 @@ class ChatWebSocketService {
           .enableReconnection()
           .setReconnectionDelay(1000)
           .setReconnectionDelayMax(5000)
+          .setExtraHeaders({'Authorization': 'Bearer $token'})
           .setAuth({'token': token})
           .disableAutoConnect()
           .build(),
@@ -78,17 +80,20 @@ class ChatWebSocketService {
     socket.onConnect((_) {
       _isConnecting = false;
       debugPrint('[$_tag] Connected to $baseUrl');
+      _connectionController.add(true);
       _rejoinTrackedConversations();
     });
 
     socket.onDisconnect((reason) {
       _isConnecting = false;
       debugPrint('[$_tag] Disconnected: $reason');
+      _connectionController.add(false);
     });
 
     socket.onConnectError((error) {
       _isConnecting = false;
       debugPrint('[$_tag] Connect error: $error');
+      _connectionController.add(false);
       _handleConnectError();
     });
 
@@ -190,7 +195,7 @@ class ChatWebSocketService {
   }
 
   void _handleConnectError() {
-    if (!Platform.isAndroid || _retryingFallback) return;
+    if (_retryingFallback) return;
     _retryingFallback = true;
     _activeBaseUrl = AppConfig.fallbackBaseUrl;
     _connectTo(_activeBaseUrl);
@@ -280,6 +285,7 @@ class ChatWebSocketService {
     await _messageDeletedController.close();
     await _messageReadController.close();
     await _typingController.close();
+    await _connectionController.close();
   }
 
   static int _toInt(dynamic value) {

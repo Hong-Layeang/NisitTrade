@@ -142,7 +142,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
 
       setStateIfMounted(() {
         _profile = profile;
-        _products = productsResponse.data ?? [];
+        _products = _sortProductsForProfile(productsResponse.data ?? []);
         _posts = (postsResponse.data ?? [])
             .where((post) => post.orderedImages.isNotEmpty)
             .toList();
@@ -536,6 +536,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                     color: AppColors.textSecondary,
                   ),
                 ),
+                if (product.isSold) _buildSoldOverlay(),
                 if (!product.isAvailable)
                   Positioned(
                     top: 6,
@@ -577,6 +578,7 @@ class _OtherProfilePageState extends State<OtherProfilePage>
                     ),
                   ),
                 ),
+                if (product.isSold) _buildSoldOverlay(),
                 if (!product.isAvailable)
                   Positioned(
                     top: 6,
@@ -612,6 +614,57 @@ class _OtherProfilePageState extends State<OtherProfilePage>
         ),
       ),
     );
+  }
+
+  Widget _buildSoldOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.42),
+        alignment: Alignment.center,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.62),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: const Text(
+            'SOLD',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<ProductDto> _sortProductsForProfile(List<ProductDto> products) {
+    final sorted = List<ProductDto>.from(products);
+    sorted.sort((a, b) {
+      final statusRankA = a.isAvailable || a.isReserved
+          ? 0
+          : a.isSold
+          ? 1
+          : a.isHidden
+          ? 2
+          : 3;
+      final statusRankB = b.isAvailable || b.isReserved
+          ? 0
+          : b.isSold
+          ? 1
+          : b.isHidden
+          ? 2
+          : 3;
+
+      final rankCompare = statusRankA.compareTo(statusRankB);
+      if (rankCompare != 0) return rankCompare;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+    return sorted;
   }
 
   void _openProduct(ProductDto product) {

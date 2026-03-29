@@ -183,6 +183,7 @@ class MessageDto {
   final String messageText;
   final int senderId;
   final int conversationId;
+  final int? attachedProductId;
   final DateTime sentAt;
   final DateTime? editedAt;
   final List<int> readBy;
@@ -195,6 +196,7 @@ class MessageDto {
     required this.messageText,
     required this.senderId,
     required this.conversationId,
+    this.attachedProductId,
     required this.sentAt,
     this.editedAt,
     this.readBy = const [],
@@ -211,12 +213,14 @@ class MessageDto {
     String? messageText,
     DateTime? editedAt,
     List<int>? readBy,
+    int? attachedProductId,
   }) {
     return MessageDto(
       id: id,
       messageText: messageText ?? this.messageText,
       senderId: senderId,
       conversationId: conversationId,
+      attachedProductId: attachedProductId ?? this.attachedProductId,
       sentAt: sentAt,
       editedAt: editedAt ?? this.editedAt,
       readBy: readBy ?? this.readBy,
@@ -265,6 +269,13 @@ class MessageDto {
       messageText: (json['message_text'] ?? json['messageText'] ?? '') as String,
       senderId: _toInt(json['sender_id'] ?? json['senderId']),
       conversationId: _toInt(json['conversation_id'] ?? json['conversationId']),
+      attachedProductId: (json['attached_product_id'] ?? json['attachedProductId']) != null
+        ? _toInt(json['attached_product_id'] ?? json['attachedProductId'])
+        : (attachedProductJson is Map<String, dynamic>
+          ? _toInt(attachedProductJson['id'], fallback: 0)
+          : 0) > 0
+        ? _toInt((attachedProductJson as Map<String, dynamic>)['id'])
+        : null,
       sentAt: DateTime.parse(
           json['sent_at'] ?? json['sentAt'] ?? DateTime.now().toIso8601String()),
       editedAt: rawEditedAt is String && rawEditedAt.isNotEmpty
@@ -286,6 +297,7 @@ class MessageDto {
         'message_text': messageText,
         'sender_id': senderId,
         'conversation_id': conversationId,
+        'attached_product_id': attachedProductId,
         'sent_at': sentAt.toIso8601String(),
         'edited_at': editedAt?.toIso8601String(),
         'image_urls': imageUrls,

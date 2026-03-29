@@ -119,6 +119,25 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
       _chatWebSocket.onMessageDeleted.listen(_onWsMessageDeleted),
     );
     _wsSubscriptions.add(_chatWebSocket.onMessageRead.listen(_onWsMessageRead));
+    _wsSubscriptions.add(
+      _chatWebSocket.onConnectionChanged.listen(_onWsConnectionChanged),
+    );
+  }
+
+  void _onWsConnectionChanged(bool isConnected) {
+    if (!isConnected) {
+      return;
+    }
+
+    _syncConversationRoomSubscriptions();
+    if (_conversations.isNotEmpty && !_isLoadingConversations) {
+      unawaited(loadConversations(refresh: true));
+    }
+
+    if (_currentConversation != null && !_isLoadingMessages) {
+      joinConversationRoom(_currentConversation!.id);
+      unawaited(loadMessages(refresh: true, preserveExisting: true));
+    }
   }
 
   Future<void> ensureWebSocketConnected() async {
@@ -168,11 +187,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     // Ignore own messages
     if (_currentUserId != null && message.senderId == _currentUserId) return;
 
-    if (message.attachedProduct != null) {
-      _syncAttachedProductsFromMessages(message.conversationId, [
-        message,
-      ], save: true);
-    }
+    _syncAttachedProductsFromMessages(
+      message.conversationId,
+      [message],
+      save: true,
+    );
 
     // Deduplicate with chat:receive
     if (!_notifiedMessageIds.add(message.id)) return;
@@ -514,7 +533,10 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     bool changed = false;
 
     for (final message in messages) {
-      final product = message.attachedProduct;
+      final product = _resolveAttachmentProductFromMessage(
+        conversationId,
+        message,
+      );
       if (product == null) continue;
       final resolvedProduct = _resolveAttachmentProduct(
         conversationId,
@@ -549,6 +571,40 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     if (changed && save) {
       _saveAttachments();
     }
+  }
+
+  ProductDto? _resolveAttachmentProductFromMessage(
+    int conversationId,
+    MessageDto message,
+  ) {
+    if (message.attachedProduct != null) {
+      return message.attachedProduct;
+    }
+
+    final attachedProductId = message.attachedProductId;
+    if (attachedProductId == null || attachedProductId <= 0) {
+      return null;
+    }
+
+    final currentConversationProduct =
+        _currentConversation?.id == conversationId
+        ? _currentConversation?.product
+        : null;
+    if (currentConversationProduct?.id == attachedProductId) {
+      return currentConversationProduct;
+    }
+
+    final listedConversation = _conversations
+        .cast<ConversationDto?>()
+        .firstWhere(
+          (conversation) => conversation?.id == conversationId,
+          orElse: () => null,
+        );
+    if (listedConversation?.product?.id == attachedProductId) {
+      return listedConversation?.product;
+    }
+
+    return null;
   }
 
   ProductDto _resolveAttachmentProduct(
@@ -704,7 +760,7 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
         for (final conversation in fetchedConversations) {
           final lastMessage = conversation.lastMessage;
-          if (lastMessage?.attachedProduct != null) {
+          if (lastMessage != null) {
             _syncAttachedProductsFromMessages(
               conversation.id,
               [lastMessage!],
@@ -1035,11 +1091,11 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
 
   // Add message to local list
   void addMessageToChat(MessageDto message) {
-    if (message.attachedProduct != null) {
-      _syncAttachedProductsFromMessages(message.conversationId, [
-        message,
-      ], save: true);
-    }
+    _syncAttachedProductsFromMessages(
+      message.conversationId,
+      [message],
+      save: true,
+    );
 
     // If user is viewing this conversation, add message to thread
     if (_currentConversation?.id == message.conversationId) {

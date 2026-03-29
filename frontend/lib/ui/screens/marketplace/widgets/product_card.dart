@@ -130,10 +130,8 @@ class _ProductCardState extends State<ProductCard>
 
     final chatViewModel = context.read<ChatRoomViewModel>();
 
-    // Prefer existing conversation for this product, else any chat with seller
     final existingConversation =
-        chatViewModel.findConversationForProduct(_product.id) ??
-        chatViewModel.findConversationWithUser(_product.userId);
+      chatViewModel.findConversationForProduct(_product.id);
     if (existingConversation != null) {
       chatViewModel.selectConversation(existingConversation);
       chatViewModel.addAttachedProduct(_product);
@@ -350,6 +348,39 @@ class _ProductCardState extends State<ProductCard>
     }
   }
 
+  Future<void> _handleRecoverToFeed() async {
+    if (_isActionLoading) return;
+    if (!_product.isSold) return;
+    setState(() => _isActionLoading = true);
+
+    try {
+      final response = await _productRepository.updateProductStatus(
+        id: _product.id,
+        status: 'available',
+      );
+      if (!response.isSuccess || response.data == null) {
+        throw response.error ?? Exception('Could not recover listing');
+      }
+
+      final updated = response.data!;
+      if (!mounted) return;
+
+      setState(() => _product = updated);
+      widget.onProductUpdated?.call(updated);
+      context.read<ProductFeedViewModel>().applyExternalProductUpdate(updated);
+      getIt<ProfileContentChangeNotifier>().markProductChanged(
+        ownerUserId: updated.userId,
+      );
+      _showSnack('Product is back on the feed.');
+    } catch (_) {
+      _showSnack('Failed to recover product to feed.');
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
+  }
+
   Future<void> _handleShareListing() async {
     await executeAction(
       () async {
@@ -466,6 +497,7 @@ class _ProductCardState extends State<ProductCard>
       onDeleteProduct: _handleDeleteListing,
       onToggleSaveProduct: _handleToggleSaveProduct,
       onHideToggle: _handleHideToggle,
+      onRecoverToFeed: _handleRecoverToFeed,
       onShareProduct: _handleShareListing,
       onReportProduct: _handleReportListing,
     );

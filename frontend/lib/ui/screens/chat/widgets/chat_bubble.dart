@@ -15,6 +15,7 @@ class ChatBubble extends StatelessWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
   final ProductDto? attachedProduct;
+  final bool showAttachedProductCard;
   final bool isSelected;
   final bool isSelectionMode;
 
@@ -25,6 +26,7 @@ class ChatBubble extends StatelessWidget {
     this.onLongPress,
     this.onTap,
     this.attachedProduct,
+    this.showAttachedProductCard = true,
     this.isSelected = false,
     this.isSelectionMode = false,
   });
@@ -123,7 +125,7 @@ class ChatBubble extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (attachedProduct != null) ...[
+          if (showAttachedProductCard && attachedProduct != null) ...[
             _buildAttachedProduct(context),
             if (hasMessageText || imageUrls.isNotEmpty)
               const SizedBox(height: 8),

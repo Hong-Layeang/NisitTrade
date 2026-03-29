@@ -165,10 +165,8 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 
     final chatViewModel = context.read<ChatRoomViewModel>();
 
-    // Prefer existing conversation for this product, else any chat with seller
     final existingConversation =
-        chatViewModel.findConversationForProduct(product.id) ??
-        chatViewModel.findConversationWithUser(product.userId);
+      chatViewModel.findConversationForProduct(product.id);
     if (existingConversation != null) {
       chatViewModel.selectConversation(existingConversation);
       chatViewModel.addAttachedProduct(product);
@@ -618,6 +616,43 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     }
   }
 
+  Future<void> _handleRecoverToFeed() async {
+    if (_isActionLoading) return;
+    final product = _product;
+    if (product == null || !product.isSold) return;
+    setState(() => _isActionLoading = true);
+
+    try {
+      final response = await _productRepository.updateProductStatus(
+        id: widget.productId,
+        status: 'available',
+      );
+      if (!response.isSuccess || response.data == null) {
+        throw response.error ?? Exception('Could not recover listing');
+      }
+
+      final updatedProduct = response.data!;
+      if (!mounted) return;
+
+      setState(() => _product = updatedProduct);
+      context.read<ProductFeedViewModel>().applyExternalProductUpdate(
+        updatedProduct,
+      );
+      getIt<ProfileContentChangeNotifier>().markProductChanged(
+        ownerUserId: updatedProduct.userId,
+      );
+      AppSnackBar.success(context, 'Product is back on the feed.');
+    } catch (_) {
+      if (mounted) {
+        AppSnackBar.error(context, 'Failed to recover product to feed.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
+  }
+
   Future<void> _handleShareProduct() async {
     await executeAction(
       () async {
@@ -750,6 +785,7 @@ class _ProductDetailPageState extends State<ProductDetailPage>
       onDeleteProduct: _handleDeleteProduct,
       onToggleSaveProduct: _handleToggleSaveProduct,
       onHideToggle: _handleHideToggle,
+      onRecoverToFeed: _handleRecoverToFeed,
       onShareProduct: _handleShareProduct,
       onReportProduct: _handleReportProduct,
     );
