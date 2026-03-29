@@ -370,8 +370,15 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     final convId = _currentConversation?.id;
     if (convId == null) return;
     final list = _attachedProductsByConversation.putIfAbsent(convId, () => []);
-    if (list.any((ap) => ap.product.id == product.id)) return;
-    list.insert(0, AttachedProduct(product: product));
+    final existingIndex = list.indexWhere((ap) => ap.product.id == product.id);
+    if (existingIndex != -1) {
+      list[existingIndex] = AttachedProduct(product: product);
+    } else {
+      list.insert(0, AttachedProduct(product: product));
+    }
+    _resolvedProductsByConversation
+        .putIfAbsent(convId, () => <int>{})
+        .remove(product.id);
     _saveAttachments();
     notifyListeners();
   }
@@ -385,6 +392,16 @@ class ChatRoomViewModel extends ChangeNotifier with WidgetsBindingObserver {
     _resolvedProductsByConversation
         .putIfAbsent(convId, () => {})
         .add(productId);
+    _saveAttachments();
+    notifyListeners();
+  }
+
+  void completeAttachedProductCycle(int productId) {
+    final convId = _currentConversation?.id;
+    if (convId == null) return;
+    _attachedProductsByConversation[convId]?.removeWhere(
+      (ap) => ap.product.id == productId,
+    );
     _saveAttachments();
     notifyListeners();
   }

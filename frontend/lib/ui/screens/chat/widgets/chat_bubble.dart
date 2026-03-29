@@ -33,10 +33,14 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayMessageText = PurchaseConfirmationMessage.isPurchaseConfirmation(
-          message.messageText,
-        )
+    final displayMessageText = PurchaseConfirmationMessage
+            .isPurchaseConfirmation(message.messageText)
         ? PurchaseConfirmationMessage.displayText(
+            productTitle: attachedProduct?.title,
+          )
+        : SellerPurchaseDecisionMessage.isSellerDecision(message.messageText)
+        ? SellerPurchaseDecisionMessage.displayText(
+            message.messageText,
             productTitle: attachedProduct?.title,
           )
         : message.messageText;

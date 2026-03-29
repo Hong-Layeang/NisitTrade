@@ -35,7 +35,7 @@ class AppActionSheet extends StatelessWidget {
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      isScrollControlled: false,
+      isScrollControlled: true,
       builder: (context) => AppActionSheet(
         title: title,
         items: items,
@@ -51,12 +51,15 @@ class AppActionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
+
     return SafeArea(
       top: false,
       child: Material(
         color: Colors.transparent,
         child: Container(
           width: double.infinity,
+          constraints: BoxConstraints(maxHeight: maxHeight),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: const BorderRadius.vertical(
@@ -94,52 +97,53 @@ class AppActionSheet extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 8),
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: items.length,
-                separatorBuilder: (_, _) => const Divider(
-                  height: 1,
-                  color: AppColors.border,
-                ),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final color = _itemColor(item);
-                  return InkWell(
-                    onTap: item.isDisabled
-                        ? null
-                        : () {
-                            Navigator.of(context).pop();
-                            if (item.onTap != null) {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                item.onTap!.call();
-                              });
-                            }
-                          },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(item.icon, color: color, size: 24),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              item.label,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: color,
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const Divider(
+                    height: 1,
+                    color: AppColors.border,
+                  ),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final color = _itemColor(item);
+                    return InkWell(
+                      onTap: item.isDisabled
+                          ? null
+                          : () {
+                              Navigator.of(context).pop();
+                              if (item.onTap != null) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  item.onTap!.call();
+                                });
+                              }
+                            },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(item.icon, color: color, size: 24),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                item.label,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: color,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 10),
             ],

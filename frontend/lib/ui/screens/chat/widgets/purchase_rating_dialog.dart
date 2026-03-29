@@ -217,7 +217,7 @@ class _DidYouSellSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Did you complete this sale with the buyer?',
+                  'Did this sale actually happen with the buyer? They may confirm by mistake.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -273,7 +273,7 @@ class _DidYouSellSheet extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: const Text("No, it didn't"),
+                        child: const Text('No, not sold'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -293,7 +293,7 @@ class _DidYouSellSheet extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        child: const Text('Yes, sold it!'),
+                        child: const Text('Yes, sold it'),
                       ),
                     ),
                   ],

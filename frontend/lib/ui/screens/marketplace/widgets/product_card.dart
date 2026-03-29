@@ -23,6 +23,7 @@ import 'product_card_image_carousel.dart';
 import 'product_card_info.dart';
 import 'product_card_seller_header.dart';
 import 'product_card_action_handler.dart';
+import 'product_report_sheet.dart';
 import '../../../../logic/services/profile_content_change_notifier.dart';
 import '../../../../logic/services/share_service.dart';
 
@@ -47,15 +48,6 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard>
   with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  static const List<String> _reportReasonOptions = [
-    'Spam or scam',
-    'Prohibited or illegal item',
-    'Counterfeit item',
-    'Misleading description',
-    'Inappropriate content',
-    'Other',
-  ];
-
   int _currentImageIndex = 0;
   late PageController _pageController;
   late AnimationController _likeAnimationController;
@@ -401,68 +393,8 @@ class _ProductCardState extends State<ProductCard>
   }
 
   Future<void> _handleReportListing() async {
-    String selectedReason = _reportReasonOptions.first;
-    final detailsController = TextEditingController();
-
-    final shouldSubmit = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Report product'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: selectedReason,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Reason'),
-                  items: _reportReasonOptions
-                      .map(
-                        (reason) => DropdownMenuItem<String>(
-                          value: reason,
-                          child: Text(reason, overflow: TextOverflow.ellipsis),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setDialogState(() => selectedReason = value);
-                  },
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: detailsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Details (optional)',
-                  ),
-                  maxLines: 3,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Submit'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (shouldSubmit != true) {
-      detailsController.dispose();
-      return;
-    }
-
-    final reason = selectedReason.trim();
-    final details = detailsController.text.trim();
-    detailsController.dispose();
+    final reportInput = await showProductReportSheet(context);
+    if (reportInput == null) return;
 
     if (_isActionLoading) return;
     setState(() => _isActionLoading = true);
@@ -471,10 +403,33 @@ class _ProductCardState extends State<ProductCard>
       if (!mounted) return;
       await context.read<ProductFeedViewModel>().reportProduct(
             productId: _product.id,
-            reason: reason,
-            details: details.isEmpty ? null : details,
+            reason: reportInput.reason,
+            details: reportInput.details,
           );
-      _showSnack('Report submitted.');
+      final originalProduct = _product;
+      final hiddenProduct = _product.copyWith(
+        status: 'hidden',
+        updatedAt: DateTime.now(),
+      );
+
+      setState(() => _product = hiddenProduct);
+      context.read<ProductFeedViewModel>().applyExternalProductUpdate(
+        hiddenProduct,
+      );
+      widget.onProductUpdated?.call(hiddenProduct);
+
+      AppSnackBar.showUndo(
+        context,
+        'Report submitted. Listing removed from your feed.',
+        onUndo: () async {
+          if (!mounted) return;
+          setState(() => _product = originalProduct);
+          context.read<ProductFeedViewModel>().applyExternalProductUpdate(
+            originalProduct,
+          );
+          widget.onProductUpdated?.call(originalProduct);
+        },
+      );
     } catch (e) {
       _showSnack('Failed to submit report.');
     } finally {

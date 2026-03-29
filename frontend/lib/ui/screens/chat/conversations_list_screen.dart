@@ -316,6 +316,9 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
       if (PurchaseConfirmationMessage.isPurchaseConfirmation(messageText)) {
         return PurchaseConfirmationMessage.previewText;
       }
+      if (SellerPurchaseDecisionMessage.isSellerDecision(messageText)) {
+        return SellerPurchaseDecisionMessage.previewText;
+      }
       return messageText;
     }
     if ((lastMessage?.imageUrls ?? const <String>[]).isNotEmpty) {

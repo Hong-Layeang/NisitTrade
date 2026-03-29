@@ -58,6 +58,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   DateTime _now = DateTime.now();
   final Set<int> _expiredPromptedProductIds = {};
   final Set<int> _autoPromptedPurchaseConfirmationMessageIds = {};
+  final Set<int> _processedSellerDecisionMessageIds = {};
   int? _lastSeenBottomMessageId;
   bool _hasPositionedLatestMessage = false;
   bool _isShowingPurchaseConfirmationPrompt = false;
@@ -127,6 +128,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
 
     _maybePromptSellerForConfirmedPurchase();
+    _applySellerDecisionSignals();
   }
 
   bool _isNearBottom() {
@@ -745,7 +747,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     if (didSell == true) {
       await _handleMarkAsSold(product);
     } else {
-      _viewModel.removeAttachedProduct(product.id);
+      _completePurchaseAttachmentCycle(product.id);
+      await _sendSellerDecisionSignal(
+        product,
+        action: SellerPurchaseDecisionMessage.actionNotSold,
+      );
     }
   }
 
@@ -757,6 +763,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       return;
     }
 
+    if (choice == _ListingStatusChoice.keepActive) {
+      _completePurchaseAttachmentCycle(product.id);
+      await _sendSellerDecisionSignal(
+        product,
+        action: SellerPurchaseDecisionMessage.actionKeepActive,
+      );
+      return;
+    }
+
     if (choice == _ListingStatusChoice.markAsSold) {
       final response = await _productRepository.updateProductStatus(
         id: product.id,
@@ -765,6 +780,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       if (!mounted) return;
       if (response.isSuccess) {
         _viewModel.removeAttachedProduct(product.id);
+        await _sendSellerDecisionSignal(
+          product,
+          action: SellerPurchaseDecisionMessage.actionSold,
+        );
         final updatedProduct = response.data;
         if (updatedProduct != null) {
           context.read<ProductFeedViewModel>().applyExternalProductUpdate(
@@ -774,12 +793,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             ownerUserId: updatedProduct.userId,
           );
         }
-
-        if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.marketplace,
-          (route) => false,
-        );
       } else {
         AppSnackBar.error(
           context,
@@ -856,9 +869,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
     if (!mounted) return;
 
-    _viewModel.removeAttachedProduct(product.id);
-
     if (response.isSuccess) {
+      _completePurchaseAttachmentCycle(product.id);
       final notifiedSeller = await _sendPurchaseConfirmationSignal(product);
       if (!mounted) return;
 
@@ -876,11 +888,69 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
   }
 
+  void _completePurchaseAttachmentCycle(int productId) {
+    _expiredPromptedProductIds.remove(productId);
+    _viewModel.completeAttachedProductCycle(productId);
+  }
+
   Future<bool> _sendPurchaseConfirmationSignal(ProductDto product) async {
     return _viewModel.sendMessage(
       PurchaseConfirmationMessage.build(productId: product.id),
       attachConversationProduct: false,
     );
+  }
+
+  Future<void> _sendSellerDecisionSignal(
+    ProductDto product, {
+    required String action,
+  }) async {
+    await _viewModel.sendMessage(
+      SellerPurchaseDecisionMessage.build(productId: product.id, action: action),
+      attachConversationProduct: false,
+    );
+  }
+
+  void _applySellerDecisionSignals() {
+    if (!mounted) return;
+
+    final conversation = _viewModel.currentConversation;
+    if (conversation == null || conversation.id != widget.conversationId) {
+      return;
+    }
+
+    final currentUserId = _getCurrentUserId();
+    if (currentUserId == 0) {
+      return;
+    }
+
+    for (final message in _viewModel.messages.reversed) {
+      final decision = SellerPurchaseDecisionMessage.tryParse(message.messageText);
+      if (decision == null) continue;
+      if (_processedSellerDecisionMessageIds.contains(message.id)) continue;
+
+      _processedSellerDecisionMessageIds.add(message.id);
+
+      final sellerId = conversation.product?.userId;
+      if (sellerId == null || sellerId <= 0) {
+        continue;
+      }
+
+      final isMessageFromSeller = message.senderId == sellerId;
+      final isCurrentUserSeller = currentUserId == sellerId;
+      if (!isMessageFromSeller || isCurrentUserSeller) {
+        continue;
+      }
+
+      _completePurchaseAttachmentCycle(decision.productId);
+      if (!mounted) return;
+
+      final label = decision.isMarkedSold
+          ? 'Seller marked this listing as sold.'
+          : decision.isKeptActive
+          ? 'Seller kept this listing active.'
+          : 'Seller marked this purchase as not sold.';
+      AppSnackBar.info(context, label);
+    }
   }
 
   String _buildProductCountdownLabel(
@@ -1600,16 +1670,6 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  "Would you like to update this listing's status on the feed?",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1656,7 +1716,7 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                       Icons.remove_shopping_cart_outlined,
                       size: 18,
                     ),
-                    label: const Text('Mark as Sold - Remove from Feed'),
+                    label: const Text('Mark as Sold'),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                     ),
@@ -1670,20 +1730,10 @@ class _UpdateListingStatusSheet extends StatelessWidget {
                       context,
                     ).pop(_ListingStatusChoice.keepActive),
                     icon: const Icon(Icons.layers_outlined, size: 18),
-                    label: const Text('Keep Listing Active'),
+                    label: const Text('Keep Product Active'),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Choose "Keep Listing Active" if you have more of this item to sell.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary.withValues(alpha: 0.7),
-                    height: 1.4,
                   ),
                 ),
               ],

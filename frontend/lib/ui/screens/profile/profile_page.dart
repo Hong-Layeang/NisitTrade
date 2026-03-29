@@ -478,8 +478,9 @@ class ProfilePageState extends State<ProfilePage>
                       color: AppColors.textSecondary,
                     ),
                   ),
-                    if (product.isSold) _buildSoldOverlay(),
-                  if (!product.isAvailable)
+                  if (product.isSold)
+                    _buildSoldRibbon()
+                  else if (!product.isAvailable)
                     Positioned(
                       top: 6,
                       left: 6,
@@ -504,8 +505,9 @@ class ProfilePageState extends State<ProfilePage>
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
                   ),
-                  if (product.isSold) _buildSoldOverlay(),
-                  if (!product.isAvailable)
+                  if (product.isSold)
+                    _buildSoldRibbon()
+                  else if (!product.isAvailable)
                     Positioned(
                       top: 6,
                       left: 6,
@@ -517,6 +519,39 @@ class ProfilePageState extends State<ProfilePage>
           );
         },
       ),
+    );
+  }
+
+  Widget _buildSoldRibbon() {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.42),
+          ),
+        ),
+        Positioned(
+          top: 6,
+          left: 6,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: const Color(0xFFD64545), width: 0.9),
+            ),
+            child: const Text(
+              'SOLD',
+              style: TextStyle(
+                color: Color(0xFFD64545),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -538,32 +573,6 @@ class ProfilePageState extends State<ProfilePage>
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSoldOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.42),
-        alignment: Alignment.center,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.62),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white24),
-          ),
-          child: const Text(
-            'SOLD',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-            ),
-          ),
         ),
       ),
     );
